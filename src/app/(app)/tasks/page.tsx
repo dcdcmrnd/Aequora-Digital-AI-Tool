@@ -1,0 +1,40 @@
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { checkPermission, getAccessibleProjectIds } from "@/lib/permissions";
+import { redirect } from "next/navigation";
+import { MyTasksView } from "@/components/tasks/MyTasksView";
+
+export default async function TasksPage() {
+  const session = await getServerSession(authOptions);
+  if (!session) redirect("/login");
+
+  const canView = await checkPermission(session.user.id, "tasks.view");
+  if (!canView && session.user.role !== "admin") redirect("/");
+
+  const projectIds = await getAccessibleProjectIds(session.user.id);
+
+  const tasks = await prisma.task.findMany({
+    where: {
+      assigneeId: session.user.id,
+      projectId: { in: projectIds },
+      status: { not: "done" },
+      parentTaskId: null,
+    },
+    include: {
+      project: { select: { id: true, name: true, color: true } },
+    },
+    orderBy: [{ priority: "asc" }, { dueDate: "asc" }],
+  });
+
+  const serialized = tasks.map((t) => ({
+    ...t,
+    tags: JSON.parse(t.tags || "[]"),
+    dueDate: t.dueDate?.toISOString() ?? null,
+    completedAt: t.completedAt?.toISOString() ?? null,
+    createdAt: t.createdAt.toISOString(),
+    updatedAt: t.updatedAt.toISOString(),
+  }));
+
+  return <MyTasksView tasks={serialized as any} />;
+}

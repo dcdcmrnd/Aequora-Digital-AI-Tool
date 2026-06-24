@@ -1,0 +1,184 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String    @id @default(cuid())
+  name        String
+  email       String    @unique
+  password    String?
+  role        String    @default("member") // admin | member
+  avatarUrl   String?
+  status      String    @default("invited") // invited | active | suspended
+  invitedAt   DateTime?
+  activatedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  permissions   UserPermission[]
+  projectAccess ProjectAccess[]
+  ownedProjects Project[]        @relation("ProjectOwner")
+  assignedTasks Task[]           @relation("TaskAssignee")
+  createdTasks  Task[]           @relation("TaskCreator")
+  notes         Note[]
+  activities    ActivityLog[]
+  notifications Notification[]
+  sentInvites   Invitation[]     @relation("InvitedBy")
+  aiChats       AiChat[]
+}
+
+model Invitation {
+  id          String    @id @default(cuid())
+  email       String
+  name        String
+  role        String    @default("member")
+  invitedById String
+  invitedBy   User      @relation("InvitedBy", fields: [invitedById], references: [id])
+  token       String    @unique
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  defaultPermissions String @default("[]") // JSON array of permission types
+  projectAccess      String @default("[]") // JSON array of {projectId, accessLevel}
+}
+
+model UserPermission {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permissionType String
+  createdAt      DateTime @default(now())
+
+  @@unique([userId, permissionType])
+}
+
+model Project {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  status      String    @default("active") // active | on-hold | completed | archived
+  color       String    @default("#0F7B8A")
+  ownerId     String
+  owner       User      @relation("ProjectOwner", fields: [ownerId], references: [id])
+  isPrivate   Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  tasks         Task[]
+  notes         Note[]
+  projectAccess ProjectAccess[]
+}
+
+model ProjectAccess {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  accessLevel String   @default("viewer") // viewer | contributor | manager
+  grantedById String
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, projectId])
+}
+
+model Task {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  status      String    @default("todo") // backlog | todo | in-progress | review | done
+  priority    String    @default("medium") // low | medium | high | urgent
+  projectId   String
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assigneeId  String?
+  assignee    User?     @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  creatorId   String
+  creator     User      @relation("TaskCreator", fields: [creatorId], references: [id])
+  dueDate     DateTime?
+  tags        String    @default("[]") // JSON array of strings
+  parentTaskId String?
+  parentTask  Task?     @relation("Subtasks", fields: [parentTaskId], references: [id])
+  subtasks    Task[]    @relation("Subtasks")
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Note {
+  id         String    @id @default(cuid())
+  title      String
+  content    String    @default("")
+  projectId  String?
+  project    Project?  @relation(fields: [projectId], references: [id])
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id])
+  authorId   String
+  author     User      @relation(fields: [authorId], references: [id])
+  isPinned   Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  color       String   @default("#0F7B8A")
+  icon        String?
+  description String?
+  createdAt   DateTime @default(now())
+
+  notes Note[]
+}
+
+model ActivityLog {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  action     String   // created | updated | completed | commented | assigned | deleted
+  entityType String   // task | project | note | user
+  entityId   String
+  entityName String   @default("")
+  metadata   String   @default("{}") // JSON
+  createdAt  DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   // task_assigned | task_due | task_status_changed | note_created
+  title     String
+  body      String
+  entityType String
+  entityId  String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model AiChat {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mode      String   // task-assistant | consultant
+  messages  String   @default("[]") // JSON array of {role, content, timestamp}
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, mode])
+}
+
+model DailyBriefing {
+  id        String   @id @default(cuid())
+  userId    String
+  date      String   // YYYY-MM-DD
+  content   String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, date])
+}
