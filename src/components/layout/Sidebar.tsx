@@ -117,7 +117,10 @@ export function Sidebar() {
           />
         )}
         {session?.user && (
-          <div className="flex items-center gap-3 px-3 py-2 mt-1">
+          <Link
+            href="/profile"
+            className="flex items-center gap-3 px-3 py-2 mt-1 rounded-btn hover:bg-white/5 transition-colors"
+          >
             <Avatar
               name={session.user.name ?? "?"}
               avatarUrl={session.user.avatarUrl}
@@ -131,7 +134,7 @@ export function Sidebar() {
                 {session.user.role}
               </p>
             </div>
-          </div>
+          </Link>
         )}
       </div>
     </aside>
