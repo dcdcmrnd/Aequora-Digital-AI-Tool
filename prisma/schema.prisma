@@ -30,8 +30,10 @@ model User {
   notes         Note[]
   activities    ActivityLog[]
   notifications Notification[]
-  sentInvites   Invitation[]     @relation("InvitedBy")
-  aiChats       AiChat[]
+  sentInvites    Invitation[]     @relation("InvitedBy")
+  aiChats        AiChat[]
+  createdEvents  CalendarEvent[]  @relation("EventCreator")
+  eventAttendees EventAttendee[]
 }
 
 model Invitation {
@@ -107,9 +109,10 @@ model Task {
   parentTaskId String?
   parentTask  Task?     @relation("Subtasks", fields: [parentTaskId], references: [id])
   subtasks    Task[]    @relation("Subtasks")
-  completedAt DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  completedAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  calendarEvents CalendarEvent[]
 }
 
 model Note {
@@ -183,4 +186,33 @@ model DailyBriefing {
   createdAt DateTime @default(now())
 
   @@unique([userId, date])
+}
+
+model CalendarEvent {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  type        String   @default("event") // event | meeting | deadline
+  startDate   DateTime
+  endDate     DateTime
+  allDay      Boolean  @default(false)
+  location    String?
+  color       String?
+  taskId      String?
+  task        Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  createdById String
+  createdBy   User     @relation("EventCreator", fields: [createdById], references: [id])
+  attendees   EventAttendee[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model EventAttendee {
+  id      String        @id @default(cuid())
+  eventId String
+  event   CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId  String
+  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
 }

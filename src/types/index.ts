@@ -175,3 +175,30 @@ export const TASK_STATUSES: TaskStatus[] = [
   "review",
   "done",
 ];
+
+export type CalendarEventType = "event" | "meeting" | "deadline";
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  description: string | null;
+  type: CalendarEventType;
+  startDate: string;
+  endDate: string;
+  allDay: boolean;
+  location: string | null;
+  color: string | null;
+  taskId: string | null;
+  task?: { id: string; title: string; status: string } | null;
+  createdById: string;
+  createdBy: { id: string; name: string; avatarUrl: string | null };
+  attendees: { userId: string; user: { id: string; name: string; avatarUrl: string | null } }[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const EVENT_TYPE_COLORS: Record<CalendarEventType, string> = {
+  meeting: "#2563EB",
+  event: "#0F7B8A",
+  deadline: "#DC2626",
+};

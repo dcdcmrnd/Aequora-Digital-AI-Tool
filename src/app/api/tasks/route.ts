@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { checkPermission, getAccessibleProjectIds, hasProjectAccess } from "@/lib/permissions";
+import { getAccessibleProjectIds, hasProjectAccess } from "@/lib/permissions";
 import { logActivity, createNotification } from "@/lib/activity";
 
 export async function GET(req: NextRequest) {
@@ -15,9 +15,11 @@ export async function GET(req: NextRequest) {
 
   const projectIds = await getAccessibleProjectIds(session.user.id);
 
+  const statusFilter = searchParams.get("status");
   const where: Record<string, unknown> = {
     projectId: { in: projectId ? [projectId] : projectIds },
     ...(assigneeId && { assigneeId }),
+    ...(statusFilter === "!done" && { status: { not: "done" } }),
   };
 
   // Ensure requested projectId is accessible
