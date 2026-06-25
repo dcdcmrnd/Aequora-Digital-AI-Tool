@@ -34,6 +34,9 @@ model User {
   aiChats        AiChat[]
   createdEvents  CalendarEvent[]  @relation("EventCreator")
   eventAttendees EventAttendee[]
+  chatRoomsCreated ChatRoom[]     @relation("ChatRoomCreator")
+  chatMemberships  ChatMember[]
+  chatMessages     ChatMessage[]
 }
 
 model Invitation {
@@ -215,4 +218,38 @@ model EventAttendee {
   user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([eventId, userId])
+}
+
+model ChatRoom {
+  id          String       @id @default(cuid())
+  name        String?      // null for DMs, required for group chats
+  isGroup     Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  createdById String
+  createdBy   User         @relation("ChatRoomCreator", fields: [createdById], references: [id])
+  members     ChatMember[]
+  messages    ChatMessage[]
+}
+
+model ChatMember {
+  id         String    @id @default(cuid())
+  roomId     String
+  room       ChatRoom  @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastReadAt DateTime?
+  joinedAt   DateTime  @default(now())
+
+  @@unique([roomId, userId])
+}
+
+model ChatMessage {
+  id        String    @id @default(cuid())
+  roomId    String
+  room      ChatRoom  @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  senderId  String
+  sender    User      @relation(fields: [senderId], references: [id])
+  content   String
+  createdAt DateTime  @default(now())
 }

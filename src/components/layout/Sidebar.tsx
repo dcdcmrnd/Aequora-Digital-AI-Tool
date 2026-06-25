@@ -6,14 +6,16 @@ import { useSession } from "next-auth/react";
 import { usePermission } from "@/hooks/usePermission";
 import { Avatar } from "@/components/ui/Avatar";
 import { cn } from "@/lib/utils";
+import { ChatUnreadBadge } from "@/components/chat/ChatUnreadBadge";
 
 interface NavItem {
   href: string;
   label: string;
   icon: React.ReactNode;
+  badge?: React.ReactNode;
 }
 
-function NavLink({ href, label, icon }: NavItem) {
+function NavLink({ href, label, icon, badge }: NavItem) {
   const pathname = usePathname();
   const isActive = pathname === href || (href !== "/" && pathname.startsWith(href));
 
@@ -29,6 +31,7 @@ function NavLink({ href, label, icon }: NavItem) {
     >
       <span className="w-4 h-4 flex-shrink-0">{icon}</span>
       {label}
+      {badge}
     </Link>
   );
 }
@@ -102,6 +105,13 @@ export function Sidebar() {
           href="/calendar"
           label="Calendar"
           icon={<CalendarIcon />}
+        />
+
+        <NavLink
+          href="/chat"
+          label="Chat"
+          icon={<ChatIcon />}
+          badge={<ChatUnreadBadge />}
         />
 
         {canUseAI && (
@@ -224,6 +234,14 @@ function CalendarIcon() {
       <line x1="16" y1="2" x2="16" y2="6" />
       <line x1="8" y1="2" x2="8" y2="6" />
       <line x1="3" y1="10" x2="21" y2="10" />
+    </svg>
+  );
+}
+
+function ChatIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
     </svg>
   );
 }
