@@ -1,29 +1,25 @@
 import { InviteAcceptForm } from "@/components/auth/InviteAcceptForm";
+import { validateInviteToken } from "@/lib/invite";
 
 interface PageProps {
   params: { token: string };
 }
 
 export default async function InvitePage({ params }: PageProps) {
-  const res = await fetch(
-    `${process.env.NEXTAUTH_URL}/api/invitations/${params.token}`,
-    { cache: "no-store" }
-  );
+  const result = await validateInviteToken(params.token);
 
-  const data = await res.json();
-
-  if (!res.ok || data.error) {
+  if (!result.valid) {
     return (
       <div className="min-h-screen bg-brand-dark flex items-center justify-center p-4">
         <div className="w-full max-w-md">
           <div className="bg-white rounded-card p-8 shadow-2xl text-center">
             <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-6 h-6 text-danger" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg className="w-6 h-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
             </div>
             <h2 className="text-lg font-semibold text-text-primary mb-2">Invite Link Issue</h2>
-            <p className="text-text-secondary text-sm mb-6">{data.error}</p>
+            <p className="text-text-secondary text-sm mb-6">{result.error}</p>
             <p className="text-text-muted text-xs">
               Request a new invite from your admin at Aequora Digital.
             </p>
@@ -32,6 +28,8 @@ export default async function InvitePage({ params }: PageProps) {
       </div>
     );
   }
+
+  const inv = result.invitation!;
 
   return (
     <div className="min-h-screen bg-brand-dark flex items-center justify-center p-4">
@@ -45,7 +43,7 @@ export default async function InvitePage({ params }: PageProps) {
           </div>
           <h1 className="text-white text-2xl font-bold">You&apos;re invited!</h1>
           <p className="text-[#64748B] mt-2 text-sm">
-            <strong className="text-white">{data.invitation.invitedBy.name}</strong> invited
+            <strong className="text-white">{inv.invitedBy.name}</strong> invited
             you to join the Aequora Digital workspace.
           </p>
         </div>
@@ -53,8 +51,8 @@ export default async function InvitePage({ params }: PageProps) {
         <div className="bg-white rounded-card p-8 shadow-2xl">
           <InviteAcceptForm
             token={params.token}
-            defaultName={data.invitation.name}
-            email={data.invitation.email}
+            defaultName={inv.name}
+            email={inv.email}
           />
         </div>
       </div>

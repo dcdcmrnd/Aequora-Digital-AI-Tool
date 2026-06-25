@@ -117,7 +117,7 @@ export function InviteUserModal({ open, onClose, onSuccess }: Props) {
 
   if (step === "success") {
     return (
-      <Modal open={open} onClose={handleClose} title="Invite Sent" size="md">
+      <Modal open={open} onClose={handleClose} title="Invite Link Ready" size="md">
         <div className="p-6 text-center">
           <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -128,7 +128,7 @@ export function InviteUserModal({ open, onClose, onSuccess }: Props) {
             Invite created for {form.name}
           </h3>
           <p className="text-sm text-text-secondary mb-6">
-            Copy the link below and send it to them. It expires in 72 hours.
+            No email is sent automatically — copy this link and share it directly with {form.name}. It expires in 72 hours.
           </p>
           <div className="bg-surface-secondary border border-border rounded-input px-3 py-2.5 text-sm text-text-secondary font-mono break-all mb-4">
             {inviteUrl}
