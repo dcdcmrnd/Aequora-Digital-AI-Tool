@@ -3,6 +3,7 @@ import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import dynamic from "next/dynamic";
+import type { CalendarEventType } from "@/types";
 
 // Disable SSR — the calendar grid uses new Date() for local timezone rendering.
 // SSR would produce UTC-based dates that mismatch the browser's local dates.
@@ -38,6 +39,7 @@ export default async function CalendarPage() {
 
   const serialized = events.map((ev) => ({
     ...ev,
+    type: ev.type as CalendarEventType,
     startDate: ev.startDate.toISOString(),
     endDate: ev.endDate.toISOString(),
     createdAt: ev.createdAt.toISOString(),
