@@ -42,8 +42,9 @@ export function Sidebar() {
   const canViewTasks = usePermission("tasks.view");
   const canViewNotes = usePermission("notes.view");
   const canViewTeam = usePermission("team.view");
-  const canUseAI =
-    usePermission("ai.task_assistant") || usePermission("ai.consultant");
+  const canAITaskAssist = usePermission("ai.task_assistant");
+  const canAIConsult = usePermission("ai.consultant");
+  const canUseAI = canAITaskAssist || canAIConsult;
   const isAdmin = session?.user?.role === "admin";
 
   return (
