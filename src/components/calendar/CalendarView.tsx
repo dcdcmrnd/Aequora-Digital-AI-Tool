@@ -175,6 +175,7 @@ export function CalendarView({ initialEvents, teamMembers, currentUserId }: Prop
             return (
               <div
                 key={i}
+                suppressHydrationWarning
                 onClick={() => isCurrentMonth && openCreate(date)}
                 className={cn(
                   "border-r border-b border-border p-1.5 min-h-[100px] cursor-pointer group transition-colors",
@@ -187,6 +188,7 @@ export function CalendarView({ initialEvents, teamMembers, currentUserId }: Prop
                 {/* Date number */}
                 <div className="flex items-center justify-between mb-1">
                   <span
+                    suppressHydrationWarning
                     className={cn(
                       "w-6 h-6 flex items-center justify-center text-xs font-medium rounded-full",
                       isToday ? "bg-brand-primary text-white" : isCurrentMonth ? "text-text-primary" : "text-text-muted"
