@@ -33,16 +33,24 @@ export function MessageThread({ room, currentUserId, currentUserName, onMessages
   const [loading, setLoading] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Use a ref so onMessagesRead never triggers fetchMessages to recreate
+  const onMessagesReadRef = useRef(onMessagesRead);
+  useEffect(() => { onMessagesReadRef.current = onMessagesRead; });
 
   const fetchMessages = useCallback(async () => {
-    const res = await fetch(`/api/chat/rooms/${room.id}/messages`);
-    if (res.ok) {
-      const data = await res.json();
-      setMessages(data.messages);
-      onMessagesRead();
+    try {
+      const res = await fetch(`/api/chat/rooms/${room.id}/messages`);
+      if (res.ok) {
+        const data = await res.json();
+        setMessages(data.messages);
+        onMessagesReadRef.current();
+      }
+    } catch {
+      // network error — keep existing messages
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }, [room.id, onMessagesRead]);
+  }, [room.id]); // onMessagesRead intentionally excluded via ref
 
   // Load messages when room changes
   useEffect(() => {
@@ -142,7 +150,6 @@ export function MessageThread({ room, currentUserId, currentUserName, onMessages
 
               return (
                 <div key={msg.id} className={cn("flex items-end gap-2", isMine && "flex-row-reverse")}>
-                  {/* Avatar placeholder for alignment */}
                   {!isMine ? (
                     showAvatar ? (
                       <Avatar name={msg.sender.name} avatarUrl={msg.sender.avatarUrl} size="sm" />

@@ -3,9 +3,9 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { checkPermission } from "@/lib/permissions";
-import { createInvitation, buildInviteUrl, hashToken } from "@/lib/invite";
+import { createInvitation, buildInviteUrl } from "@/lib/invite";
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -65,7 +65,9 @@ export async function POST(req: NextRequest) {
     projectAccess,
   });
 
-  const baseUrl = (process.env.NEXTAUTH_URL || "http://localhost:3000").replace(/^﻿/, "").trim();
+  // Strip BOM (U+FEFF) and whitespace that can appear in env vars pasted from editors
+  const rawBase = process.env.NEXTAUTH_URL || "http://localhost:3000";
+  const baseUrl = (rawBase.charCodeAt(0) === 0xFEFF ? rawBase.slice(1) : rawBase).trim();
   const inviteUrl = buildInviteUrl(token, baseUrl);
 
   return NextResponse.json({ invitation, inviteUrl, token });
