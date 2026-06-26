@@ -25,6 +25,7 @@ interface ProjectAccessEntry {
 
 export function EditUserModal({ user, open, onClose, onSuccess, currentUserId }: Props) {
   const [loading, setLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [permissions, setPermissions] = useState<PermissionType[]>(
     (user.permissions as PermissionType[]) ?? []
   );
@@ -141,20 +142,51 @@ export function EditUserModal({ user, open, onClose, onSuccess, currentUserId }:
             </div>
 
             {!isSelf && (
-              <div className="pt-4 border-t border-border">
-                <Button
-                  variant={user.status === "suspended" ? "secondary" : "danger"}
-                  size="sm"
-                  onClick={handleSuspend}
-                  loading={loading}
-                >
-                  {user.status === "suspended" ? "Reactivate Account" : "Suspend Account"}
-                </Button>
-                <p className="text-xs text-text-muted mt-2">
-                  {user.status === "suspended"
-                    ? "This user cannot log in. Reactivating restores their access."
-                    : "Suspended users cannot log in but their data is preserved."}
-                </p>
+              <div className="pt-4 border-t border-border space-y-4">
+                <div>
+                  <Button
+                    variant={user.status === "suspended" ? "secondary" : "danger"}
+                    size="sm"
+                    onClick={handleSuspend}
+                    loading={loading}
+                  >
+                    {user.status === "suspended" ? "Reactivate Account" : "Suspend Account"}
+                  </Button>
+                  <p className="text-xs text-text-muted mt-2">
+                    {user.status === "suspended"
+                      ? "This user cannot log in. Reactivating restores their access."
+                      : "Suspended users cannot log in but their data is preserved."}
+                  </p>
+                </div>
+
+                <div className="pt-3 border-t border-border">
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    loading={deleting}
+                    onClick={async () => {
+                      if (!confirm(`Permanently delete ${user.name}? This cannot be undone. Their tasks, notes, and projects will be transferred to you.`)) return;
+                      setDeleting(true);
+                      try {
+                        const res = await fetch(`/api/users/${user.id}`, { method: "DELETE" });
+                        const data = await res.json();
+                        if (!res.ok) { toast.error(data.error || "Failed to delete user."); return; }
+                        toast.success(`${user.name} has been removed.`);
+                        onSuccess();
+                        onClose();
+                      } catch {
+                        toast.error("Failed to delete user.");
+                      } finally {
+                        setDeleting(false);
+                      }
+                    }}
+                  >
+                    Remove User Permanently
+                  </Button>
+                  <p className="text-xs text-text-muted mt-2">
+                    Permanently deletes this account. Tasks and projects are transferred to you.
+                  </p>
+                </div>
               </div>
             )}
           </div>
