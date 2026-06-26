@@ -6,7 +6,12 @@ interface PageProps {
 }
 
 export default async function InvitePage({ params }: PageProps) {
-  const result = await validateInviteToken(params.token);
+  let result: Awaited<ReturnType<typeof validateInviteToken>>;
+  try {
+    result = await validateInviteToken(params.token);
+  } catch {
+    result = { valid: false, error: "Unable to verify invite link. Please try again or request a new invite." };
+  }
 
   if (!result.valid) {
     return (

@@ -17,9 +17,19 @@ export default async function AppLayout({
   const userCount = await prisma.user.count();
   if (userCount === 0) redirect("/setup");
 
+  let companyName = "Aequora Digital";
+  let companyLogoUrl: string | null = null;
+  try {
+    const settings = await prisma.companySettings.findUnique({ where: { id: "singleton" } });
+    if (settings) {
+      companyName = settings.name;
+      companyLogoUrl = settings.logoUrl;
+    }
+  } catch {}
+
   return (
     <div className="flex h-screen overflow-hidden bg-surface-secondary">
-      <Sidebar />
+      <Sidebar companyName={companyName} companyLogoUrl={companyLogoUrl} />
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         <Header />
         <main className="flex-1 overflow-y-auto">

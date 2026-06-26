@@ -36,15 +36,17 @@ function NavLink({ href, label, icon, badge }: NavItem) {
   );
 }
 
-export function Sidebar() {
+interface SidebarProps {
+  companyName?: string;
+  companyLogoUrl?: string | null;
+}
+
+export function Sidebar({ companyName = "Aequora Digital", companyLogoUrl }: SidebarProps) {
   const { data: session } = useSession();
   const canViewProjects = usePermission("projects.view");
   const canViewTasks = usePermission("tasks.view");
   const canViewNotes = usePermission("notes.view");
   const canViewTeam = usePermission("team.view");
-  const canAITaskAssist = usePermission("ai.task_assistant");
-  const canAIConsult = usePermission("ai.consultant");
-  const canUseAI = canAITaskAssist || canAIConsult;
   const isAdmin = session?.user?.role === "admin";
 
   return (
@@ -52,11 +54,15 @@ export function Sidebar() {
       {/* Logo */}
       <div className="px-4 py-5 border-b border-white/10">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-btn bg-brand-primary flex items-center justify-center">
-            <WaveIcon />
+          <div className="w-8 h-8 rounded-btn bg-brand-primary flex items-center justify-center overflow-hidden flex-shrink-0">
+            {companyLogoUrl ? (
+              <img src={companyLogoUrl} alt={companyName} className="w-full h-full object-contain" />
+            ) : (
+              <WaveIcon />
+            )}
           </div>
           <div>
-            <p className="text-white font-semibold text-sm leading-tight">Aequora Digital</p>
+            <p className="text-white font-semibold text-sm leading-tight truncate max-w-[140px]">{companyName}</p>
             <p className="text-[#64748B] text-xs">Workspace</p>
           </div>
         </div>
@@ -115,13 +121,6 @@ export function Sidebar() {
           badge={<ChatUnreadBadge />}
         />
 
-        {canUseAI && (
-          <NavLink
-            href="/ai"
-            label="AI Assistant"
-            icon={<SparklesIcon />}
-          />
-        )}
       </nav>
 
       {/* User + Settings */}

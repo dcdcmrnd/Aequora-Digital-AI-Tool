@@ -30,8 +30,9 @@ model User {
   notes         Note[]
   activities    ActivityLog[]
   notifications Notification[]
-  sentInvites    Invitation[]     @relation("InvitedBy")
-  aiChats        AiChat[]
+  sentInvites       Invitation[]      @relation("InvitedBy")
+  aiChats           AiChat[]
+  uploadedDocuments CompanyDocument[] @relation("DocumentUploader")
   createdEvents  CalendarEvent[]  @relation("EventCreator")
   eventAttendees EventAttendee[]
   chatRoomsCreated ChatRoom[]     @relation("ChatRoomCreator")
@@ -252,4 +253,25 @@ model ChatMessage {
   sender    User      @relation(fields: [senderId], references: [id])
   content   String
   createdAt DateTime  @default(now())
+}
+
+model CompanySettings {
+  id          String   @id @default("singleton")
+  name        String   @default("Aequora Digital")
+  description String?
+  logoUrl     String?
+  primaryColor String  @default("#0F7B8A")
+  updatedAt   DateTime @updatedAt
+}
+
+model CompanyDocument {
+  id           String   @id @default(cuid())
+  name         String
+  description  String?
+  url          String
+  fileSize     Int?
+  mimeType     String?
+  uploadedById String
+  uploadedBy   User     @relation("DocumentUploader", fields: [uploadedById], references: [id])
+  createdAt    DateTime @default(now())
 }
