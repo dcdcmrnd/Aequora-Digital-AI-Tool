@@ -12,20 +12,30 @@ export default async function TasksPage() {
   const canView = await checkPermission(session.user.id, "tasks.view");
   if (!canView && session.user.role !== "admin") redirect("/");
 
+  const canCreate = session.user.role === "admin" ||
+    await checkPermission(session.user.id, "tasks.create");
+
   const projectIds = await getAccessibleProjectIds(session.user.id);
 
-  const tasks = await prisma.task.findMany({
-    where: {
-      assigneeId: session.user.id,
-      projectId: { in: projectIds },
-      status: { not: "done" },
-      parentTaskId: null,
-    },
-    include: {
-      project: { select: { id: true, name: true, color: true } },
-    },
-    orderBy: [{ priority: "asc" }, { dueDate: "asc" }],
-  });
+  const [tasks, projects] = await Promise.all([
+    prisma.task.findMany({
+      where: {
+        assigneeId: session.user.id,
+        projectId: { in: projectIds },
+        status: { not: "done" },
+        parentTaskId: null,
+      },
+      include: {
+        project: { select: { id: true, name: true, color: true } },
+      },
+      orderBy: [{ priority: "asc" }, { dueDate: "asc" }],
+    }),
+    prisma.project.findMany({
+      where: { id: { in: projectIds }, status: { not: "archived" } },
+      select: { id: true, name: true, color: true },
+      orderBy: { name: "asc" },
+    }),
+  ]);
 
   const serialized = tasks.map((t) => ({
     ...t,
@@ -36,5 +46,12 @@ export default async function TasksPage() {
     updatedAt: t.updatedAt.toISOString(),
   }));
 
-  return <MyTasksView tasks={serialized as any} />;
+  return (
+    <MyTasksView
+      tasks={serialized as any}
+      projects={projects}
+      canCreate={canCreate}
+      currentUserId={session.user.id}
+    />
+  );
 }
