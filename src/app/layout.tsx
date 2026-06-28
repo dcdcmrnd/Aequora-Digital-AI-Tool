@@ -1,11 +1,29 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { SessionProvider } from "@/components/providers/SessionProvider";
+import { ServiceWorkerRegistration } from "@/components/providers/ServiceWorkerRegistration";
 import { Toaster } from "react-hot-toast";
 
 export const metadata: Metadata = {
   title: "Aequora Digital — Workspace",
   description: "Internal project management for Aequora Digital",
+  applicationName: "Aequora Digital",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Aequora",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0F7B8A",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({
@@ -17,6 +35,7 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <SessionProvider>
+          <ServiceWorkerRegistration />
           {children}
           <Toaster
             position="bottom-right"
