@@ -6,7 +6,11 @@ import { GlobalSearch } from "./GlobalSearch";
 import { Dropdown } from "@/components/ui/Dropdown";
 import { Avatar } from "@/components/ui/Avatar";
 
-export function Header() {
+interface HeaderProps {
+  onMenuClick?: () => void;
+}
+
+export function Header({ onMenuClick }: HeaderProps) {
   const { data: session } = useSession();
 
   const menuItems = [
@@ -25,9 +29,25 @@ export function Header() {
   ];
 
   return (
-    <header className="h-14 flex-shrink-0 bg-white border-b border-border flex items-center justify-between px-6">
-      <div className="flex-1 max-w-md">
-        <GlobalSearch />
+    <header className="h-14 flex-shrink-0 bg-white border-b border-border flex items-center justify-between px-4 md:px-6">
+      <div className="flex items-center gap-3 flex-1 min-w-0">
+        {/* Hamburger - mobile only */}
+        {onMenuClick && (
+          <button
+            onClick={onMenuClick}
+            className="md:hidden flex-shrink-0 p-1.5 rounded-btn text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-colors"
+            aria-label="Open menu"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <line x1="3" y1="6" x2="21" y2="6" />
+              <line x1="3" y1="12" x2="21" y2="12" />
+              <line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+          </button>
+        )}
+        <div className="flex-1 max-w-md">
+          <GlobalSearch />
+        </div>
       </div>
 
       <div className="flex items-center gap-3 ml-4">

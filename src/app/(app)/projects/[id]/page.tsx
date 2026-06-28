@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { hasProjectAccess } from "@/lib/permissions";
+import { hasProjectAccess, checkPermission } from "@/lib/permissions";
 import { redirect } from "next/navigation";
 import { ProjectPage } from "@/components/projects/ProjectPage";
 
@@ -31,10 +31,31 @@ export default async function SingleProjectPage({
   if (!project) redirect("/projects");
 
   const isAdmin = session.user.role === "admin";
-  const myAccess = isAdmin
-    ? "manager"
-    : (project.projectAccess.find((a) => a.userId === session.user.id)
-        ?.accessLevel ?? "viewer");
+  let myAccess: "viewer" | "contributor" | "manager";
+
+  if (isAdmin) {
+    myAccess = "manager";
+  } else {
+    const explicitAccess = project.projectAccess.find(
+      (a) => a.userId === session.user.id
+    )?.accessLevel as "viewer" | "contributor" | "manager" | undefined;
+
+    const [canCreateTasks, canManageTasks] = await Promise.all([
+      checkPermission(session.user.id, "tasks.create"),
+      checkPermission(session.user.id, "tasks.manage"),
+    ]);
+
+    const levels = ["viewer", "contributor", "manager"] as const;
+    const globalLevel: (typeof levels)[number] = canManageTasks
+      ? "manager"
+      : canCreateTasks
+      ? "contributor"
+      : "viewer";
+
+    const explicitIdx = explicitAccess !== undefined ? levels.indexOf(explicitAccess) : 0;
+    const globalIdx = levels.indexOf(globalLevel);
+    myAccess = levels[Math.max(explicitIdx, globalIdx)];
+  }
 
   const tasks = await prisma.task.findMany({
     where: { projectId: params.id },

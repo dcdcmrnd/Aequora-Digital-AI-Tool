@@ -80,10 +80,10 @@ export function NotesListView({ notes: initialNotes, categories, projects, canCr
         )}
       </div>
 
-      <div className="flex gap-6">
-        {/* Category sidebar */}
-        <div className="w-48 flex-shrink-0">
-          <div className="space-y-0.5">
+      <div className="flex flex-col md:flex-row gap-4 md:gap-6">
+        {/* Category sidebar — vertical on desktop, horizontal scroll on mobile */}
+        <div className="md:w-48 md:flex-shrink-0">
+          <div className="flex md:flex-col gap-1 overflow-x-auto pb-1 md:pb-0 scrollbar-thin">
             <SidebarItem
               label="All Notes"
               count={notes.length}
@@ -96,29 +96,22 @@ export function NotesListView({ notes: initialNotes, categories, projects, canCr
               active={showPinned}
               onClick={() => { setShowPinned(true); setActiveCategoryId(null); }}
             />
-            {categories.length > 0 && (
-              <>
-                <div className="pt-3 pb-1">
-                  <p className="text-xs font-semibold text-text-muted uppercase tracking-wide px-2">Categories</p>
-                </div>
-                {categories.map((cat) => (
-                  <SidebarItem
-                    key={cat.id}
-                    label={cat.name}
-                    icon={cat.icon ?? undefined}
-                    color={cat.color}
-                    count={notes.filter((n) => n.categoryId === cat.id).length}
-                    active={activeCategoryId === cat.id}
-                    onClick={() => { setActiveCategoryId(cat.id); setShowPinned(false); }}
-                  />
-                ))}
-              </>
-            )}
+            {categories.map((cat) => (
+              <SidebarItem
+                key={cat.id}
+                label={cat.name}
+                icon={cat.icon ?? undefined}
+                color={cat.color}
+                count={notes.filter((n) => n.categoryId === cat.id).length}
+                active={activeCategoryId === cat.id}
+                onClick={() => { setActiveCategoryId(cat.id); setShowPinned(false); }}
+              />
+            ))}
           </div>
         </div>
 
         {/* Notes list */}
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           {filtered.length === 0 ? (
             <div className="bg-white border border-border rounded-card p-12 text-center">
               <p className="text-text-muted text-sm">
@@ -201,7 +194,7 @@ function SidebarItem({
     <button
       onClick={onClick}
       className={cn(
-        "w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-btn text-sm transition-colors",
+        "flex-shrink-0 md:w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-btn text-sm transition-colors whitespace-nowrap",
         active
           ? "bg-brand-primary/10 text-brand-primary font-medium"
           : "text-text-secondary hover:bg-surface-hover hover:text-text-primary"

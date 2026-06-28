@@ -39,9 +39,10 @@ function NavLink({ href, label, icon, badge }: NavItem) {
 interface SidebarProps {
   companyName?: string;
   companyLogoUrl?: string | null;
+  onClose?: () => void;
 }
 
-export function Sidebar({ companyName = "Aequora Digital", companyLogoUrl }: SidebarProps) {
+export function Sidebar({ companyName = "Aequora Digital", companyLogoUrl, onClose }: SidebarProps) {
   const { data: session } = useSession();
   const canViewProjects = usePermission("projects.view");
   const canViewTasks = usePermission("tasks.view");
@@ -61,10 +62,22 @@ export function Sidebar({ companyName = "Aequora Digital", companyLogoUrl }: Sid
               <WaveIcon />
             )}
           </div>
-          <div>
+          <div className="flex-1 min-w-0">
             <p className="text-white font-semibold text-sm leading-tight truncate max-w-[140px]">{companyName}</p>
             <p className="text-[#64748B] text-xs">Workspace</p>
           </div>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="ml-auto p-1 text-[#64748B] hover:text-white transition-colors flex-shrink-0"
+              aria-label="Close menu"
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
 
@@ -217,15 +230,6 @@ function UsersIcon() {
   );
 }
 
-function SparklesIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z" />
-      <path d="M19 15l.75 2.25L22 18l-2.25.75L19 21l-.75-2.25L16 18l2.25-.75z" />
-      <path d="M5 6l.75 2.25L8 9l-2.25.75L5 12l-.75-2.25L2 9l2.25-.75z" />
-    </svg>
-  );
-}
 
 function CalendarIcon() {
   return (

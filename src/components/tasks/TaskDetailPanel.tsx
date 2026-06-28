@@ -126,7 +126,7 @@ export function TaskDetailPanel({
   };
 
   return (
-    <div className="w-96 flex-shrink-0 border-l border-border bg-white flex flex-col h-full overflow-hidden">
+    <div className="fixed inset-0 z-40 md:relative md:inset-auto md:z-auto md:w-96 md:flex-shrink-0 border-l border-border bg-white flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-3.5 border-b border-border flex-shrink-0">
         <h3 className="text-sm font-semibold text-text-primary">
@@ -181,7 +181,7 @@ export function TaskDetailPanel({
                 className="w-full px-3 py-2 border border-border rounded-input text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary resize-none"
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-text-secondary mb-1">Status</label>
                 <select
@@ -260,7 +260,7 @@ export function TaskDetailPanel({
             />
 
             {/* Status + Priority row */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <FieldBlock label="Status">
                 {canEdit ? (
                   <select

@@ -67,32 +67,43 @@ export async function hasProjectAccess(
   if (!user) return false;
   if (user.role === "admin") return true;
 
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: { isPrivate: true },
-  });
+  const [project, access, userPerms] = await Promise.all([
+    prisma.project.findUnique({ where: { id: projectId }, select: { isPrivate: true } }),
+    prisma.projectAccess.findUnique({
+      where: { userId_projectId: { userId, projectId } },
+      select: { accessLevel: true },
+    }),
+    prisma.userPermission.findMany({ where: { userId }, select: { permissionType: true } }),
+  ]);
 
   if (!project) return false;
 
-  const access = await prisma.projectAccess.findUnique({
-    where: {
-      userId_projectId: {
-        userId,
-        projectId,
-      },
-    },
-    select: { accessLevel: true },
-  });
+  const permSet = new Set(userPerms.map((p) => p.permissionType));
+  const levels = ["viewer", "contributor", "manager"] as const;
 
-  if (!project.isPrivate && !access) {
-    // Public project — all active users with projects.view can see it
-    return minLevel === "viewer";
+  // Effective level from global permissions
+  const globalLevel: typeof levels[number] =
+    permSet.has("tasks.manage") || permSet.has("projects.manage")
+      ? "manager"
+      : permSet.has("tasks.create") || permSet.has("notes.create")
+      ? "contributor"
+      : "viewer";
+
+  if (!access) {
+    // Private project with no explicit access — deny
+    if (project.isPrivate) return false;
+    // Public project — use global permission level
+    const canViewPublic = permSet.has("projects.view") || permSet.has("tasks.view");
+    if (!canViewPublic) return false;
+    return levels.indexOf(globalLevel) >= levels.indexOf(minLevel);
   }
 
-  if (!access) return false;
-
-  const levels = ["viewer", "contributor", "manager"];
-  return levels.indexOf(access.accessLevel) >= levels.indexOf(minLevel);
+  // Has explicit project access — elevate with global permissions
+  const effectiveIdx = Math.max(
+    levels.indexOf(access.accessLevel as typeof levels[number]),
+    levels.indexOf(globalLevel)
+  );
+  return effectiveIdx >= levels.indexOf(minLevel);
 }
 
 export async function getAccessibleProjectIds(userId: string): Promise<string[]> {

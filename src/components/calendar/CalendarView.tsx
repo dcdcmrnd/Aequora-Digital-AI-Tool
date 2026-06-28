@@ -155,12 +155,14 @@ export function CalendarView({ initialEvents, teamMembers, currentUserId }: Prop
       </div>
 
       {/* Grid */}
-      <div className={cn("flex-1 bg-white border border-border rounded-card overflow-hidden", loading && "opacity-60 pointer-events-none")}>
+      <div className={cn("flex-1 bg-white border border-border rounded-card overflow-auto", loading && "opacity-60 pointer-events-none")}>
+        <div className="min-w-[560px]">
         {/* Day headers */}
         <div className="grid grid-cols-7 border-b border-border">
           {DAYS.map((d) => (
             <div key={d} className="py-2 text-center text-xs font-medium text-text-muted uppercase tracking-wide">
-              {d}
+              <span className="hidden sm:inline">{d}</span>
+              <span className="sm:hidden">{d.charAt(0)}</span>
             </div>
           ))}
         </div>
@@ -227,6 +229,7 @@ export function CalendarView({ initialEvents, teamMembers, currentUserId }: Prop
             );
           })}
         </div>
+        </div>{/* end min-w wrapper */}
       </div>
 
       {modal.open && (

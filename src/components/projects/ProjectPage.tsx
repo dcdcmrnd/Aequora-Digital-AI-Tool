@@ -96,7 +96,7 @@ export function ProjectPage({
   ];
 
   return (
-    <div className="-mx-6 -my-6 flex flex-col h-[calc(100vh-3.5rem)]">
+    <div className="-mx-4 -my-4 md:-mx-6 md:-my-6 flex flex-col h-[calc(100vh-3.5rem)]">
       {/* Project header */}
       <div className="px-6 py-4 bg-white border-b border-border flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3 min-w-0">

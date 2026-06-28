@@ -23,10 +23,10 @@ interface Props {
 
 export function ChatPageClient({ initialRooms, teamMembers, currentUserId, currentUserName }: Props) {
   const [rooms, setRooms] = useState<ChatRoom[]>(initialRooms);
-  const [activeRoomId, setActiveRoomId] = useState<string | null>(
-    initialRooms[0]?.id ?? null
-  );
+  const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const [showNewChat, setShowNewChat] = useState(false);
+  // On mobile: track whether we're showing the thread panel
+  const [mobileShowThread, setMobileShowThread] = useState(false);
 
   // Poll rooms list every 5 s to refresh unread counts + new rooms
   useEffect(() => {
@@ -58,9 +58,9 @@ export function ChatPageClient({ initialRooms, teamMembers, currentUserId, curre
   };
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] bg-white border border-border rounded-card overflow-hidden">
-      {/* Left panel — room list */}
-      <div className="w-72 flex-shrink-0 border-r border-border flex flex-col">
+    <div className="flex h-[calc(100vh-7rem)] md:h-[calc(100vh-8rem)] bg-white border border-border rounded-card overflow-hidden">
+      {/* Left panel — room list (hidden on mobile when thread is open) */}
+      <div className={`${mobileShowThread ? "hidden" : "flex"} md:flex w-full md:w-72 flex-shrink-0 border-r border-border flex-col`}>
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <h2 className="text-sm font-semibold text-text-primary">Messages</h2>
           <button
@@ -78,19 +78,34 @@ export function ChatPageClient({ initialRooms, teamMembers, currentUserId, curre
           onSelect={(id) => {
             setActiveRoomId(id);
             markRoomRead(id);
+            setMobileShowThread(true);
           }}
         />
       </div>
 
-      {/* Right panel — thread */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      {/* Right panel — thread (hidden on mobile when room list is showing) */}
+      <div className={`${mobileShowThread ? "flex" : "hidden"} md:flex flex-1 flex-col overflow-hidden`}>
         {activeRoom ? (
-          <MessageThread
-            room={activeRoom}
-            currentUserId={currentUserId}
-            currentUserName={currentUserName}
-            onMessagesRead={() => markRoomRead(activeRoom.id)}
-          />
+          <>
+            {/* Mobile back button */}
+            <div className="md:hidden flex items-center gap-2 px-4 py-2 border-b border-border bg-white">
+              <button
+                onClick={() => setMobileShowThread(false)}
+                className="p-1 -ml-1 text-text-secondary hover:text-text-primary transition-colors"
+              >
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M19 12H5M12 5l-7 7 7 7" />
+                </svg>
+              </button>
+              <span className="text-sm font-medium text-text-primary">Back</span>
+            </div>
+            <MessageThread
+              room={activeRoom}
+              currentUserId={currentUserId}
+              currentUserName={currentUserName}
+              onMessagesRead={() => markRoomRead(activeRoom.id)}
+            />
+          </>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-text-muted gap-3">
             <svg className="w-12 h-12 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
