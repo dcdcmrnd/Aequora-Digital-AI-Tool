@@ -275,3 +275,12 @@ model CompanyDocument {
   uploadedBy   User     @relation("DocumentUploader", fields: [uploadedById], references: [id])
   createdAt    DateTime @default(now())
 }
+
+model GmailToken {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  accessToken  String
+  refreshToken String
+  expiryDate   BigInt
+  updatedAt    DateTime @updatedAt
+}

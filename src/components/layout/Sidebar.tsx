@@ -55,12 +55,12 @@ export function Sidebar({ companyName = "Aequora Digital", companyLogoUrl, onClo
       {/* Logo */}
       <div className="px-4 py-5 border-b border-white/10">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-btn bg-brand-primary flex items-center justify-center overflow-hidden flex-shrink-0">
-            {companyLogoUrl ? (
-              <img src={companyLogoUrl} alt={companyName} className="w-full h-full object-contain" />
-            ) : (
-              <WaveIcon />
-            )}
+          <div className="w-8 h-8 rounded-btn overflow-hidden flex-shrink-0">
+            <img
+              src={companyLogoUrl || "/logo.png"}
+              alt={companyName}
+              className="w-full h-full object-contain"
+            />
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-white font-semibold text-sm leading-tight truncate max-w-[140px]">{companyName}</p>
@@ -134,6 +134,12 @@ export function Sidebar({ companyName = "Aequora Digital", companyLogoUrl, onClo
           badge={<ChatUnreadBadge />}
         />
 
+        <NavLink
+          href="/inbox"
+          label="Inbox"
+          icon={<InboxIcon />}
+        />
+
       </nav>
 
       {/* User + Settings */}
@@ -172,11 +178,11 @@ export function Sidebar({ companyName = "Aequora Digital", companyLogoUrl, onClo
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
 
-function WaveIcon() {
+function InboxIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 text-white" stroke="currentColor" strokeWidth={2}>
-      <path d="M3 12c1.5-3 3-4.5 4.5-4.5S10.5 9 12 9s3-1.5 4.5-1.5S19.5 9 21 12" strokeLinecap="round" />
-      <path d="M3 17c1.5-3 3-4.5 4.5-4.5S10.5 14.5 12 14.5s3-1.5 4.5-1.5S19.5 14.5 21 17" strokeLinecap="round" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
+      <path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z" />
     </svg>
   );
 }
