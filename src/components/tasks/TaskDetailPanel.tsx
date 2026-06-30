@@ -49,7 +49,7 @@ export function TaskDetailPanel({
   const [newDescription, setNewDescription] = useState("");
   const [newStatus, setNewStatus] = useState<TaskStatus>("todo");
   const [newPriority, setNewPriority] = useState<TaskPriority>("medium");
-  const [newAssigneeId, setNewAssigneeId] = useState("");
+  const [newAssigneeIds, setNewAssigneeIds] = useState<string[]>([currentUserId]);
   const [newDueDate, setNewDueDate] = useState("");
   const [newTags, setNewTags] = useState("");
 
@@ -96,7 +96,8 @@ export function TaskDetailPanel({
           status: newStatus,
           priority: newPriority,
           projectId,
-          assigneeId: newAssigneeId || undefined,
+          assigneeId: newAssigneeIds[0] || undefined,
+          assigneeIds: newAssigneeIds,
           dueDate: newDueDate || undefined,
           tags: newTags ? newTags.split(",").map((t) => t.trim()).filter(Boolean) : [],
         }),
@@ -208,17 +209,34 @@ export function TaskDetailPanel({
               </div>
             </div>
             <div>
-              <label className="block text-xs font-medium text-text-secondary mb-1">Assignee</label>
-              <select
-                value={newAssigneeId}
-                onChange={(e) => setNewAssigneeId(e.target.value)}
-                className="w-full px-2 py-1.5 border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-brand-primary"
-              >
-                <option value="">Unassigned</option>
+              <label className="block text-xs font-medium text-text-secondary mb-1">Assignees</label>
+              {newAssigneeIds.length > 0 && (
+                <div className="flex flex-wrap gap-1 mb-1.5">
+                  {newAssigneeIds.map((id) => {
+                    const u = assignableUsers.find((x) => x.id === id);
+                    if (!u) return null;
+                    return (
+                      <span key={id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-primary/10 text-brand-primary text-xs font-medium">
+                        {u.name}
+                        <button type="button" onClick={() => setNewAssigneeIds((prev) => prev.filter((x) => x !== id))} className="hover:opacity-60">×</button>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+              <div className="grid grid-cols-1 gap-0.5 max-h-32 overflow-y-auto border border-border rounded p-1.5">
                 {assignableUsers.map((u) => (
-                  <option key={u.id} value={u.id}>{u.name}</option>
+                  <label key={u.id} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-surface-secondary cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={newAssigneeIds.includes(u.id)}
+                      onChange={() => setNewAssigneeIds((prev) => prev.includes(u.id) ? prev.filter((x) => x !== u.id) : [...prev, u.id])}
+                      className="w-3.5 h-3.5 rounded border-border text-brand-primary"
+                    />
+                    <span className="text-xs text-text-primary">{u.name}</span>
+                  </label>
                 ))}
-              </select>
+              </div>
             </div>
             <div>
               <label className="block text-xs font-medium text-text-secondary mb-1">Due Date</label>
@@ -296,19 +314,29 @@ export function TaskDetailPanel({
               </FieldBlock>
             </div>
 
-            {/* Assignee */}
-            <FieldBlock label="Assignee">
+            {/* Assignees */}
+            <FieldBlock label="Assignees">
               {canEdit ? (
-                <select
-                  value={task.assigneeId ?? ""}
-                  onChange={(e) => handleFieldSave("assigneeId", e.target.value || null)}
-                  className="w-full px-2 py-1.5 border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-brand-primary"
-                >
-                  <option value="">Unassigned</option>
+                <div className="grid grid-cols-1 gap-0.5 max-h-32 overflow-y-auto border border-border rounded p-1.5">
                   {assignableUsers.map((u) => (
-                    <option key={u.id} value={u.id}>{u.name}</option>
+                    <label key={u.id} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-surface-secondary cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={task.assigneeId === u.id || ((task as any).assignees ?? []).some((a: any) => a.userId === u.id || a.user?.id === u.id)}
+                        onChange={async (e) => {
+                          const current: string[] = assignableUsers
+                            .filter((x) => task.assigneeId === x.id || ((task as any).assignees ?? []).some((a: any) => a.userId === x.id || a.user?.id === x.id))
+                            .map((x) => x.id);
+                          const next = e.target.checked ? [...current, u.id] : current.filter((x) => x !== u.id);
+                          await handleFieldSave("assigneeId", next[0] || null);
+                          await handleFieldSave("assigneeIds", next);
+                        }}
+                        className="w-3.5 h-3.5 rounded border-border text-brand-primary"
+                      />
+                      <span className="text-xs text-text-primary">{u.name}</span>
+                    </label>
                   ))}
-                </select>
+                </div>
               ) : task.assignee ? (
                 <div className="flex items-center gap-2">
                   <Avatar name={task.assignee.name} avatarUrl={task.assignee.avatarUrl} size="xs" />
