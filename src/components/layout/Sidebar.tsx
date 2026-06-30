@@ -90,13 +90,13 @@ export function Sidebar({ companyName = "Aequora Digital", companyLogoUrl, onClo
         {canViewTasks && <NavLink href="/tasks" label="My Tasks" icon={<CheckSquareIcon />} />}
         {canViewNotes && <NavLink href="/notes" label="Notes" icon={<FileTextIcon />} />}
 
-        {/* Communication */}
-        <p className="px-3 pt-4 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-[#475569]">Communication</p>
-        <NavLink href="/chat" label="Chat" icon={<ChatIcon />} badge={<ChatUnreadBadge />} />
+        {/* Clients */}
+        <p className="px-3 pt-4 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-[#475569]">Clients</p>
         <NavLink href="/inbox" label="Inbox" icon={<InboxIcon />} />
 
         {/* Team */}
         <p className="px-3 pt-4 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-[#475569]">Team</p>
+        <NavLink href="/chat" label="Chat" icon={<ChatIcon />} badge={<ChatUnreadBadge />} />
         {canViewTeam && <NavLink href="/team" label="Team" icon={<UsersIcon />} />}
         <NavLink href="/calendar" label="Calendar" icon={<CalendarIcon />} />
       </nav>
