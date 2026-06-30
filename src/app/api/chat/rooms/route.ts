@@ -40,6 +40,7 @@ export async function GET() {
       id: m.room.id,
       name: m.room.name,
       isGroup: m.room.isGroup,
+      createdById: m.room.createdById,
       members: m.room.members.map((cm) => cm.user),
       lastMessage: m.room.messages[0]
         ? {
@@ -93,6 +94,7 @@ export async function POST(req: NextRequest) {
           id: existing.id,
           name: existing.name,
           isGroup: false,
+          createdById: existing.createdById,
           members: existing.members.map((m) => m.user),
           lastMessage: null,
           unreadCount: 0,
@@ -122,6 +124,7 @@ export async function POST(req: NextRequest) {
       id: room.id,
       name: room.name,
       isGroup: room.isGroup,
+      createdById: room.createdById,
       members: room.members.map((m) => m.user),
       lastMessage: null,
       unreadCount: 0,

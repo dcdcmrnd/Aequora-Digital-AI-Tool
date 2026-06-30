@@ -41,6 +41,7 @@ export default async function ChatPage() {
       id: m.room.id,
       name: m.room.name,
       isGroup: m.room.isGroup,
+      createdById: m.room.createdById,
       members: m.room.members.map((cm) => cm.user),
       lastMessage: m.room.messages[0]
         ? {
@@ -64,6 +65,7 @@ export default async function ChatPage() {
       teamMembers={teamMembers}
       currentUserId={session.user.id}
       currentUserName={session.user.name ?? ""}
+      isAdmin={session.user.role === "admin"}
     />
   );
 }

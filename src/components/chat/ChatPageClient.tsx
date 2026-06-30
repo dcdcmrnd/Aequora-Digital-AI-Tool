@@ -4,11 +4,13 @@ import { useState, useEffect } from "react";
 import { RoomList } from "./RoomList";
 import { MessageThread } from "./MessageThread";
 import { NewChatModal } from "./NewChatModal";
+import { EditGroupModal } from "./EditGroupModal";
 
 export interface ChatRoom {
   id: string;
   name: string | null;
   isGroup: boolean;
+  createdById: string;
   members: { id: string; name: string; avatarUrl: string | null }[];
   lastMessage: { content: string; senderName: string; createdAt: string } | null;
   unreadCount: number;
@@ -19,16 +21,16 @@ interface Props {
   teamMembers: { id: string; name: string; avatarUrl: string | null }[];
   currentUserId: string;
   currentUserName: string;
+  isAdmin: boolean;
 }
 
-export function ChatPageClient({ initialRooms, teamMembers, currentUserId, currentUserName }: Props) {
+export function ChatPageClient({ initialRooms, teamMembers, currentUserId, currentUserName, isAdmin }: Props) {
   const [rooms, setRooms] = useState<ChatRoom[]>(initialRooms);
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const [showNewChat, setShowNewChat] = useState(false);
-  // On mobile: track whether we're showing the thread panel
+  const [editingRoom, setEditingRoom] = useState<ChatRoom | null>(null);
   const [mobileShowThread, setMobileShowThread] = useState(false);
 
-  // Poll rooms list every 5 s to refresh unread counts + new rooms
   useEffect(() => {
     const id = setInterval(async () => {
       const res = await fetch("/api/chat/rooms");
@@ -51,15 +53,25 @@ export function ChatPageClient({ initialRooms, teamMembers, currentUserId, curre
     setShowNewChat(false);
   };
 
+  const handleRoomUpdated = (updated: ChatRoom) => {
+    setRooms((prev) => prev.map((r) => (r.id === updated.id ? { ...r, ...updated } : r)));
+  };
+
+  const handleRoomDeleted = (roomId: string) => {
+    setRooms((prev) => prev.filter((r) => r.id !== roomId));
+    if (activeRoomId === roomId) {
+      setActiveRoomId(null);
+      setMobileShowThread(false);
+    }
+  };
+
   const markRoomRead = (roomId: string) => {
-    setRooms((prev) =>
-      prev.map((r) => (r.id === roomId ? { ...r, unreadCount: 0 } : r))
-    );
+    setRooms((prev) => prev.map((r) => (r.id === roomId ? { ...r, unreadCount: 0 } : r)));
   };
 
   return (
     <div className="flex h-[calc(100vh-7rem)] md:h-[calc(100vh-8rem)] bg-white border border-border rounded-card overflow-hidden">
-      {/* Left panel — room list (hidden on mobile when thread is open) */}
+      {/* Left panel */}
       <div className={`${mobileShowThread ? "hidden" : "flex"} md:flex w-full md:w-72 flex-shrink-0 border-r border-border flex-col`}>
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <h2 className="text-sm font-semibold text-text-primary">Messages</h2>
@@ -83,11 +95,11 @@ export function ChatPageClient({ initialRooms, teamMembers, currentUserId, curre
         />
       </div>
 
-      {/* Right panel — thread (hidden on mobile when room list is showing) */}
+      {/* Right panel */}
       <div className={`${mobileShowThread ? "flex" : "hidden"} md:flex flex-1 flex-col overflow-hidden`}>
         {activeRoom ? (
           <>
-            {/* Mobile back button */}
+            {/* Mobile back */}
             <div className="md:hidden flex items-center gap-2 px-4 py-2 border-b border-border bg-white">
               <button
                 onClick={() => setMobileShowThread(false)}
@@ -103,7 +115,9 @@ export function ChatPageClient({ initialRooms, teamMembers, currentUserId, curre
               room={activeRoom}
               currentUserId={currentUserId}
               currentUserName={currentUserName}
+              isAdmin={isAdmin}
               onMessagesRead={() => markRoomRead(activeRoom.id)}
+              onEditGroup={() => setEditingRoom(activeRoom)}
             />
           </>
         ) : (
@@ -128,6 +142,18 @@ export function ChatPageClient({ initialRooms, teamMembers, currentUserId, curre
           currentUserId={currentUserId}
           onCreated={handleRoomCreated}
           onClose={() => setShowNewChat(false)}
+        />
+      )}
+
+      {editingRoom && (
+        <EditGroupModal
+          room={editingRoom}
+          teamMembers={teamMembers}
+          currentUserId={currentUserId}
+          isAdmin={isAdmin}
+          onUpdated={handleRoomUpdated}
+          onDeleted={handleRoomDeleted}
+          onClose={() => setEditingRoom(null)}
         />
       )}
     </div>
