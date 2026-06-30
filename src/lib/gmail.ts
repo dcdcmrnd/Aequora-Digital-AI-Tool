@@ -73,6 +73,6 @@ export function extractBody(payload: any): { html: string; text: string } {
   return { html, text };
 }
 
-export function getHeader(headers: { name: string; value: string }[], name: string) {
-  return headers.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value ?? "";
+export function getHeader(headers: { name?: string | null; value?: string | null }[], name: string) {
+  return headers.find((h) => h.name?.toLowerCase() === name.toLowerCase())?.value ?? "";
 }
