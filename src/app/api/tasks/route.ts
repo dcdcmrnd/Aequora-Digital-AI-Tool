@@ -57,6 +57,10 @@ export async function POST(req: NextRequest) {
     await hasProjectAccess(session.user.id, projectId, "contributor");
   if (!canCreate) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+  const { assigneeIds } = body;
+  const primaryAssigneeId = assigneeId || (Array.isArray(assigneeIds) && assigneeIds[0]) || null;
+  const allAssigneeIds: string[] = Array.isArray(assigneeIds) ? assigneeIds : (assigneeId ? [assigneeId] : []);
+
   const task = await prisma.task.create({
     data: {
       title,
@@ -64,15 +68,19 @@ export async function POST(req: NextRequest) {
       status: status || "todo",
       priority: priority || "medium",
       projectId,
-      assigneeId: assigneeId || null,
+      assigneeId: primaryAssigneeId,
       creatorId: session.user.id,
       dueDate: dueDate ? new Date(dueDate) : null,
       tags: JSON.stringify(tags || []),
       parentTaskId: parentTaskId || null,
+      assignees: allAssigneeIds.length > 0
+        ? { create: allAssigneeIds.map((userId: string) => ({ userId })) }
+        : undefined,
     },
     include: {
       project: { select: { id: true, name: true, color: true } },
       assignee: { select: { id: true, name: true, avatarUrl: true } },
+      assignees: { include: { user: { select: { id: true, name: true, avatarUrl: true } } } },
     },
   });
 
@@ -85,17 +93,20 @@ export async function POST(req: NextRequest) {
     metadata: { projectId },
   });
 
-  // Notify assignee if different from creator
-  if (assigneeId && assigneeId !== session.user.id) {
-    await createNotification({
-      userId: assigneeId,
-      type: "task_assigned",
-      title: "New task assigned",
-      body: `${session.user.name} assigned you "${task.title}"`,
-      entityType: "task",
-      entityId: task.id,
-    });
-  }
+  // Notify all assignees different from creator
+  const notifyIds = allAssigneeIds.filter((id: string) => id !== session.user.id);
+  await Promise.all(
+    notifyIds.map((userId: string) =>
+      createNotification({
+        userId,
+        type: "task_assigned",
+        title: "New task assigned",
+        body: `${session.user.name} assigned you "${task.title}"`,
+        entityType: "task",
+        entityId: task.id,
+      })
+    )
+  );
 
   return NextResponse.json({ task: { ...task, tags: tags || [] } }, { status: 201 });
 }

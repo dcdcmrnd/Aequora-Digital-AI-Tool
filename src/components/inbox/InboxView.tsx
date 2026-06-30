@@ -1,37 +1,39 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/Button";
 import { ComposeModal } from "./ComposeModal";
 import { cn } from "@/lib/utils";
 
-interface EmailSummary {
+interface ThreadSummary {
   id: string;
-  threadId: string;
+  subject: string;
   snippet: string;
+  date: string;
   isUnread: boolean;
+  messageCount: number;
+  contactName: string;
+  contactEmail: string;
+}
+
+interface ThreadMessage {
+  id: string;
   from: string;
   to: string;
   subject: string;
   date: string;
-}
-
-interface EmailDetail extends EmailSummary {
+  isOutgoing: boolean;
   html: string;
   text: string;
-  replyTo: string;
-  labelIds: string[];
+}
+
+interface ThreadDetail {
+  id: string;
+  subject: string;
+  messages: ThreadMessage[];
 }
 
 type Label = "INBOX" | "SENT" | "SPAM";
-
-function parseSender(from: string) {
-  const match = from.match(/^"?([^"<]+)"?\s*<?([^>]*)>?$/);
-  return {
-    name: match?.[1]?.trim() || from,
-    email: match?.[2]?.trim() || from,
-  };
-}
 
 function formatDate(dateStr: string) {
   if (!dateStr) return "";
@@ -43,30 +45,40 @@ function formatDate(dateStr: string) {
     : d.toLocaleDateString([], { month: "short", day: "numeric" });
 }
 
+function getInitials(name: string) {
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+}
+
 interface Props {
   isConnected: boolean;
   isAdmin: boolean;
 }
 
 export function InboxView({ isConnected, isAdmin }: Props) {
-  const [messages, setMessages] = useState<EmailSummary[]>([]);
-  const [selected, setSelected] = useState<EmailDetail | null>(null);
+  const [threads, setThreads] = useState<ThreadSummary[]>([]);
+  const [selected, setSelected] = useState<ThreadDetail | null>(null);
   const [loadingList, setLoadingList] = useState(false);
-  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [loadingThread, setLoadingThread] = useState(false);
   const [nextPageToken, setNextPageToken] = useState<string | null>(null);
   const [activeLabel, setActiveLabel] = useState<Label>("INBOX");
   const [composeOpen, setComposeOpen] = useState(false);
   const [replyOpen, setReplyOpen] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
-  const fetchMessages = useCallback(async (label: Label, pageToken?: string) => {
+  const fetchThreads = useCallback(async (label: Label, pageToken?: string) => {
     setLoadingList(true);
     try {
       const params = new URLSearchParams({ label });
       if (pageToken) params.set("pageToken", pageToken);
-      const res = await fetch(`/api/gmail/messages?${params}`);
+      const res = await fetch(`/api/gmail/threads?${params}`);
       const data = await res.json();
       if (data.error === "not_connected") return;
-      setMessages((prev) => pageToken ? [...prev, ...data.messages] : data.messages);
+      setThreads((prev) => pageToken ? [...prev, ...data.threads] : data.threads);
       setNextPageToken(data.nextPageToken);
     } finally {
       setLoadingList(false);
@@ -75,27 +87,30 @@ export function InboxView({ isConnected, isAdmin }: Props) {
 
   useEffect(() => {
     if (!isConnected) return;
-    setMessages([]);
+    setThreads([]);
     setSelected(null);
-    fetchMessages(activeLabel);
-  }, [isConnected, activeLabel, fetchMessages]);
+    fetchThreads(activeLabel);
+  }, [isConnected, activeLabel, fetchThreads]);
 
-  const openMessage = async (msg: EmailSummary) => {
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [selected]);
+
+  const openThread = async (thread: ThreadSummary) => {
     setSelected(null);
-    setLoadingDetail(true);
-    setMessages((prev) =>
-      prev.map((m) => (m.id === msg.id ? { ...m, isUnread: false } : m))
+    setLoadingThread(true);
+    setThreads((prev) =>
+      prev.map((t) => (t.id === thread.id ? { ...t, isUnread: false } : t))
     );
     try {
-      const res = await fetch(`/api/gmail/messages/${msg.id}`);
+      const res = await fetch(`/api/gmail/threads/${thread.id}`);
       const data = await res.json();
       setSelected(data);
     } finally {
-      setLoadingDetail(false);
+      setLoadingThread(false);
     }
   };
 
-  // Not connected state
   if (!isConnected) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center px-4">
@@ -124,13 +139,15 @@ export function InboxView({ isConnected, isAdmin }: Props) {
     { label: "SPAM", display: "Spam" },
   ];
 
+  const lastMessage = selected?.messages[selected.messages.length - 1];
+
   return (
     <div className="flex flex-col h-[calc(100vh-7rem)] md:h-[calc(100vh-8rem)] bg-white border border-border rounded-card overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-border flex-shrink-0">
+      <div className="flex items-center justify-between px-6 py-3 border-b border-border flex-shrink-0 bg-white">
         <div>
-          <h1 className="text-xl font-semibold text-text-primary">Inbox</h1>
-          <p className="text-xs text-text-muted mt-0.5">info@aequoradigital.com</p>
+          <h1 className="text-lg font-semibold text-text-primary">Inbox</h1>
+          <p className="text-xs text-text-muted">info@aequoradigital.com</p>
         </div>
         <Button size="sm" onClick={() => setComposeOpen(true)}>
           <PenIcon />
@@ -139,10 +156,10 @@ export function InboxView({ isConnected, isAdmin }: Props) {
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Left panel — email list */}
-        <div className="w-80 flex-shrink-0 border-r border-border flex flex-col">
+        {/* Left panel — conversation list */}
+        <div className="w-72 flex-shrink-0 border-r border-border flex flex-col bg-surface-secondary/30">
           {/* Tabs */}
-          <div className="flex border-b border-border">
+          <div className="flex border-b border-border bg-white">
             {tabs.map((t) => (
               <button
                 key={t.label}
@@ -159,52 +176,65 @@ export function InboxView({ isConnected, isAdmin }: Props) {
             ))}
           </div>
 
-          {/* Email list */}
+          {/* Thread list */}
           <div className="flex-1 overflow-y-auto">
-            {loadingList && messages.length === 0 ? (
+            {loadingList && threads.length === 0 ? (
               <div className="flex items-center justify-center py-12">
                 <Spinner />
               </div>
-            ) : messages.length === 0 ? (
-              <div className="text-center py-12 text-sm text-text-muted">No messages</div>
+            ) : threads.length === 0 ? (
+              <div className="text-center py-12 text-sm text-text-muted">No conversations</div>
             ) : (
               <>
-                {messages.map((msg) => {
-                  const { name } = parseSender(msg.from);
-                  const isSelected = selected?.id === msg.id;
+                {threads.map((thread) => {
+                  const isSelected = selected?.id === thread.id;
                   return (
                     <button
-                      key={msg.id}
-                      onClick={() => openMessage(msg)}
+                      key={thread.id}
+                      onClick={() => openThread(thread)}
                       className={cn(
-                        "w-full text-left px-4 py-3 border-b border-border transition-colors",
-                        isSelected ? "bg-brand-primary/5" : "hover:bg-surface-hover",
-                        msg.isUnread && "bg-blue-50/50"
+                        "w-full text-left px-4 py-3 border-b border-border/50 transition-colors",
+                        isSelected ? "bg-brand-primary/8 border-l-2 border-l-brand-primary" : "hover:bg-white",
+                        thread.isUnread && !isSelected && "bg-blue-50/40"
                       )}
                     >
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          {msg.isUnread && (
-                            <span className="w-2 h-2 rounded-full bg-brand-primary flex-shrink-0" />
-                          )}
-                          <span className={cn("text-sm truncate", msg.isUnread ? "font-semibold text-text-primary" : "font-medium text-text-primary")}>
-                            {name}
+                      <div className="flex items-start gap-3">
+                        {/* Avatar */}
+                        <div className="w-9 h-9 rounded-full bg-brand-primary/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <span className="text-xs font-semibold text-brand-primary">
+                            {getInitials(thread.contactName)}
                           </span>
                         </div>
-                        <span className="text-xs text-text-muted flex-shrink-0 ml-2">
-                          {formatDate(msg.date)}
-                        </span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-1 mb-0.5">
+                            <span className={cn(
+                              "text-sm truncate",
+                              thread.isUnread ? "font-semibold text-text-primary" : "font-medium text-text-primary"
+                            )}>
+                              {thread.contactName}
+                            </span>
+                            <span className="text-[10px] text-text-muted flex-shrink-0">
+                              {formatDate(thread.date)}
+                            </span>
+                          </div>
+                          <p className={cn(
+                            "text-xs truncate mb-0.5",
+                            thread.isUnread ? "font-medium text-text-primary" : "text-text-secondary"
+                          )}>
+                            {thread.subject || "(no subject)"}
+                          </p>
+                          <p className="text-xs text-text-muted truncate">{thread.snippet}</p>
+                        </div>
+                        {thread.isUnread && (
+                          <span className="w-2 h-2 rounded-full bg-brand-primary flex-shrink-0 mt-1.5" />
+                        )}
                       </div>
-                      <p className={cn("text-xs truncate mb-0.5", msg.isUnread ? "text-text-primary font-medium" : "text-text-secondary")}>
-                        {msg.subject || "(no subject)"}
-                      </p>
-                      <p className="text-xs text-text-muted truncate">{msg.snippet}</p>
                     </button>
                   );
                 })}
                 {nextPageToken && (
                   <button
-                    onClick={() => fetchMessages(activeLabel, nextPageToken)}
+                    onClick={() => fetchThreads(activeLabel, nextPageToken)}
                     className="w-full py-3 text-xs text-brand-primary hover:underline"
                     disabled={loadingList}
                   >
@@ -216,68 +246,98 @@ export function InboxView({ isConnected, isAdmin }: Props) {
           </div>
         </div>
 
-        {/* Right panel — email detail */}
-        <div className="flex-1 overflow-y-auto">
-          {loadingDetail ? (
+        {/* Right panel — conversation/thread view */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {loadingThread ? (
             <div className="flex items-center justify-center h-full">
               <Spinner />
             </div>
           ) : !selected ? (
             <div className="flex flex-col items-center justify-center h-full text-center px-8">
               <MailIcon className="w-10 h-10 text-text-muted mb-3" />
-              <p className="text-sm text-text-muted">Select an email to read it</p>
+              <p className="text-sm text-text-muted">Select a conversation to read it</p>
             </div>
           ) : (
-            <div className="flex flex-col h-full">
-              {/* Email header */}
-              <div className="px-6 py-5 border-b border-border">
-                <h2 className="text-lg font-semibold text-text-primary mb-4">
-                  {selected.subject || "(no subject)"}
-                </h2>
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-1 text-sm">
-                    <div className="flex gap-2">
-                      <span className="text-text-muted w-8">From</span>
-                      <span className="text-text-primary">{selected.from}</span>
-                    </div>
-                    <div className="flex gap-2">
-                      <span className="text-text-muted w-8">To</span>
-                      <span className="text-text-secondary">{selected.to}</span>
-                    </div>
-                    <div className="flex gap-2">
-                      <span className="text-text-muted w-8">Date</span>
-                      <span className="text-text-secondary">
-                        {new Date(selected.date).toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => setReplyOpen(true)}
-                  >
-                    <ReplyIcon />
-                    Reply
-                  </Button>
+            <>
+              {/* Conversation header */}
+              <div className="px-5 py-3 border-b border-border flex-shrink-0 flex items-center justify-between bg-white">
+                <div>
+                  <h2 className="text-sm font-semibold text-text-primary">{selected.subject || "(no subject)"}</h2>
+                  <p className="text-xs text-text-muted mt-0.5">{selected.messages.length} message{selected.messages.length !== 1 ? "s" : ""}</p>
                 </div>
+                <Button size="sm" variant="secondary" onClick={() => setReplyOpen(true)}>
+                  <ReplyIcon />
+                  Reply
+                </Button>
               </div>
 
-              {/* Email body */}
-              <div className="flex-1 overflow-auto">
-                {selected.html ? (
-                  <iframe
-                    srcDoc={selected.html}
-                    className="w-full h-full border-none"
-                    sandbox="allow-same-origin"
-                    title="Email content"
-                  />
-                ) : (
-                  <div className="px-6 py-5 text-sm text-text-primary whitespace-pre-wrap font-mono">
-                    {selected.text}
+              {/* Message bubbles */}
+              <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 bg-surface-secondary/20">
+                {selected.messages.map((msg) => (
+                  <div key={msg.id} className={cn("flex gap-3", msg.isOutgoing ? "flex-row-reverse" : "flex-row")}>
+                    {/* Avatar */}
+                    {!msg.isOutgoing && (
+                      <div className="w-8 h-8 rounded-full bg-brand-primary/15 flex items-center justify-center flex-shrink-0 mt-1">
+                        <span className="text-xs font-semibold text-brand-primary">
+                          {getInitials(msg.from.replace(/<.*>/, "").trim() || "?")}
+                        </span>
+                      </div>
+                    )}
+                    {msg.isOutgoing && (
+                      <div className="w-8 h-8 rounded-full bg-brand-primary flex items-center justify-center flex-shrink-0 mt-1">
+                        <span className="text-xs font-semibold text-white">Ae</span>
+                      </div>
+                    )}
+
+                    <div className={cn("max-w-[75%]", msg.isOutgoing ? "items-end" : "items-start")} style={{ display: "flex", flexDirection: "column" }}>
+                      <div className="flex items-center gap-2 mb-1 px-1">
+                        <span className="text-xs font-medium text-text-secondary">
+                          {msg.isOutgoing ? "Aequora Digital" : msg.from.replace(/<.*>/, "").trim()}
+                        </span>
+                        <span className="text-[10px] text-text-muted">{formatDate(msg.date)}</span>
+                      </div>
+                      <div className={cn(
+                        "rounded-2xl overflow-hidden text-sm",
+                        msg.isOutgoing
+                          ? "bg-brand-primary text-white rounded-tr-sm"
+                          : "bg-white border border-border rounded-tl-sm shadow-sm"
+                      )}>
+                        {msg.html ? (
+                          <div className={cn("p-3", msg.isOutgoing ? "[&_*]:!color-white [&_a]:!text-white" : "")}>
+                            <iframe
+                              srcDoc={msg.html}
+                              className="w-full border-none"
+                              style={{ minHeight: "60px", height: "auto" }}
+                              sandbox="allow-same-origin"
+                              title="Email content"
+                              onLoad={(e) => {
+                                const iframe = e.currentTarget;
+                                iframe.style.height = iframe.contentDocument?.body?.scrollHeight + "px";
+                              }}
+                            />
+                          </div>
+                        ) : (
+                          <div className="px-4 py-3 whitespace-pre-wrap font-sans text-sm">
+                            {msg.text}
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                )}
+                ))}
+                <div ref={bottomRef} />
               </div>
-            </div>
+
+              {/* Quick reply bar */}
+              <div className="px-5 py-3 border-t border-border bg-white flex-shrink-0">
+                <button
+                  onClick={() => setReplyOpen(true)}
+                  className="w-full text-left px-4 py-2.5 rounded-full border border-border text-sm text-text-muted hover:border-brand-primary hover:text-text-primary transition-colors bg-surface-secondary/40"
+                >
+                  Reply to {lastMessage?.isOutgoing ? "this thread" : (lastMessage?.from.replace(/<.*>/, "").trim() || "sender")}…
+                </button>
+              </div>
+            </>
           )}
         </div>
       </div>
@@ -290,16 +350,16 @@ export function InboxView({ isConnected, isAdmin }: Props) {
       />
 
       {/* Reply modal */}
-      {selected && (
+      {selected && lastMessage && (
         <ComposeModal
           open={replyOpen}
           onClose={() => setReplyOpen(false)}
           mode="reply"
-          defaultTo={selected.replyTo || selected.from}
+          defaultTo={lastMessage.isOutgoing ? lastMessage.to : lastMessage.from}
           defaultSubject={selected.subject.startsWith("Re:") ? selected.subject : `Re: ${selected.subject}`}
-          threadId={selected.threadId}
-          inReplyTo={selected.id}
-          references={selected.id}
+          threadId={selected.id}
+          inReplyTo={lastMessage.id}
+          references={lastMessage.id}
         />
       )}
     </div>

@@ -17,22 +17,31 @@ export default async function TasksPage() {
 
   const projectIds = await getAccessibleProjectIds(session.user.id);
 
-  const [tasks, projects] = await Promise.all([
+  const [tasks, projects, teamMembers] = await Promise.all([
     prisma.task.findMany({
       where: {
-        assigneeId: session.user.id,
+        OR: [
+          { assigneeId: session.user.id },
+          { assignees: { some: { userId: session.user.id } } },
+        ],
         projectId: { in: projectIds },
         status: { not: "done" },
         parentTaskId: null,
       },
       include: {
         project: { select: { id: true, name: true, color: true } },
+        assignees: { include: { user: { select: { id: true, name: true, avatarUrl: true } } } },
       },
       orderBy: [{ priority: "asc" }, { dueDate: "asc" }],
     }),
     prisma.project.findMany({
       where: { id: { in: projectIds }, status: { not: "archived" } },
       select: { id: true, name: true, color: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.user.findMany({
+      where: { status: "active" },
+      select: { id: true, name: true, avatarUrl: true },
       orderBy: { name: "asc" },
     }),
   ]);
@@ -50,6 +59,7 @@ export default async function TasksPage() {
     <MyTasksView
       tasks={serialized as any}
       projects={projects}
+      teamMembers={teamMembers}
       canCreate={canCreate}
       currentUserId={session.user.id}
     />

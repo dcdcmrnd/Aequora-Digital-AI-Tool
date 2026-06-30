@@ -13,14 +13,32 @@ interface Project {
   color: string;
 }
 
+interface TeamMember {
+  id: string;
+  name: string;
+  avatarUrl: string | null;
+}
+
 interface Props {
   tasks: Task[];
   projects: Project[];
+  teamMembers: TeamMember[];
   canCreate: boolean;
   currentUserId: string;
 }
 
-export function MyTasksView({ tasks: initialTasks, projects, canCreate, currentUserId }: Props) {
+function MemberAvatar({ member, size = "sm" }: { member: TeamMember; size?: "sm" | "xs" }) {
+  const dim = size === "xs" ? "w-5 h-5 text-[9px]" : "w-6 h-6 text-[10px]";
+  return member.avatarUrl ? (
+    <img src={member.avatarUrl} alt={member.name} className={`${dim} rounded-full object-cover border border-white`} />
+  ) : (
+    <div className={`${dim} rounded-full bg-brand-primary/20 flex items-center justify-center font-semibold text-brand-primary border border-white`}>
+      {member.name[0].toUpperCase()}
+    </div>
+  );
+}
+
+export function MyTasksView({ tasks: initialTasks, projects, teamMembers, canCreate, currentUserId }: Props) {
   const [tasks, setTasks] = useState(initialTasks);
   const [filterProject, setFilterProject] = useState("all");
   const [filterPriority, setFilterPriority] = useState("all");
@@ -57,7 +75,6 @@ export function MyTasksView({ tasks: initialTasks, projects, canCreate, currentU
     toast.success("Task created!");
   };
 
-  // Projects present in current task list (for the filter dropdown)
   const taskProjects = Array.from(
     new Map(
       tasks
@@ -109,7 +126,6 @@ export function MyTasksView({ tasks: initialTasks, projects, canCreate, currentU
 
   return (
     <div>
-      {/* Page header */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-xl font-semibold text-text-primary">My Tasks</h1>
@@ -145,8 +161,7 @@ export function MyTasksView({ tasks: initialTasks, projects, canCreate, currentU
               className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-primary text-white text-sm font-medium rounded-btn hover:bg-brand-primary/90 transition-colors"
             >
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
+                <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
               </svg>
               New Task
             </button>
@@ -160,10 +175,7 @@ export function MyTasksView({ tasks: initialTasks, projects, canCreate, currentU
             {tasks.length === 0 ? "No tasks assigned to you yet." : "No tasks match the current filters."}
           </p>
           {canCreate && tasks.length === 0 && (
-            <button
-              onClick={() => setShowCreate(true)}
-              className="mt-3 text-brand-primary text-sm hover:underline"
-            >
+            <button onClick={() => setShowCreate(true)} className="mt-3 text-brand-primary text-sm hover:underline">
               Create your first task
             </button>
           )}
@@ -178,11 +190,9 @@ export function MyTasksView({ tasks: initialTasks, projects, canCreate, currentU
               <div className="bg-white border border-border rounded-card divide-y divide-border">
                 {group.tasks.map((task) => {
                   const isOverdue = task.dueDate && new Date(task.dueDate) < todayStart;
+                  const extraAssignees = (task as any).assignees as { user: TeamMember }[] | undefined;
                   return (
-                    <div
-                      key={task.id}
-                      className="flex items-center gap-3 px-4 py-3 hover:bg-surface-secondary transition-colors"
-                    >
+                    <div key={task.id} className="flex items-center gap-3 px-4 py-3 hover:bg-surface-secondary transition-colors">
                       <input
                         type="checkbox"
                         checked={false}
@@ -209,6 +219,19 @@ export function MyTasksView({ tasks: initialTasks, projects, canCreate, currentU
                           )}
                         </div>
                       </div>
+                      {/* Assignee avatars */}
+                      {extraAssignees && extraAssignees.length > 0 && (
+                        <div className="flex -space-x-1 flex-shrink-0">
+                          {extraAssignees.slice(0, 3).map(({ user }) => (
+                            <MemberAvatar key={user.id} member={user} size="xs" />
+                          ))}
+                          {extraAssignees.length > 3 && (
+                            <div className="w-5 h-5 rounded-full bg-surface-secondary border border-white flex items-center justify-center text-[9px] text-text-muted">
+                              +{extraAssignees.length - 3}
+                            </div>
+                          )}
+                        </div>
+                      )}
                       <div className="flex items-center gap-2 flex-shrink-0">
                         <PriorityBadge priority={task.priority} />
                         <StatusBadge status={task.status} />
@@ -222,10 +245,10 @@ export function MyTasksView({ tasks: initialTasks, projects, canCreate, currentU
         </div>
       )}
 
-      {/* Create task modal */}
       {showCreate && (
         <CreateTaskModal
           projects={projects}
+          teamMembers={teamMembers}
           currentUserId={currentUserId}
           onCreated={handleTaskCreated}
           onClose={() => setShowCreate(false)}
@@ -239,20 +262,41 @@ export function MyTasksView({ tasks: initialTasks, projects, canCreate, currentU
 
 interface CreateTaskModalProps {
   projects: Project[];
+  teamMembers: TeamMember[];
   currentUserId: string;
   onCreated: (task: Task) => void;
   onClose: () => void;
 }
 
-function CreateTaskModal({ projects, currentUserId, onCreated, onClose }: CreateTaskModalProps) {
+function CreateTaskModal({ projects, teamMembers, currentUserId, onCreated, onClose }: CreateTaskModalProps) {
   const [form, setForm] = useState({
     title: "",
     projectId: projects[0]?.id ?? "",
     priority: "medium",
     dueDate: "",
     description: "",
+    tagInput: "",
+    tags: [] as string[],
   });
+  const [assigneeIds, setAssigneeIds] = useState<string[]>([currentUserId]);
   const [saving, setSaving] = useState(false);
+
+  const toggleAssignee = (id: string) => {
+    setAssigneeIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const addTag = () => {
+    const tag = form.tagInput.trim();
+    if (tag && !form.tags.includes(tag)) {
+      setForm((f) => ({ ...f, tags: [...f.tags, tag], tagInput: "" }));
+    }
+  };
+
+  const removeTag = (tag: string) => {
+    setForm((f) => ({ ...f, tags: f.tags.filter((t) => t !== tag) }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -270,17 +314,15 @@ function CreateTaskModal({ projects, currentUserId, onCreated, onClose }: Create
           priority: form.priority,
           dueDate: form.dueDate || null,
           description: form.description || null,
-          assigneeId: currentUserId,
+          assigneeId: assigneeIds[0] || null,
+          assigneeIds,
+          tags: form.tags,
           status: "todo",
         }),
       });
 
       const data = await res.json();
-      if (!res.ok) {
-        toast.error(data.error || "Failed to create task.");
-        return;
-      }
-
+      if (!res.ok) { toast.error(data.error || "Failed to create task."); return; }
       onCreated(data.task);
     } catch {
       toast.error("Something went wrong.");
@@ -291,69 +333,101 @@ function CreateTaskModal({ projects, currentUserId, onCreated, onClose }: Create
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-
-      {/* Panel */}
-      <div className="relative bg-white rounded-card shadow-2xl w-full max-w-md">
+      <div className="relative bg-white rounded-card shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border sticky top-0 bg-white z-10">
           <h2 className="text-base font-semibold text-text-primary">New Task</h2>
-          <button
-            onClick={onClose}
-            className="p-1 text-text-muted hover:text-text-primary transition-colors rounded"
-          >
+          <button onClick={onClose} className="p-1 text-text-muted hover:text-text-primary transition-colors rounded">
             <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </button>
         </div>
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           {/* Title */}
           <div>
-            <label className="block text-sm font-medium text-text-primary mb-1.5">
-              Task Title <span className="text-danger">*</span>
-            </label>
             <input
               autoFocus
               type="text"
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
-              placeholder="What needs to be done?"
-              className="w-full px-3 py-2 border border-border rounded-input text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary"
+              placeholder="Task title…"
+              className="w-full px-0 py-1 text-lg font-semibold border-0 border-b border-transparent focus:border-brand-primary focus:outline-none text-text-primary placeholder:text-text-muted transition-colors bg-transparent"
             />
           </div>
 
-          {/* Project */}
+          {/* Description */}
           <div>
-            <label className="block text-sm font-medium text-text-primary mb-1.5">
-              Project <span className="text-danger">*</span>
-            </label>
-            {projects.length === 0 ? (
-              <p className="text-sm text-text-muted">No projects available. Ask your admin for project access.</p>
-            ) : (
-              <select
-                value={form.projectId}
-                onChange={(e) => setForm({ ...form, projectId: e.target.value })}
-                className="w-full px-3 py-2 border border-border rounded-input text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary"
-              >
-                {projects.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            )}
+            <textarea
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              placeholder="Add a description…"
+              rows={3}
+              className="w-full px-0 py-1 text-sm border-0 focus:outline-none text-text-secondary placeholder:text-text-muted resize-none bg-transparent"
+            />
           </div>
 
-          {/* Priority + Due Date */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-text-primary mb-1.5">Priority</label>
+          <div className="border-t border-border pt-4 space-y-3">
+            {/* Project */}
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-medium text-text-muted w-24 flex-shrink-0">Project</span>
+              {projects.length === 0 ? (
+                <span className="text-xs text-text-muted">No projects available.</span>
+              ) : (
+                <select
+                  value={form.projectId}
+                  onChange={(e) => setForm({ ...form, projectId: e.target.value })}
+                  className="flex-1 px-2 py-1.5 border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-brand-primary"
+                >
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {/* Assignees */}
+            <div className="flex items-start gap-3">
+              <span className="text-xs font-medium text-text-muted w-24 flex-shrink-0 mt-1">Assignees</span>
+              <div className="flex-1">
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {assigneeIds.map((id) => {
+                    const m = teamMembers.find((t) => t.id === id);
+                    if (!m) return null;
+                    return (
+                      <span key={id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-primary/10 text-brand-primary text-xs font-medium">
+                        {m.name}
+                        <button type="button" onClick={() => toggleAssignee(id)} className="hover:text-brand-primary/60">×</button>
+                      </span>
+                    );
+                  })}
+                </div>
+                <div className="grid grid-cols-2 gap-1 max-h-28 overflow-y-auto border border-border rounded p-1.5">
+                  {teamMembers.map((m) => (
+                    <label key={m.id} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-surface-secondary cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={assigneeIds.includes(m.id)}
+                        onChange={() => toggleAssignee(m.id)}
+                        className="w-3.5 h-3.5 rounded border-border text-brand-primary"
+                      />
+                      <MemberAvatar member={m} size="xs" />
+                      <span className="text-xs text-text-primary truncate">{m.name}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Priority + Due Date */}
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-medium text-text-muted w-24 flex-shrink-0">Priority</span>
               <select
                 value={form.priority}
                 onChange={(e) => setForm({ ...form, priority: e.target.value })}
-                className="w-full px-3 py-2 border border-border rounded-input text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                className="flex-1 px-2 py-1.5 border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-brand-primary"
               >
                 <option value="urgent">Urgent</option>
                 <option value="high">High</option>
@@ -361,33 +435,48 @@ function CreateTaskModal({ projects, currentUserId, onCreated, onClose }: Create
                 <option value="low">Low</option>
               </select>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-text-primary mb-1.5">Due Date</label>
+
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-medium text-text-muted w-24 flex-shrink-0">Due Date</span>
               <input
                 type="date"
                 value={form.dueDate}
                 onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
-                className="w-full px-3 py-2 border border-border rounded-input text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                className="flex-1 px-2 py-1.5 border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-brand-primary"
               />
+            </div>
+
+            {/* Tags */}
+            <div className="flex items-start gap-3">
+              <span className="text-xs font-medium text-text-muted w-24 flex-shrink-0 mt-1.5">Tags</span>
+              <div className="flex-1">
+                {form.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mb-1.5">
+                    {form.tags.map((tag) => (
+                      <span key={tag} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-secondary text-text-secondary text-xs">
+                        {tag}
+                        <button type="button" onClick={() => removeTag(tag)} className="hover:text-text-primary">×</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div className="flex gap-1.5">
+                  <input
+                    type="text"
+                    value={form.tagInput}
+                    onChange={(e) => setForm({ ...form, tagInput: e.target.value })}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTag(); } }}
+                    placeholder="Add tag…"
+                    className="flex-1 px-2 py-1.5 border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-brand-primary"
+                  />
+                  <button type="button" onClick={addTag} className="px-3 py-1.5 border border-border rounded text-sm hover:bg-surface-secondary transition-colors">Add</button>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Description */}
-          <div>
-            <label className="block text-sm font-medium text-text-primary mb-1.5">
-              Description <span className="text-text-muted font-normal">(optional)</span>
-            </label>
-            <textarea
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              placeholder="Add more details…"
-              rows={3}
-              className="w-full px-3 py-2 border border-border rounded-input text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary resize-none"
-            />
-          </div>
-
           {/* Actions */}
-          <div className="flex gap-3 pt-1">
+          <div className="flex gap-3 pt-2 border-t border-border">
             <button
               type="submit"
               disabled={saving || !form.title.trim() || !form.projectId}

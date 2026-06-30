@@ -11,16 +11,16 @@ export default function AppleIcon() {
         style={{
           width: 180,
           height: 180,
-          background: "#0A2540",
+          background: "#0F7B8A",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          borderRadius: 40,
+          borderRadius: 36,
         }}
       >
         <span
           style={{
-            color: "#0F7B8A",
+            color: "#F5F0EA",
             fontSize: 100,
             fontWeight: 800,
             letterSpacing: "-5px",

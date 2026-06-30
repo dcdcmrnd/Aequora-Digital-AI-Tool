@@ -82,64 +82,23 @@ export function Sidebar({ companyName = "Aequora Digital", companyLogoUrl, onClo
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto scrollbar-thin px-3 py-4 space-y-1">
-        <NavLink
-          href="/"
-          label="Dashboard"
-          icon={<HomeIcon />}
-        />
+      <nav className="flex-1 overflow-y-auto scrollbar-thin px-3 py-4 space-y-0.5">
+        {/* Workspace */}
+        <p className="px-3 pt-1 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-[#475569]">Workspace</p>
+        <NavLink href="/" label="Dashboard" icon={<HomeIcon />} />
+        {canViewProjects && <NavLink href="/projects" label="Projects" icon={<FolderIcon />} />}
+        {canViewTasks && <NavLink href="/tasks" label="My Tasks" icon={<CheckSquareIcon />} />}
+        {canViewNotes && <NavLink href="/notes" label="Notes" icon={<FileTextIcon />} />}
 
-        {canViewProjects && (
-          <NavLink
-            href="/projects"
-            label="Projects"
-            icon={<FolderIcon />}
-          />
-        )}
+        {/* Communication */}
+        <p className="px-3 pt-4 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-[#475569]">Communication</p>
+        <NavLink href="/chat" label="Chat" icon={<ChatIcon />} badge={<ChatUnreadBadge />} />
+        <NavLink href="/inbox" label="Inbox" icon={<InboxIcon />} />
 
-        {canViewTasks && (
-          <NavLink
-            href="/tasks"
-            label="My Tasks"
-            icon={<CheckSquareIcon />}
-          />
-        )}
-
-        {canViewNotes && (
-          <NavLink
-            href="/notes"
-            label="Notes"
-            icon={<FileTextIcon />}
-          />
-        )}
-
-        {canViewTeam && (
-          <NavLink
-            href="/team"
-            label="Team"
-            icon={<UsersIcon />}
-          />
-        )}
-
-        <NavLink
-          href="/calendar"
-          label="Calendar"
-          icon={<CalendarIcon />}
-        />
-
-        <NavLink
-          href="/chat"
-          label="Chat"
-          icon={<ChatIcon />}
-          badge={<ChatUnreadBadge />}
-        />
-
-        <NavLink
-          href="/inbox"
-          label="Inbox"
-          icon={<InboxIcon />}
-        />
-
+        {/* Team */}
+        <p className="px-3 pt-4 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-[#475569]">Team</p>
+        {canViewTeam && <NavLink href="/team" label="Team" icon={<UsersIcon />} />}
+        <NavLink href="/calendar" label="Calendar" icon={<CalendarIcon />} />
       </nav>
 
       {/* User + Settings */}
