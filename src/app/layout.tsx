@@ -3,6 +3,8 @@ import "./globals.css";
 import { SessionProvider } from "@/components/providers/SessionProvider";
 import { ServiceWorkerRegistration } from "@/components/providers/ServiceWorkerRegistration";
 import { Toaster } from "react-hot-toast";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 export const metadata: Metadata = {
   title: "Aequora Digital — Workspace",
@@ -44,6 +46,8 @@ export default function RootLayout({
               style: { borderRadius: "8px", border: "1px solid #E5E7EB" },
             }}
           />
+          <Analytics />
+          <SpeedInsights />
         </SessionProvider>
       </body>
     </html>
