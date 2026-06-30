@@ -1,9 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import toast from "react-hot-toast";
+
+interface Signature {
+  id: string;
+  name: string;
+  content: string;
+  isDefault: boolean;
+  user: { id: string; name: string };
+}
 
 interface Props {
   open: boolean;
@@ -32,6 +40,30 @@ export function ComposeModal({
   const [subject, setSubject] = useState(defaultSubject);
   const [body, setBody] = useState(defaultBody);
   const [sending, setSending] = useState(false);
+  const [signatures, setSignatures] = useState<Signature[]>([]);
+  const [selectedSigId, setSelectedSigId] = useState<string>("");
+
+  useEffect(() => {
+    if (!open) return;
+    fetch("/api/signatures")
+      .then((r) => r.json())
+      .then((d) => {
+        const sigs: Signature[] = d.signatures ?? [];
+        setSignatures(sigs);
+        const def = sigs.find((s) => s.isDefault);
+        if (def) setSelectedSigId(def.id);
+      })
+      .catch(() => {});
+  }, [open]);
+
+  const selectedSig = signatures.find((s) => s.id === selectedSigId);
+
+  const buildFullBody = () => {
+    const sigBlock = selectedSig
+      ? `\n\n--\n${selectedSig.content}`
+      : "";
+    return (body + sigBlock).replace(/\n/g, "<br>");
+  };
 
   const handleSend = async () => {
     if (!to.trim()) { toast.error("Recipient is required."); return; }
@@ -46,7 +78,7 @@ export function ComposeModal({
         body: JSON.stringify({
           to,
           subject,
-          body: body.replace(/\n/g, "<br>"),
+          body: buildFullBody(),
           threadId,
           inReplyTo,
           references,
@@ -93,10 +125,36 @@ export function ComposeModal({
           <textarea
             value={body}
             onChange={(e) => setBody(e.target.value)}
-            rows={10}
+            rows={8}
             placeholder="Write your message..."
             className="w-full border border-border rounded-btn px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-primary resize-none"
           />
+        </div>
+
+        {/* Signature selector */}
+        <div className="border border-border rounded-btn overflow-hidden">
+          <div className="flex items-center justify-between px-3 py-2 bg-surface-secondary/50 border-b border-border">
+            <span className="text-xs font-medium text-text-secondary">Signature</span>
+            <select
+              value={selectedSigId}
+              onChange={(e) => setSelectedSigId(e.target.value)}
+              className="text-xs border-0 bg-transparent text-text-primary focus:outline-none focus:ring-0 cursor-pointer"
+            >
+              <option value="">— No signature —</option>
+              {signatures.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}{s.isDefault ? " (default)" : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+          {selectedSig ? (
+            <div className="px-3 py-2 text-xs text-text-muted whitespace-pre-wrap font-sans leading-relaxed">
+              {selectedSig.content}
+            </div>
+          ) : (
+            <div className="px-3 py-2 text-xs text-text-muted italic">No signature selected</div>
+          )}
         </div>
 
         <div className="flex justify-end gap-2 pt-2">

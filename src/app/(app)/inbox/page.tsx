@@ -14,5 +14,5 @@ export default async function InboxPage() {
     select: { id: true },
   });
 
-  return <InboxView isConnected={!!token} isAdmin={isAdmin} />;
+  return <InboxView isConnected={!!token} isAdmin={isAdmin} currentUserId={session?.user?.id ?? ""} />;
 }

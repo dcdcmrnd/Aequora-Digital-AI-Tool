@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/Button";
 import { ComposeModal } from "./ComposeModal";
+import { SignatureManager } from "./SignatureManager";
 import { cn } from "@/lib/utils";
 
 interface ThreadSummary {
@@ -57,9 +58,10 @@ function getInitials(name: string) {
 interface Props {
   isConnected: boolean;
   isAdmin: boolean;
+  currentUserId: string;
 }
 
-export function InboxView({ isConnected, isAdmin }: Props) {
+export function InboxView({ isConnected, isAdmin, currentUserId }: Props) {
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
   const [selected, setSelected] = useState<ThreadDetail | null>(null);
   const [loadingList, setLoadingList] = useState(false);
@@ -68,6 +70,7 @@ export function InboxView({ isConnected, isAdmin }: Props) {
   const [activeLabel, setActiveLabel] = useState<Label>("INBOX");
   const [composeOpen, setComposeOpen] = useState(false);
   const [replyOpen, setReplyOpen] = useState(false);
+  const [signaturesOpen, setSignaturesOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const fetchThreads = useCallback(async (label: Label, pageToken?: string) => {
@@ -149,10 +152,18 @@ export function InboxView({ isConnected, isAdmin }: Props) {
           <h1 className="text-lg font-semibold text-text-primary">Inbox</h1>
           <p className="text-xs text-text-muted">info@aequoradigital.com</p>
         </div>
-        <Button size="sm" onClick={() => setComposeOpen(true)}>
-          <PenIcon />
-          Compose
-        </Button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setSignaturesOpen(true)}
+            className="text-xs text-text-secondary hover:text-brand-primary border border-border rounded-btn px-3 py-1.5 transition-colors hover:border-brand-primary"
+          >
+            Signatures
+          </button>
+          <Button size="sm" onClick={() => setComposeOpen(true)}>
+            <PenIcon />
+            Compose
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-1 overflow-hidden">
@@ -341,6 +352,13 @@ export function InboxView({ isConnected, isAdmin }: Props) {
           )}
         </div>
       </div>
+
+      {/* Signature manager */}
+      <SignatureManager
+        open={signaturesOpen}
+        onClose={() => setSignaturesOpen(false)}
+        currentUserId={currentUserId}
+      />
 
       {/* Compose modal */}
       <ComposeModal
