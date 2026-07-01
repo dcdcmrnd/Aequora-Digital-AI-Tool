@@ -71,6 +71,8 @@ export function InboxView({ isConnected, isAdmin, currentUserId }: Props) {
   const [composeOpen, setComposeOpen] = useState(false);
   const [replyOpen, setReplyOpen] = useState(false);
   const [signaturesOpen, setSignaturesOpen] = useState(false);
+  // Mobile: show thread list (false) or email detail (true)
+  const [mobileShowDetail, setMobileShowDetail] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const fetchThreads = useCallback(async (label: Label, pageToken?: string) => {
@@ -92,6 +94,7 @@ export function InboxView({ isConnected, isAdmin, currentUserId }: Props) {
     if (!isConnected) return;
     setThreads([]);
     setSelected(null);
+    setMobileShowDetail(false);
     fetchThreads(activeLabel);
   }, [isConnected, activeLabel, fetchThreads]);
 
@@ -102,6 +105,7 @@ export function InboxView({ isConnected, isAdmin, currentUserId }: Props) {
   const openThread = async (thread: ThreadSummary) => {
     setSelected(null);
     setLoadingThread(true);
+    setMobileShowDetail(true);
     setThreads((prev) =>
       prev.map((t) => (t.id === thread.id ? { ...t, isUnread: false } : t))
     );
@@ -112,6 +116,10 @@ export function InboxView({ isConnected, isAdmin, currentUserId }: Props) {
     } finally {
       setLoadingThread(false);
     }
+  };
+
+  const goBackToList = () => {
+    setMobileShowDetail(false);
   };
 
   if (!isConnected) {
@@ -146,31 +154,61 @@ export function InboxView({ isConnected, isAdmin, currentUserId }: Props) {
 
   return (
     <div className="flex flex-col h-[calc(100vh-7rem)] md:h-[calc(100vh-8rem)] bg-white border border-border rounded-card overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between px-6 py-3 border-b border-border flex-shrink-0 bg-white">
-        <div>
-          <h1 className="text-lg font-semibold text-text-primary">Inbox</h1>
-          <p className="text-xs text-text-muted">info@aequoradigital.com</p>
-        </div>
-        <div className="flex items-center gap-2">
+
+      {/* ── Top header (always visible) ── */}
+      <div className="flex items-center justify-between px-4 md:px-6 py-3 border-b border-border flex-shrink-0 bg-white gap-3">
+        {/* Mobile: show back arrow when in detail view */}
+        {mobileShowDetail ? (
+          <button
+            onClick={goBackToList}
+            className="md:hidden flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors flex-shrink-0"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M19 12H5M12 5l-7 7 7 7" />
+            </svg>
+            <span className="text-sm font-medium">Back</span>
+          </button>
+        ) : (
+          <div>
+            <h1 className="text-base md:text-lg font-semibold text-text-primary leading-tight">Inbox</h1>
+            <p className="text-[11px] text-text-muted hidden md:block">info@aequoradigital.com</p>
+          </div>
+        )}
+
+        {/* Subject on mobile detail view */}
+        {mobileShowDetail && selected && (
+          <p className="md:hidden flex-1 text-sm font-medium text-text-primary truncate">{selected.subject || "(no subject)"}</p>
+        )}
+
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Signatures — icon only on mobile */}
           <button
             onClick={() => setSignaturesOpen(true)}
-            className="text-xs text-text-secondary hover:text-brand-primary border border-border rounded-btn px-3 py-1.5 transition-colors hover:border-brand-primary"
+            className="text-xs text-text-secondary hover:text-brand-primary border border-border rounded-btn px-2 md:px-3 py-1.5 transition-colors hover:border-brand-primary"
+            title="Manage Signatures"
           >
-            Signatures
+            <span className="hidden md:inline">Signatures</span>
+            <SignatureIcon className="w-4 h-4 md:hidden" />
           </button>
           <Button size="sm" onClick={() => setComposeOpen(true)}>
             <PenIcon />
-            Compose
+            <span className="hidden md:inline">Compose</span>
           </Button>
         </div>
       </div>
 
+      {/* ── Body ── */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left panel — conversation list */}
-        <div className="w-72 flex-shrink-0 border-r border-border flex flex-col bg-surface-secondary/30">
+
+        {/* Left panel — thread list */}
+        {/* On mobile: visible only when NOT in detail view */}
+        <div className={cn(
+          "flex-col bg-surface-secondary/30",
+          "w-full md:w-72 md:flex-shrink-0 md:border-r md:border-border",
+          mobileShowDetail ? "hidden md:flex" : "flex"
+        )}>
           {/* Tabs */}
-          <div className="flex border-b border-border bg-white">
+          <div className="flex border-b border-border bg-white flex-shrink-0">
             {tabs.map((t) => (
               <button
                 key={t.label}
@@ -204,20 +242,19 @@ export function InboxView({ isConnected, isAdmin, currentUserId }: Props) {
                       key={thread.id}
                       onClick={() => openThread(thread)}
                       className={cn(
-                        "w-full text-left px-4 py-3 border-b border-border/50 transition-colors",
+                        "w-full text-left px-4 py-3.5 border-b border-border/50 transition-colors",
                         isSelected ? "bg-brand-primary/8 border-l-2 border-l-brand-primary" : "hover:bg-white",
                         thread.isUnread && !isSelected && "bg-blue-50/40"
                       )}
                     >
                       <div className="flex items-start gap-3">
-                        {/* Avatar */}
                         <div className="w-9 h-9 rounded-full bg-brand-primary/15 flex items-center justify-center flex-shrink-0 mt-0.5">
                           <span className="text-xs font-semibold text-brand-primary">
                             {getInitials(thread.contactName)}
                           </span>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-1 mb-0.5">
+                          <div className="flex items-center justify-between gap-2 mb-0.5">
                             <span className={cn(
                               "text-sm truncate",
                               thread.isUnread ? "font-semibold text-text-primary" : "font-medium text-text-primary"
@@ -237,7 +274,7 @@ export function InboxView({ isConnected, isAdmin, currentUserId }: Props) {
                           <p className="text-xs text-text-muted truncate">{thread.snippet}</p>
                         </div>
                         {thread.isUnread && (
-                          <span className="w-2 h-2 rounded-full bg-brand-primary flex-shrink-0 mt-1.5" />
+                          <span className="w-2 h-2 rounded-full bg-brand-primary flex-shrink-0 mt-2" />
                         )}
                       </div>
                     </button>
@@ -249,7 +286,7 @@ export function InboxView({ isConnected, isAdmin, currentUserId }: Props) {
                     className="w-full py-3 text-xs text-brand-primary hover:underline"
                     disabled={loadingList}
                   >
-                    {loadingList ? "Loading..." : "Load more"}
+                    {loadingList ? "Loading…" : "Load more"}
                   </button>
                 )}
               </>
@@ -257,21 +294,25 @@ export function InboxView({ isConnected, isAdmin, currentUserId }: Props) {
           </div>
         </div>
 
-        {/* Right panel — conversation/thread view */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Right panel — email detail */}
+        {/* On mobile: visible only when in detail view */}
+        <div className={cn(
+          "flex-1 flex-col overflow-hidden",
+          mobileShowDetail ? "flex" : "hidden md:flex"
+        )}>
           {loadingThread ? (
             <div className="flex items-center justify-center h-full">
               <Spinner />
             </div>
           ) : !selected ? (
-            <div className="flex flex-col items-center justify-center h-full text-center px-8">
+            <div className="hidden md:flex flex-col items-center justify-center h-full text-center px-8">
               <MailIcon className="w-10 h-10 text-text-muted mb-3" />
               <p className="text-sm text-text-muted">Select a conversation to read it</p>
             </div>
           ) : (
             <>
-              {/* Conversation header */}
-              <div className="px-5 py-3 border-b border-border flex-shrink-0 flex items-center justify-between bg-white">
+              {/* Thread subject header — desktop only (mobile shows in top bar) */}
+              <div className="hidden md:flex px-5 py-3 border-b border-border flex-shrink-0 items-center justify-between bg-white">
                 <div>
                   <h2 className="text-sm font-semibold text-text-primary">{selected.subject || "(no subject)"}</h2>
                   <p className="text-xs text-text-muted mt-0.5">{selected.messages.length} message{selected.messages.length !== 1 ? "s" : ""}</p>
@@ -283,9 +324,9 @@ export function InboxView({ isConnected, isAdmin, currentUserId }: Props) {
               </div>
 
               {/* Message bubbles */}
-              <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 bg-surface-secondary/20">
+              <div className="flex-1 overflow-y-auto px-4 md:px-5 py-4 space-y-4 bg-surface-secondary/20">
                 {selected.messages.map((msg) => (
-                  <div key={msg.id} className={cn("flex gap-3", msg.isOutgoing ? "flex-row-reverse" : "flex-row")}>
+                  <div key={msg.id} className={cn("flex gap-2 md:gap-3", msg.isOutgoing ? "flex-row-reverse" : "flex-row")}>
                     {/* Avatar */}
                     {!msg.isOutgoing && (
                       <div className="w-8 h-8 rounded-full bg-brand-primary/15 flex items-center justify-center flex-shrink-0 mt-1">
@@ -296,11 +337,14 @@ export function InboxView({ isConnected, isAdmin, currentUserId }: Props) {
                     )}
                     {msg.isOutgoing && (
                       <div className="w-8 h-8 rounded-full bg-brand-primary flex items-center justify-center flex-shrink-0 mt-1">
-                        <span className="text-xs font-semibold text-white">Ae</span>
+                        <span className="text-[10px] font-semibold text-white">Ae</span>
                       </div>
                     )}
 
-                    <div className={cn("max-w-[75%]", msg.isOutgoing ? "items-end" : "items-start")} style={{ display: "flex", flexDirection: "column" }}>
+                    <div
+                      className={cn("flex flex-col", msg.isOutgoing ? "items-end" : "items-start")}
+                      style={{ maxWidth: "min(75%, 520px)" }}
+                    >
                       <div className="flex items-center gap-2 mb-1 px-1">
                         <span className="text-xs font-medium text-text-secondary">
                           {msg.isOutgoing ? "Aequora Digital" : msg.from.replace(/<.*>/, "").trim()}
@@ -308,13 +352,13 @@ export function InboxView({ isConnected, isAdmin, currentUserId }: Props) {
                         <span className="text-[10px] text-text-muted">{formatDate(msg.date)}</span>
                       </div>
                       <div className={cn(
-                        "rounded-2xl overflow-hidden text-sm",
+                        "rounded-2xl overflow-hidden text-sm w-full",
                         msg.isOutgoing
                           ? "bg-brand-primary text-white rounded-tr-sm"
                           : "bg-white border border-border rounded-tl-sm shadow-sm"
                       )}>
                         {msg.html ? (
-                          <div className={cn("p-3", msg.isOutgoing ? "[&_*]:!color-white [&_a]:!text-white" : "")}>
+                          <div className="p-3">
                             <iframe
                               srcDoc={msg.html}
                               className="w-full border-none"
@@ -323,7 +367,7 @@ export function InboxView({ isConnected, isAdmin, currentUserId }: Props) {
                               title="Email content"
                               onLoad={(e) => {
                                 const iframe = e.currentTarget;
-                                iframe.style.height = iframe.contentDocument?.body?.scrollHeight + "px";
+                                iframe.style.height = (iframe.contentDocument?.body?.scrollHeight ?? 60) + "px";
                               }}
                             />
                           </div>
@@ -340,12 +384,19 @@ export function InboxView({ isConnected, isAdmin, currentUserId }: Props) {
               </div>
 
               {/* Quick reply bar */}
-              <div className="px-5 py-3 border-t border-border bg-white flex-shrink-0">
+              <div className="px-4 md:px-5 py-3 border-t border-border bg-white flex-shrink-0 flex items-center gap-2">
                 <button
                   onClick={() => setReplyOpen(true)}
-                  className="w-full text-left px-4 py-2.5 rounded-full border border-border text-sm text-text-muted hover:border-brand-primary hover:text-text-primary transition-colors bg-surface-secondary/40"
+                  className="flex-1 text-left px-4 py-2.5 rounded-full border border-border text-sm text-text-muted hover:border-brand-primary hover:text-text-primary transition-colors bg-surface-secondary/40"
                 >
                   Reply to {lastMessage?.isOutgoing ? "this thread" : (lastMessage?.from.replace(/<.*>/, "").trim() || "sender")}…
+                </button>
+                {/* Mobile reply button */}
+                <button
+                  onClick={() => setReplyOpen(true)}
+                  className="md:hidden flex-shrink-0 w-10 h-10 bg-brand-primary text-white rounded-full flex items-center justify-center"
+                >
+                  <ReplyIcon />
                 </button>
               </div>
             </>
@@ -384,6 +435,8 @@ export function InboxView({ isConnected, isAdmin, currentUserId }: Props) {
   );
 }
 
+// ─── Icons ────────────────────────────────────────────────────────────────────
+
 function MailIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -412,6 +465,15 @@ function LinkIcon() {
   return (
     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+    </svg>
+  );
+}
+
+function SignatureIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" />
     </svg>
   );
 }
