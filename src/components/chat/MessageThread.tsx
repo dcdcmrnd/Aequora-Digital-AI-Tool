@@ -19,14 +19,38 @@ interface AudioMessage {
   duration: number;
 }
 
-function parseContent(content: string): { isAudio: true; audio: AudioMessage } | { isAudio: false; text: string } {
-  if (content.startsWith('{"type":"audio"')) {
+interface ImageMessage {
+  type: "image" | "gif";
+  url: string;
+  alt?: string;
+}
+
+function parseContent(content: string):
+  | { isAudio: true; audio: AudioMessage; isImage: false }
+  | { isImage: true; image: ImageMessage; isAudio: false }
+  | { isAudio: false; isImage: false; text: string } {
+  if (content.startsWith('{"type":"')) {
     try {
-      const parsed = JSON.parse(content) as AudioMessage;
-      return { isAudio: true, audio: parsed };
+      const parsed = JSON.parse(content) as AudioMessage | ImageMessage;
+      if (parsed.type === "audio") {
+        return { isAudio: true, audio: parsed as AudioMessage, isImage: false };
+      }
+      if (parsed.type === "image" || parsed.type === "gif") {
+        return { isAudio: false, isImage: true, image: parsed as ImageMessage };
+      }
     } catch {}
   }
-  return { isAudio: false, text: content };
+
+  const imageUrlPattern = /^https?:\/\/.+\.(png|jpe?g|gif|webp|avif|svg)(\?.*)?$/i;
+  if (imageUrlPattern.test(content.trim())) {
+    return {
+      isAudio: false,
+      isImage: true,
+      image: { type: "image", url: content.trim() },
+    };
+  }
+
+  return { isAudio: false, isImage: false, text: content };
 }
 
 interface Props {
@@ -49,6 +73,9 @@ export function MessageThread({ room, currentUserId, currentUserName, isAdmin, o
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showPicker, setShowPicker] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const onMessagesReadRef = useRef(onMessagesRead);
@@ -127,9 +154,29 @@ export function MessageThread({ room, currentUserId, currentUserName, isAdmin, o
 
   const send = async () => {
     const text = input.trim();
-    if (!text) return;
+    if (!text && !selectedFile) return;
     setInput("");
-    await sendMessage(text);
+    setSelectedFile(null);
+    setPreviewUrl(null);
+
+    if (selectedFile) {
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+      try {
+        const res = await fetch("/api/upload", { method: "POST", body: formData });
+        if (!res.ok) throw new Error("Upload failed");
+        const { url } = await res.json();
+
+        const type = selectedFile.type.includes("gif") ? "gif" : "image";
+        await sendMessage(JSON.stringify({ type, url, alt: text || "Shared image" }));
+      } catch (error) {
+        console.error("Image upload failed", error);
+      }
+    }
+
+    if (text) {
+      await sendMessage(text);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -137,6 +184,27 @@ export function MessageThread({ room, currentUserId, currentUserName, isAdmin, o
       e.preventDefault();
       send();
     }
+  };
+
+  const addEmoji = (emoji: string) => {
+    setInput((current) => current + emoji);
+    setShowPicker(false);
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      alert("Only image files are supported.");
+      return;
+    }
+    setSelectedFile(file);
+    setPreviewUrl(URL.createObjectURL(file));
+  };
+
+  const removeSelectedFile = () => {
+    setSelectedFile(null);
+    setPreviewUrl(null);
   };
 
   const startRecording = async () => {
@@ -262,13 +330,21 @@ export function MessageThread({ room, currentUserId, currentUserName, isAdmin, o
                         isMine
                           ? "bg-brand-primary text-white rounded-br-sm"
                           : "bg-surface-secondary text-text-primary rounded-bl-sm",
-                        parsed.isAudio ? "min-w-[200px]" : "px-3 py-2"
+                        parsed.isAudio || parsed.isImage ? "min-w-[200px]" : "px-3 py-2"
                       )}
                     >
                       {parsed.isAudio ? (
                         <AudioPlayer audio={parsed.audio} isMine={isMine} />
+                      ) : parsed.isImage ? (
+                        <div className="max-w-[24rem] rounded-2xl overflow-hidden bg-black/5">
+                          <img
+                            src={parsed.image.url}
+                            alt={parsed.image.alt ?? "Shared image"}
+                            className="w-full h-auto object-cover"
+                          />
+                        </div>
                       ) : (
-                        parsed.text
+                        <span className="whitespace-pre-wrap break-words">{parsed.text}</span>
                       )}
                     </div>
                     <span className="text-[10px] text-text-muted mt-1 mx-1">
@@ -306,7 +382,28 @@ export function MessageThread({ room, currentUserId, currentUserName, isAdmin, o
         )}
 
         <div className="flex items-end gap-2">
-          {/* Mic button */}
+          <button
+            type="button"
+            onClick={() => setShowPicker((open) => !open)}
+            className="flex-shrink-0 w-9 h-9 flex items-center justify-center border border-border rounded-xl text-text-muted hover:text-brand-primary hover:border-brand-primary transition-colors"
+          >
+            <span className="text-lg">😊</span>
+          </button>
+
+          <label className="flex-shrink-0 w-9 h-9 flex items-center justify-center border border-border rounded-xl text-text-muted hover:text-brand-primary hover:border-brand-primary transition-colors cursor-pointer">
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16.5V19a2 2 0 002 2h12a2 2 0 002-2v-2.5" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 13.5l-4.5 4.5L7.5 13.5" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 12a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" />
+            </svg>
+          </label>
+
           <button
             onClick={isRecording ? stopRecording : startRecording}
             disabled={uploadingAudio}
@@ -333,7 +430,7 @@ export function MessageThread({ room, currentUserId, currentUserName, isAdmin, o
           />
           <button
             onClick={send}
-            disabled={!input.trim() || sending || isRecording}
+            disabled={(!input.trim() && !selectedFile) || sending || isRecording}
             className="flex-shrink-0 w-9 h-9 flex items-center justify-center bg-brand-primary text-white rounded-xl hover:bg-brand-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <svg className="w-4 h-4 rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -341,6 +438,48 @@ export function MessageThread({ room, currentUserId, currentUserName, isAdmin, o
             </svg>
           </button>
         </div>
+        {previewUrl && (
+          <div className="mt-3 flex items-center gap-3 rounded-2xl border border-border overflow-hidden bg-surface-secondary">
+            <img src={previewUrl} alt="Preview" className="h-16 w-16 object-cover" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-text-primary">Image ready to send</p>
+              <button
+                type="button"
+                onClick={removeSelectedFile}
+                className="text-[11px] text-text-muted hover:text-text-primary"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        )}
+        {showPicker && (
+          <div className="mt-3 grid grid-cols-6 gap-2 rounded-2xl border border-border bg-white p-3 shadow-sm">
+            {[
+              "😀",
+              "😂",
+              "😍",
+              "😎",
+              "😭",
+              "👍",
+              "🎉",
+              "🔥",
+              "💬",
+              "🥳",
+              "🤖",
+              "❤️",
+            ].map((emoji) => (
+              <button
+                key={emoji}
+                type="button"
+                onClick={() => addEmoji(emoji)}
+                className="h-10 w-10 rounded-xl text-lg hover:bg-surface-secondary transition-colors"
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+        )}
         <p className="text-[10px] text-text-muted mt-1.5">Enter to send · Shift+Enter for new line</p>
       </div>
     </div>
