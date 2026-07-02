@@ -12,6 +12,7 @@ interface ThreadSummary {
   snippet: string;
   date: string;
   isUnread: boolean;
+  status: "unread" | "read";
   messageCount: number;
   contactName: string;
   contactEmail: string;
@@ -31,6 +32,7 @@ interface ThreadMessage {
 interface ThreadDetail {
   id: string;
   subject: string;
+  status: "unread" | "read";
   messages: ThreadMessage[];
 }
 
@@ -261,9 +263,19 @@ export function InboxView({ isConnected, isAdmin, currentUserId }: Props) {
                             )}>
                               {thread.contactName}
                             </span>
-                            <span className="text-[10px] text-text-muted flex-shrink-0">
-                              {formatDate(thread.date)}
-                            </span>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <span className={cn(
+                                "text-[10px] px-2 py-0.5 rounded-full font-medium",
+                                thread.isUnread
+                                  ? "bg-amber-100 text-amber-700"
+                                  : "bg-emerald-100 text-emerald-700"
+                              )}>
+                                {thread.isUnread ? "Unread" : "Read"}
+                              </span>
+                              <span className="text-[10px] text-text-muted">
+                                {formatDate(thread.date)}
+                              </span>
+                            </div>
                           </div>
                           <p className={cn(
                             "text-xs truncate mb-0.5",
@@ -315,7 +327,17 @@ export function InboxView({ isConnected, isAdmin, currentUserId }: Props) {
               <div className="hidden md:flex px-5 py-3 border-b border-border flex-shrink-0 items-center justify-between bg-white">
                 <div>
                   <h2 className="text-sm font-semibold text-text-primary">{selected.subject || "(no subject)"}</h2>
-                  <p className="text-xs text-text-muted mt-0.5">{selected.messages.length} message{selected.messages.length !== 1 ? "s" : ""}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className={cn(
+                      "text-[10px] px-2 py-0.5 rounded-full font-medium",
+                      selected.status === "unread"
+                        ? "bg-amber-100 text-amber-700"
+                        : "bg-emerald-100 text-emerald-700"
+                    )}>
+                      {selected.status === "unread" ? "Unread" : "Read"}
+                    </span>
+                    <p className="text-xs text-text-muted">{selected.messages.length} message{selected.messages.length !== 1 ? "s" : ""}</p>
+                  </div>
                 </div>
                 <Button size="sm" variant="secondary" onClick={() => setReplyOpen(true)}>
                   <ReplyIcon />

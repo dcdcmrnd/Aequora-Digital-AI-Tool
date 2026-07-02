@@ -62,6 +62,7 @@ export async function GET(req: NextRequest) {
           snippet: last?.snippet ?? "",
           date: getHeader(headers, "Date"),
           isUnread,
+          status: isUnread ? "unread" : "read",
           messageCount: messages.length,
           contactName: contact.name,
           contactEmail: contact.email,

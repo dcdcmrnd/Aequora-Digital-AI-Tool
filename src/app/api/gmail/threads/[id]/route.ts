@@ -39,6 +39,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       );
     }
 
+    const hadUnread = (thread.data.messages ?? []).some((m) => m.labelIds?.includes("UNREAD"));
+
     const messages = (thread.data.messages ?? []).map((msg) => {
       const headers = msg.payload?.headers ?? [];
       const from = getHeader(headers, "From");
@@ -63,6 +65,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     return NextResponse.json({
       id: params.id,
       subject: getHeader(firstHeaders, "Subject"),
+      status: hadUnread ? "unread" : "read",
       messages,
     });
   } catch (err: any) {
