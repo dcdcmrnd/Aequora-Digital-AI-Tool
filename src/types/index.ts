@@ -15,6 +15,7 @@ export type PermissionType =
   | "notes.create"
   | "notes.manage"
   | "team.view"
+  | "company.email"
   | "ai.task_assistant"
   | "ai.consultant"
   | "admin.users"
@@ -31,6 +32,7 @@ export const ALL_PERMISSIONS: { key: PermissionType; label: string; group: strin
   { key: "notes.create", label: "Create Notes", group: "Notes" },
   { key: "notes.manage", label: "Manage Notes", group: "Notes" },
   { key: "team.view", label: "View Team", group: "Team" },
+  { key: "company.email", label: "Access Company Email", group: "Inbox" },
   { key: "ai.task_assistant", label: "Task Assistant", group: "AI" },
   { key: "ai.consultant", label: "Business Consultant", group: "AI" },
   { key: "admin.users", label: "Manage Users", group: "Admin" },

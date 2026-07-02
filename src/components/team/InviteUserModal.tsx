@@ -31,6 +31,7 @@ const ADMIN_PERMISSIONS: PermissionType[] = [
   "notes.create",
   "notes.manage",
   "team.view",
+  "company.email",
   "ai.task_assistant",
   "ai.consultant",
   "admin.users",

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getGmailClient } from "@/lib/gmail";
+import { checkPermission } from "@/lib/permissions";
 
 function encodeEmail(fields: {
   to: string;
@@ -33,6 +34,9 @@ function encodeEmail(fields: {
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const canAccessInbox = session.user.role === "admin" || (await checkPermission(session.user.id, "company.email"));
+  if (!canAccessInbox) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { to, subject, body, threadId, inReplyTo, references } = await req.json();
 

@@ -11,6 +11,7 @@ export const PERMISSIONS = {
   NOTES_CREATE: "notes.create",
   NOTES_MANAGE: "notes.manage",
   TEAM_VIEW: "team.view",
+  COMPANY_EMAIL_ACCESS: "company.email",
   AI_TASK_ASSISTANT: "ai.task_assistant",
   AI_CONSULTANT: "ai.consultant",
   ADMIN_USERS: "admin.users",

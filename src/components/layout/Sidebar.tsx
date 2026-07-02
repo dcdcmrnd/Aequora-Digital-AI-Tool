@@ -48,6 +48,7 @@ export function Sidebar({ companyName = "Aequora Digital", companyLogoUrl, onClo
   const canViewTasks = usePermission("tasks.view");
   const canViewNotes = usePermission("notes.view");
   const canViewTeam = usePermission("team.view");
+  const canAccessCompanyEmail = usePermission("company.email");
   const isAdmin = session?.user?.role === "admin";
 
   return (
@@ -92,7 +93,7 @@ export function Sidebar({ companyName = "Aequora Digital", companyLogoUrl, onClo
 
         {/* Clients */}
         <p className="px-3 pt-4 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-[#475569]">Clients</p>
-        <NavLink href="/inbox" label="Inbox" icon={<InboxIcon />} />
+        {(isAdmin || canAccessCompanyEmail) && <NavLink href="/inbox" label="Inbox" icon={<InboxIcon />} />}
 
         {/* Team */}
         <p className="px-3 pt-4 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-[#475569]">Team</p>
