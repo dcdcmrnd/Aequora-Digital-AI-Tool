@@ -31,9 +31,20 @@ function parseContent(content: string):
   | { isImage: true; image: ImageMessage; isAudio: false }
   | { isAudio: false; isImage: false; text: string } {
   const trimmed = content.trim();
-  if (trimmed.startsWith('{"type":"')) {
+  let normalized = trimmed;
+
+  if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
     try {
-      const parsed = JSON.parse(trimmed) as AudioMessage | ImageMessage;
+      const parsedString = JSON.parse(trimmed);
+      if (typeof parsedString === "string") {
+        normalized = parsedString.trim();
+      }
+    } catch {}
+  }
+
+  if (normalized.startsWith('{"type":"')) {
+    try {
+      const parsed = JSON.parse(normalized) as AudioMessage | ImageMessage;
       if (parsed.type === "audio") {
         return { isAudio: true, audio: parsed as AudioMessage, isImage: false };
       }
@@ -44,15 +55,15 @@ function parseContent(content: string):
   }
 
   const imageUrlPattern = /^https?:\/\/.+\.(png|jpe?g|gif|webp|avif|svg)(\?.*)?$/i;
-  if (imageUrlPattern.test(content.trim())) {
+  if (imageUrlPattern.test(normalized)) {
     return {
       isAudio: false,
       isImage: true,
-      image: { type: "image", url: content.trim() },
+      image: { type: "image", url: normalized },
     };
   }
 
-  return { isAudio: false, isImage: false, text: content };
+  return { isAudio: false, isImage: false, text: normalized };
 }
 
 interface Props {
