@@ -23,15 +23,17 @@ interface ImageMessage {
   type: "image" | "gif";
   url: string;
   alt?: string;
+  caption?: string;
 }
 
 function parseContent(content: string):
   | { isAudio: true; audio: AudioMessage; isImage: false }
   | { isImage: true; image: ImageMessage; isAudio: false }
   | { isAudio: false; isImage: false; text: string } {
-  if (content.startsWith('{"type":"')) {
+  const trimmed = content.trim();
+  if (trimmed.startsWith('{"type":"')) {
     try {
-      const parsed = JSON.parse(content) as AudioMessage | ImageMessage;
+      const parsed = JSON.parse(trimmed) as AudioMessage | ImageMessage;
       if (parsed.type === "audio") {
         return { isAudio: true, audio: parsed as AudioMessage, isImage: false };
       }
@@ -169,10 +171,17 @@ export function MessageThread({ room, currentUserId, currentUserName, isAdmin, o
         const { url } = await res.json();
 
         const type = selectedFile.type.includes("gif") ? "gif" : "image";
-        await sendMessage(JSON.stringify({ type, url, alt: text || "Shared image" }));
+        const imagePayload: ImageMessage = {
+          type,
+          url,
+          alt: text || "Shared image",
+          caption: text || undefined,
+        };
+        await sendMessage(JSON.stringify(imagePayload));
       } catch (error) {
         console.error("Image upload failed", error);
       }
+      return;
     }
 
     if (text) {
@@ -384,6 +393,11 @@ export function MessageThread({ room, currentUserId, currentUserName, isAdmin, o
                             alt={parsed.image.alt ?? "Shared image"}
                             className="w-full h-auto object-cover"
                           />
+                          {parsed.image.caption ? (
+                            <div className="px-3 py-2 bg-surface-secondary text-text-primary text-sm">
+                              {parsed.image.caption}
+                            </div>
+                          ) : null}
                         </div>
                       ) : (
                         <span className="whitespace-pre-wrap break-words">{parsed.text}</span>
