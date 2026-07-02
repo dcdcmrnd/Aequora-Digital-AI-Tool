@@ -66,6 +66,15 @@ export function Sidebar({ companyName = "Aequora Digital", companyLogoUrl, onClo
           <div className="flex-1 min-w-0">
             <p className="text-white font-semibold text-sm leading-tight truncate max-w-[140px]">{companyName}</p>
             <p className="text-[#64748B] text-xs">Workspace</p>
+            <a
+              href="https://www.linkedin.com/company/aequora-digital-services/posts/?feedView=all"
+              target="_blank"
+              rel="noreferrer"
+              className="mt-1 inline-flex items-center gap-2 text-[10px] text-[#94A3B8] hover:text-white"
+            >
+              <LinkedInIcon />
+              LinkedIn
+            </a>
           </div>
           {onClose && (
             <button
@@ -204,6 +213,14 @@ function CalendarIcon() {
       <line x1="16" y1="2" x2="16" y2="6" />
       <line x1="8" y1="2" x2="8" y2="6" />
       <line x1="3" y1="10" x2="21" y2="10" />
+    </svg>
+  );
+}
+
+function LinkedInIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3">
+      <path d="M4.98 3.5C4.98 4.88 3.86 6 2.5 6S0 4.88 0 3.5 1.12 1 2.5 1 4.98 2.12 4.98 3.5zM0 8.5h5V24H0V8.5zm7.5 0h4.75v2.15h.07c.66-1.24 2.27-2.55 4.68-2.55 5 0 5.93 3.29 5.93 7.56V24h-5V14.4c0-2.29-.04-5.24-3.2-5.24-3.2 0-3.69 2.5-3.69 5.08V24h-5V8.5z" />
     </svg>
   );
 }
