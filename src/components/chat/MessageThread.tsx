@@ -168,20 +168,21 @@ export function MessageThread({ room, currentUserId, currentUserName, isAdmin, o
 
   const send = async () => {
     const text = input.trim();
-    if (!text && !selectedFile) return;
+    const fileToSend = selectedFile;
+    if (!text && !fileToSend) return;
     setInput("");
     setSelectedFile(null);
     setPreviewUrl(null);
 
-    if (selectedFile) {
+    if (fileToSend) {
       const formData = new FormData();
-      formData.append("file", selectedFile);
+      formData.append("file", fileToSend);
       try {
         const res = await fetch("/api/upload", { method: "POST", body: formData });
         if (!res.ok) throw new Error("Upload failed");
         const { url } = await res.json();
 
-        const type = selectedFile.type.includes("gif") ? "gif" : "image";
+        const type = fileToSend.type.includes("gif") ? "gif" : "image";
         const imagePayload: ImageMessage = {
           type,
           url,
