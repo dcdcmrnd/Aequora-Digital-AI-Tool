@@ -66,15 +66,6 @@ export function Sidebar({ companyName = "Aequora Digital", companyLogoUrl, onClo
           <div className="flex-1 min-w-0">
             <p className="text-white font-semibold text-sm leading-tight truncate max-w-[140px]">{companyName}</p>
             <p className="text-[#64748B] text-xs">Workspace</p>
-            <a
-              href="https://www.linkedin.com/company/aequora-digital-services/posts/?feedView=all"
-              target="_blank"
-              rel="noreferrer"
-              className="mt-1 inline-flex items-center gap-2 text-[10px] text-[#94A3B8] hover:text-white"
-            >
-              <LinkedInIcon />
-              LinkedIn
-            </a>
           </div>
           {onClose && (
             <button
@@ -113,6 +104,15 @@ export function Sidebar({ companyName = "Aequora Digital", companyLogoUrl, onClo
 
       {/* User + Settings */}
       <div className="px-3 py-4 border-t border-white/10 space-y-1">
+        <a
+          href="https://www.linkedin.com/company/aequora-digital-services/posts/?feedView=all"
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-2 px-3 py-2 rounded-btn text-sm text-[#94A3B8] hover:text-white hover:bg-white/5 transition-colors"
+        >
+          <LinkedInIcon />
+          LinkedIn
+        </a>
         {isAdmin && (
           <NavLink
             href="/settings"
