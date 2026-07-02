@@ -76,6 +76,7 @@ export function MessageThread({ room, currentUserId, currentUserName, isAdmin, o
   const [showPicker, setShowPicker] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [dragActive, setDragActive] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const onMessagesReadRef = useRef(onMessagesRead);
@@ -191,6 +192,11 @@ export function MessageThread({ room, currentUserId, currentUserName, isAdmin, o
     setShowPicker(false);
   };
 
+  const uploadSelectedFile = async (file: File) => {
+    setSelectedFile(file);
+    setPreviewUrl(URL.createObjectURL(file));
+  };
+
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null;
     if (!file) return;
@@ -198,8 +204,44 @@ export function MessageThread({ room, currentUserId, currentUserName, isAdmin, o
       alert("Only image files are supported.");
       return;
     }
-    setSelectedFile(file);
-    setPreviewUrl(URL.createObjectURL(file));
+    uploadSelectedFile(file);
+  };
+
+  const handlePaste = async (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = event.clipboardData.items;
+    if (!items) return;
+
+    for (const item of Array.from(items)) {
+      if (item.kind === "file" && item.type.startsWith("image/")) {
+        event.preventDefault();
+        const file = item.getAsFile();
+        if (file) {
+          uploadSelectedFile(file);
+        }
+        break;
+      }
+    }
+  };
+
+  const handleDrop = async (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setDragActive(false);
+    const file = event.dataTransfer.files?.[0] ?? null;
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      alert("Only image files are supported.");
+      return;
+    }
+    uploadSelectedFile(file);
+  };
+
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setDragActive(true);
+  };
+
+  const handleDragLeave = () => {
+    setDragActive(false);
   };
 
   const removeSelectedFile = () => {
@@ -418,16 +460,27 @@ export function MessageThread({ room, currentUserId, currentUserName, isAdmin, o
             {isRecording ? <StopIcon /> : <MicIcon />}
           </button>
 
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            rows={1}
-            placeholder={`Message ${title}…`}
-            disabled={isRecording}
-            className="flex-1 resize-none px-3 py-2 text-sm border border-border rounded-xl focus:outline-none focus:border-brand-primary transition-colors bg-surface-secondary placeholder:text-text-muted max-h-32 disabled:opacity-50"
-            style={{ minHeight: "40px" }}
-          />
+          <div
+            onDrop={handleDrop}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            className={cn(
+              "flex-1 rounded-xl border transition-colors",
+              dragActive ? "border-brand-primary bg-brand-primary/5" : "border-border bg-surface-secondary"
+            )}
+          >
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
+              rows={1}
+              placeholder={`Message ${title}…`}
+              disabled={isRecording}
+              className="w-full resize-none px-3 py-2 text-sm bg-transparent border-none outline-none focus:outline-none focus:ring-0 placeholder:text-text-muted max-h-32 disabled:opacity-50"
+              style={{ minHeight: "40px" }}
+            />
+          </div>
           <button
             onClick={send}
             disabled={(!input.trim() && !selectedFile) || sending || isRecording}
