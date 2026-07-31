@@ -10,6 +10,8 @@ export const PERMISSIONS = {
   NOTES_VIEW: "notes.view",
   NOTES_CREATE: "notes.create",
   NOTES_MANAGE: "notes.manage",
+  LEADS_VIEW: "leads.view",
+  LEADS_MANAGE: "leads.manage",
   TEAM_VIEW: "team.view",
   COMPANY_EMAIL_ACCESS: "company.email",
   AI_TASK_ASSISTANT: "ai.task_assistant",
@@ -27,6 +29,8 @@ export const DEFAULT_MEMBER_PERMISSIONS: PermissionType[] = [
   PERMISSIONS.NOTES_VIEW,
   PERMISSIONS.NOTES_CREATE,
   PERMISSIONS.AI_TASK_ASSISTANT,
+  PERMISSIONS.LEADS_VIEW,
+  PERMISSIONS.LEADS_MANAGE,
 ];
 
 export async function checkPermission(

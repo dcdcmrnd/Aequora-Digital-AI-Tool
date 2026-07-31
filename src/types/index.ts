@@ -14,6 +14,8 @@ export type PermissionType =
   | "notes.view"
   | "notes.create"
   | "notes.manage"
+  | "leads.view"
+  | "leads.manage"
   | "team.view"
   | "company.email"
   | "ai.task_assistant"
@@ -31,6 +33,8 @@ export const ALL_PERMISSIONS: { key: PermissionType; label: string; group: strin
   { key: "notes.view", label: "View Notes", group: "Notes" },
   { key: "notes.create", label: "Create Notes", group: "Notes" },
   { key: "notes.manage", label: "Manage Notes", group: "Notes" },
+  { key: "leads.view", label: "View Leads", group: "Leads" },
+  { key: "leads.manage", label: "Manage Leads", group: "Leads" },
   { key: "team.view", label: "View Team", group: "Team" },
   { key: "company.email", label: "Access Company Email", group: "Inbox" },
   { key: "ai.task_assistant", label: "Task Assistant", group: "AI" },
@@ -204,3 +208,78 @@ export const EVENT_TYPE_COLORS: Record<CalendarEventType, string> = {
   event: "#0F7B8A",
   deadline: "#DC2626",
 };
+
+export type LeadStatus = "New" | "Contacted" | "Meeting Scheduled" | "Proposal Sent" | "Won" | "Lost";
+
+export const LEAD_STATUSES: LeadStatus[] = [
+  "New",
+  "Contacted",
+  "Meeting Scheduled",
+  "Proposal Sent",
+  "Won",
+  "Lost",
+];
+
+export interface LeadAudit {
+  id: string;
+  leadId: string;
+  performanceScore: number | null;
+  seoScore: number | null;
+  accessibilityScore: number | null;
+  bestPracticesScore: number | null;
+  mobileFriendly: boolean | null;
+  httpsEnabled: boolean | null;
+  hasMetaDescription: boolean | null;
+  hasTitle: boolean | null;
+  sslValid: boolean | null;
+  pageSpeed: number | null;
+  overallScore: number | null;
+  lastScanned: string;
+  createdAt: string;
+}
+
+export interface Lead {
+  id: string;
+  googlePlaceId: string;
+  name: string;
+  category: string | null;
+  businessStatus: string | null;
+  phone: string | null;
+  website: string | null;
+  rating: number | null;
+  reviewCount: number;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  lat: number | null;
+  lng: number | null;
+  opportunityScore: number;
+  opportunityScoreUpdatedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  audit?: LeadAudit | null;
+}
+
+export interface SavedLead {
+  id: string;
+  userId: string;
+  leadId: string;
+  lead?: Lead;
+  status: LeadStatus;
+  notes: string | null;
+  tags: string[];
+  followUpDate: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LeadSearch {
+  id: string;
+  userId: string;
+  keyword: string;
+  location: string;
+  radius: number | null;
+  resultsCount: number;
+  createdAt: string;
+}
