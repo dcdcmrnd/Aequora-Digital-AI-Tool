@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { QueryProvider } from "@/components/providers/QueryProvider";
 import { SessionProvider } from "@/components/providers/SessionProvider";
 import { ServiceWorkerRegistration } from "@/components/providers/ServiceWorkerRegistration";
 import { Toaster } from "react-hot-toast";
@@ -37,8 +38,10 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <SessionProvider>
-          <ServiceWorkerRegistration />
-          {children}
+          <QueryProvider>
+            <ServiceWorkerRegistration />
+            {children}
+          </QueryProvider>
           <Toaster
             position="bottom-right"
             toastOptions={{
