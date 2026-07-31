@@ -40,6 +40,8 @@ model User {
   chatRoomsCreated ChatRoom[]     @relation("ChatRoomCreator")
   chatMemberships  ChatMember[]
   chatMessages     ChatMessage[]
+  savedLeads       SavedLead[]    @relation("SavedLeadOwner")
+  leadSearches     LeadSearch[]   @relation("LeadSearchOwner")
 }
 
 model Invitation {
@@ -308,4 +310,77 @@ model GmailToken {
   refreshToken String
   expiryDate   BigInt
   updatedAt    DateTime @updatedAt
+}
+
+// --- Leads / Prospecting ---
+
+model Lead {
+  id                        String    @id @default(cuid())
+  googlePlaceId             String    @unique
+  name                      String
+  category                  String?
+  businessStatus            String?   // OPERATING | CLOSED_TEMPORARILY | CLOSED_PERMANENTLY
+  phone                     String?
+  website                   String?
+  rating                    Float?
+  reviewCount                Int       @default(0)
+  address                   String?
+  city                      String?
+  state                     String?
+  country                   String?
+  lat                       Float?
+  lng                       Float?
+  opportunityScore          Int       @default(0)
+  opportunityScoreUpdatedAt DateTime?
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+
+  audit        LeadAudit?
+  savedByUsers SavedLead[]
+}
+
+model LeadAudit {
+  id                 String   @id @default(cuid())
+  leadId             String   @unique
+  lead               Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  performanceScore   Int?
+  seoScore           Int?
+  accessibilityScore Int?
+  bestPracticesScore Int?
+  mobileFriendly     Boolean?
+  httpsEnabled       Boolean?
+  hasMetaDescription Boolean?
+  hasTitle           Boolean?
+  sslValid           Boolean?
+  pageSpeed          Float?
+  overallScore       Int?
+  lastScanned        DateTime @default(now())
+  createdAt          DateTime @default(now())
+}
+
+model SavedLead {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation("SavedLeadOwner", fields: [userId], references: [id], onDelete: Cascade)
+  leadId       String
+  lead         Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  status       String    @default("New") // New | Contacted | Meeting Scheduled | Proposal Sent | Won | Lost
+  notes        String?
+  tags         String    @default("[]") // JSON array of strings
+  followUpDate DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([userId, leadId])
+}
+
+model LeadSearch {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation("LeadSearchOwner", fields: [userId], references: [id], onDelete: Cascade)
+  keyword      String
+  location     String
+  radius       Int?
+  resultsCount Int      @default(0)
+  createdAt    DateTime @default(now())
 }
