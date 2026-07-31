@@ -47,6 +47,7 @@ export function Sidebar({ companyName = "Aequora Digital", companyLogoUrl, onClo
   const canViewProjects = usePermission("projects.view");
   const canViewTasks = usePermission("tasks.view");
   const canViewNotes = usePermission("notes.view");
+  const canViewLeads = usePermission("leads.view");
   const canViewTeam = usePermission("team.view");
   const canAccessCompanyEmail = usePermission("company.email");
   const isAdmin = session?.user?.role === "admin";
@@ -93,6 +94,7 @@ export function Sidebar({ companyName = "Aequora Digital", companyLogoUrl, onClo
 
         {/* Clients */}
         <p className="px-3 pt-4 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-[#475569]">Clients</p>
+        {canViewLeads && <NavLink href="/leads" label="Leads" icon={<TargetIcon />} />}
         {(isAdmin || canAccessCompanyEmail) && <NavLink href="/inbox" label="Inbox" icon={<InboxIcon />} />}
 
         {/* Team */}
@@ -205,6 +207,16 @@ function UsersIcon() {
   );
 }
 
+
+function TargetIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <circle cx="12" cy="12" r="6" />
+      <circle cx="12" cy="12" r="2" />
+    </svg>
+  );
+}
 
 function CalendarIcon() {
   return (

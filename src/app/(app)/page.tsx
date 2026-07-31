@@ -1,9 +1,11 @@
+import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getAccessibleProjectIds } from "@/lib/permissions";
+import { checkPermission, getAccessibleProjectIds } from "@/lib/permissions";
 import { getGreeting } from "@/lib/utils";
 import { DailyBriefingWidget } from "@/components/dashboard/DailyBriefingWidget";
+import { OpportunityBadge } from "@/components/leads/OpportunityBadge";
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions);
@@ -14,8 +16,9 @@ export default async function DashboardPage() {
   const weekEnd = new Date(todayStart.getTime() + 7 * 24 * 60 * 60 * 1000);
 
   const projectIds = await getAccessibleProjectIds(session.user.id);
+  const canViewLeads = session.user.role === "admin" || (await checkPermission(session.user.id, "leads.view"));
 
-  const [myOverdueTasks, myTodayTasks, myWeekTasks, recentActivity] =
+  const [myOverdueTasks, myTodayTasks, myWeekTasks, recentActivity, topOpportunities] =
     await Promise.all([
       // Overdue
       prisma.task.findMany({
@@ -59,6 +62,10 @@ export default async function DashboardPage() {
         take: 15,
         include: { user: { select: { name: true, avatarUrl: true } } },
       }),
+      // Top prospecting opportunities (shared reference data, not project-scoped)
+      canViewLeads
+        ? prisma.lead.findMany({ orderBy: { opportunityScore: "desc" }, take: 5 })
+        : Promise.resolve([]),
     ]);
 
   const greeting = getGreeting();
@@ -113,6 +120,38 @@ export default async function DashboardPage() {
               <div className="space-y-1">
                 {myWeekTasks.map((task) => (
                   <DashboardTaskRow key={task.id} task={task} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Top prospecting opportunities */}
+          {canViewLeads && topOpportunities.length > 0 && (
+            <section className="bg-white border border-border rounded-card p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-brand-primary flex-shrink-0" />
+                  Top Opportunities
+                </h2>
+                <Link href="/leads" className="text-xs font-medium text-brand-primary hover:underline">
+                  View all
+                </Link>
+              </div>
+              <div className="space-y-1">
+                {topOpportunities.map((lead) => (
+                  <Link
+                    key={lead.id}
+                    href={`/leads/${lead.id}`}
+                    className="flex items-center gap-3 py-2 px-3 rounded-btn hover:bg-surface-secondary transition-colors"
+                  >
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-sm text-text-primary truncate">{lead.name}</span>
+                      {lead.category && (
+                        <span className="block text-xs text-text-muted truncate">{lead.category}</span>
+                      )}
+                    </span>
+                    <OpportunityBadge score={lead.opportunityScore} />
+                  </Link>
                 ))}
               </div>
             </section>
