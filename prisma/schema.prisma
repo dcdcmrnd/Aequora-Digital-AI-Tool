@@ -43,6 +43,8 @@ model User {
   savedLeads       SavedLead[]    @relation("SavedLeadOwner")
   leadSearches     LeadSearch[]   @relation("LeadSearchOwner")
   contactsCreated  Contact[]      @relation("ContactCreator")
+  opportunitiesCreated Opportunity[] @relation("OpportunityCreator")
+  automationsCreated   Automation[]  @relation("AutomationCreator")
 }
 
 model Invitation {
@@ -409,4 +411,78 @@ model Contact {
   sourceLead   Lead?    @relation(fields: [sourceLeadId], references: [id], onDelete: SetNull)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  opportunities Opportunity[]
+}
+
+// --- Pipeline / Opportunities ---
+
+model Pipeline {
+  id            String          @id @default(cuid())
+  name          String
+  createdAt     DateTime        @default(now())
+  stages        PipelineStage[]
+  opportunities Opportunity[]
+}
+
+model PipelineStage {
+  id            String        @id @default(cuid())
+  pipelineId    String
+  pipeline      Pipeline      @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  name          String
+  order         Int
+  opportunities Opportunity[]
+}
+
+model Opportunity {
+  id          String        @id @default(cuid())
+  name        String
+  value       Float?
+  status      String        @default("open") // open | won | lost
+  contactId   String
+  contact     Contact       @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  pipelineId  String
+  pipeline    Pipeline      @relation(fields: [pipelineId], references: [id])
+  stageId     String
+  stage       PipelineStage @relation(fields: [stageId], references: [id])
+  notes       String?
+  createdById String
+  createdBy   User          @relation("OpportunityCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+// --- Automation ---
+
+model Automation {
+  id            String             @id @default(cuid())
+  name          String
+  isActive      Boolean            @default(true)
+  triggerType   String             // contact_created | tag_added | opportunity_stage_changed
+  triggerConfig String             @default("{}") // JSON, shape depends on triggerType
+  createdById   String
+  createdBy     User               @relation("AutomationCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  actions       AutomationAction[]
+  runs          AutomationRun[]
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+}
+
+model AutomationAction {
+  id           String     @id @default(cuid())
+  automationId String
+  automation   Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  order        Int
+  actionType   String     // send_email | add_tag | move_pipeline_stage
+  config       String     @default("{}") // JSON, shape depends on actionType
+}
+
+model AutomationRun {
+  id           String     @id @default(cuid())
+  automationId String
+  automation   Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  contactId    String?
+  status       String     // success | error
+  detail       String?
+  createdAt    DateTime   @default(now())
 }

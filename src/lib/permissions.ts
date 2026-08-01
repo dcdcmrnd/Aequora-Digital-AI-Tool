@@ -14,6 +14,10 @@ export const PERMISSIONS = {
   LEADS_MANAGE: "leads.manage",
   CONTACTS_VIEW: "contacts.view",
   CONTACTS_MANAGE: "contacts.manage",
+  PIPELINE_VIEW: "pipeline.view",
+  PIPELINE_MANAGE: "pipeline.manage",
+  AUTOMATION_VIEW: "automation.view",
+  AUTOMATION_MANAGE: "automation.manage",
   TEAM_VIEW: "team.view",
   COMPANY_EMAIL_ACCESS: "company.email",
   AI_TASK_ASSISTANT: "ai.task_assistant",
@@ -35,6 +39,9 @@ export const DEFAULT_MEMBER_PERMISSIONS: PermissionType[] = [
   PERMISSIONS.LEADS_MANAGE,
   PERMISSIONS.CONTACTS_VIEW,
   PERMISSIONS.CONTACTS_MANAGE,
+  PERMISSIONS.PIPELINE_VIEW,
+  PERMISSIONS.PIPELINE_MANAGE,
+  PERMISSIONS.AUTOMATION_VIEW,
 ];
 
 export async function checkPermission(

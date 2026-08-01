@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { logActivity } from "@/lib/activity";
 import { authOptions } from "@/lib/auth";
+import { runAutomationsForTrigger } from "@/lib/automation/engine";
 import { checkPermission } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 
@@ -69,6 +70,8 @@ export async function POST(req: NextRequest) {
     entityId: contact.id,
     entityName: contact.name,
   });
+
+  await runAutomationsForTrigger({ triggerType: "contact_created", contactId: contact.id });
 
   return NextResponse.json({ contact: { ...contact, tags: JSON.parse(contact.tags) } }, { status: 201 });
 }

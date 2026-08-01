@@ -18,6 +18,10 @@ export type PermissionType =
   | "leads.manage"
   | "contacts.view"
   | "contacts.manage"
+  | "pipeline.view"
+  | "pipeline.manage"
+  | "automation.view"
+  | "automation.manage"
   | "team.view"
   | "company.email"
   | "ai.task_assistant"
@@ -39,6 +43,10 @@ export const ALL_PERMISSIONS: { key: PermissionType; label: string; group: strin
   { key: "leads.manage", label: "Manage Leads", group: "Leads" },
   { key: "contacts.view", label: "View Contacts", group: "Contacts" },
   { key: "contacts.manage", label: "Manage Contacts", group: "Contacts" },
+  { key: "pipeline.view", label: "View Pipeline", group: "Pipeline" },
+  { key: "pipeline.manage", label: "Manage Pipeline", group: "Pipeline" },
+  { key: "automation.view", label: "View Automations", group: "Automation" },
+  { key: "automation.manage", label: "Manage Automations", group: "Automation" },
   { key: "team.view", label: "View Team", group: "Team" },
   { key: "company.email", label: "Access Company Email", group: "Inbox" },
   { key: "ai.task_assistant", label: "Task Assistant", group: "AI" },
@@ -305,6 +313,70 @@ export interface Contact {
   notes: string | null;
   tags: string[];
   sourceLeadId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PipelineStage {
+  id: string;
+  pipelineId: string;
+  name: string;
+  order: number;
+}
+
+export interface Pipeline {
+  id: string;
+  name: string;
+  createdAt: string;
+  stages: PipelineStage[];
+}
+
+export type OpportunityStatus = "open" | "won" | "lost";
+
+export interface Opportunity {
+  id: string;
+  name: string;
+  value: number | null;
+  status: OpportunityStatus;
+  contactId: string;
+  contact?: { id: string; name: string; company: string | null };
+  pipelineId: string;
+  stageId: string;
+  notes: string | null;
+  createdById: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type AutomationTriggerType = "contact_created" | "tag_added" | "opportunity_stage_changed";
+export type AutomationActionType = "send_email" | "add_tag" | "move_pipeline_stage";
+
+export interface AutomationAction {
+  id: string;
+  automationId: string;
+  order: number;
+  actionType: AutomationActionType;
+  config: Record<string, string>;
+}
+
+export interface AutomationRun {
+  id: string;
+  automationId: string;
+  contactId: string | null;
+  status: "success" | "error";
+  detail: string | null;
+  createdAt: string;
+}
+
+export interface Automation {
+  id: string;
+  name: string;
+  isActive: boolean;
+  triggerType: AutomationTriggerType;
+  triggerConfig: Record<string, string>;
+  createdById: string;
+  actions: AutomationAction[];
+  runs?: AutomationRun[];
   createdAt: string;
   updatedAt: string;
 }

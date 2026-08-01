@@ -5,6 +5,7 @@ import type { Prisma } from "@prisma/client";
 
 import { logActivity } from "@/lib/activity";
 import { authOptions } from "@/lib/auth";
+import { runAutomationsForTrigger } from "@/lib/automation/engine";
 import { checkPermission } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 
@@ -82,6 +83,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     entityId: updated.id,
     entityName: updated.name,
   });
+
+  if (parsed.data.tags !== undefined) {
+    const previousTags = new Set(JSON.parse(existing.tags) as string[]);
+    const newTags = parsed.data.tags.filter((tag) => !previousTags.has(tag));
+    for (const tag of newTags) {
+      await runAutomationsForTrigger({ triggerType: "tag_added", contactId: updated.id, tag });
+    }
+  }
 
   return NextResponse.json({ contact: { ...updated, tags: JSON.parse(updated.tags) } });
 }

@@ -49,6 +49,8 @@ export function Sidebar({ companyName = "Aequora Digital", companyLogoUrl, onClo
   const canViewNotes = usePermission("notes.view");
   const canViewLeads = usePermission("leads.view");
   const canViewContacts = usePermission("contacts.view");
+  const canViewPipeline = usePermission("pipeline.view");
+  const canViewAutomation = usePermission("automation.view");
   const canViewTeam = usePermission("team.view");
   const canAccessCompanyEmail = usePermission("company.email");
   const isAdmin = session?.user?.role === "admin";
@@ -97,7 +99,8 @@ export function Sidebar({ companyName = "Aequora Digital", companyLogoUrl, onClo
         <p className="px-3 pt-4 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-[#475569]">Clients</p>
         {canViewLeads && <NavLink href="/leads" label="Leads" icon={<TargetIcon />} />}
         {canViewContacts && <NavLink href="/contacts" label="Contacts" icon={<ContactIcon />} />}
-        <NavLink href="/automation" label="Automation" icon={<ZapIcon />} />
+        {canViewPipeline && <NavLink href="/pipeline" label="Pipeline" icon={<PipelineIcon />} />}
+        {canViewAutomation && <NavLink href="/automation" label="Automation" icon={<ZapIcon />} />}
         {(isAdmin || canAccessCompanyEmail) && <NavLink href="/inbox" label="Inbox" icon={<InboxIcon />} />}
 
         {/* Team */}
@@ -227,6 +230,16 @@ function ContactIcon() {
       <rect x="4" y="3" width="16" height="18" rx="2" />
       <circle cx="12" cy="10" r="2.5" />
       <path d="M8 17c0-2 1.79-3 4-3s4 1 4 3" />
+    </svg>
+  );
+}
+
+function PipelineIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="6" width="5" height="12" rx="1" />
+      <rect x="9.5" y="3" width="5" height="18" rx="1" />
+      <rect x="17" y="9" width="5" height="9" rx="1" />
     </svg>
   );
 }
