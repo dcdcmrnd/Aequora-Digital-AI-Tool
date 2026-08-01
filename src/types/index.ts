@@ -16,6 +16,8 @@ export type PermissionType =
   | "notes.manage"
   | "leads.view"
   | "leads.manage"
+  | "contacts.view"
+  | "contacts.manage"
   | "team.view"
   | "company.email"
   | "ai.task_assistant"
@@ -35,6 +37,8 @@ export const ALL_PERMISSIONS: { key: PermissionType; label: string; group: strin
   { key: "notes.manage", label: "Manage Notes", group: "Notes" },
   { key: "leads.view", label: "View Leads", group: "Leads" },
   { key: "leads.manage", label: "Manage Leads", group: "Leads" },
+  { key: "contacts.view", label: "View Contacts", group: "Contacts" },
+  { key: "contacts.manage", label: "Manage Contacts", group: "Contacts" },
   { key: "team.view", label: "View Team", group: "Team" },
   { key: "company.email", label: "Access Company Email", group: "Inbox" },
   { key: "ai.task_assistant", label: "Task Assistant", group: "AI" },
@@ -282,4 +286,25 @@ export interface LeadSearch {
   radius: number | null;
   resultsCount: number;
   createdAt: string;
+}
+
+export interface Contact {
+  id: string;
+  createdById: string;
+  createdBy?: { id: string; name: string };
+  name: string;
+  company: string | null;
+  email: string | null;
+  phone: string | null;
+  website: string | null;
+  facebookUrl: string | null;
+  instagramUrl: string | null;
+  linkedinUrl: string | null;
+  twitterUrl: string | null;
+  address: string | null;
+  notes: string | null;
+  tags: string[];
+  sourceLeadId: string | null;
+  createdAt: string;
+  updatedAt: string;
 }

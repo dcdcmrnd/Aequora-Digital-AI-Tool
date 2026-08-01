@@ -42,6 +42,7 @@ model User {
   chatMessages     ChatMessage[]
   savedLeads       SavedLead[]    @relation("SavedLeadOwner")
   leadSearches     LeadSearch[]   @relation("LeadSearchOwner")
+  contactsCreated  Contact[]      @relation("ContactCreator")
 }
 
 model Invitation {
@@ -337,6 +338,7 @@ model Lead {
 
   audit        LeadAudit?
   savedByUsers SavedLead[]
+  contacts     Contact[]
 }
 
 model LeadAudit {
@@ -383,4 +385,28 @@ model LeadSearch {
   radius       Int?
   resultsCount Int      @default(0)
   createdAt    DateTime @default(now())
+}
+
+// --- Contacts ---
+
+model Contact {
+  id           String   @id @default(cuid())
+  createdById  String
+  createdBy    User     @relation("ContactCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  name         String
+  company      String?
+  email        String?
+  phone        String?
+  website      String?
+  facebookUrl  String?
+  instagramUrl String?
+  linkedinUrl  String?
+  twitterUrl   String?
+  address      String?
+  notes        String?
+  tags         String   @default("[]") // JSON array of strings
+  sourceLeadId String?
+  sourceLead   Lead?    @relation(fields: [sourceLeadId], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
