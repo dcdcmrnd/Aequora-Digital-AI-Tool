@@ -60,7 +60,7 @@ export function Sidebar({ companyName = "Aequora Digital", companyLogoUrl, onClo
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-btn overflow-hidden flex-shrink-0">
             <img
-              src={companyLogoUrl || "/logo.png"}
+              src={companyLogoUrl || "/logo.png?v=3"}
               alt={companyName}
               className="w-full h-full object-contain"
             />

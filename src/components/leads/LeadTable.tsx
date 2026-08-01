@@ -12,6 +12,7 @@ import {
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { createLeadColumns } from "@/components/leads/columns";
+import { ContactFormModal } from "@/components/contacts/ContactFormModal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/Table";
@@ -30,8 +31,12 @@ interface LeadTableProps {
 export function LeadTable({ data, savedLeadIds, onSave, page, pageSize, total, onPageChange }: LeadTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
+  const [contactPrefillLead, setContactPrefillLead] = useState<Lead | null>(null);
 
-  const columns = useMemo(() => createLeadColumns({ savedLeadIds, onSave }), [savedLeadIds, onSave]);
+  const columns = useMemo(
+    () => createLeadColumns({ savedLeadIds, onSave, onSaveAsContact: setContactPrefillLead }),
+    [savedLeadIds, onSave],
+  );
 
   const table = useReactTable({
     data,
@@ -103,6 +108,20 @@ export function LeadTable({ data, savedLeadIds, onSave, page, pageSize, total, o
           </Button>
         </div>
       </div>
+
+      {contactPrefillLead && (
+        <ContactFormModal
+          open={!!contactPrefillLead}
+          onClose={() => setContactPrefillLead(null)}
+          prefill={{
+            name: contactPrefillLead.name,
+            phone: contactPrefillLead.phone ?? undefined,
+            website: contactPrefillLead.website ?? undefined,
+            address: contactPrefillLead.address ?? undefined,
+            sourceLeadId: contactPrefillLead.id,
+          }}
+        />
+      )}
     </div>
   );
 }

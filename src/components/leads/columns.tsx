@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { Column, ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown, Star } from "lucide-react";
+import { ArrowUpDown, BookUser, Star } from "lucide-react";
 
 import { OpportunityBadge } from "@/components/leads/OpportunityBadge";
 import { ScoreGauge } from "@/components/leads/ScoreGauge";
@@ -27,9 +27,10 @@ function SortableHeader({ column, label }: { column: Column<Lead, unknown>; labe
 export interface LeadColumnsOptions {
   savedLeadIds: Set<string>;
   onSave: (lead: Lead) => void;
+  onSaveAsContact: (lead: Lead) => void;
 }
 
-export function createLeadColumns({ savedLeadIds, onSave }: LeadColumnsOptions): ColumnDef<Lead>[] {
+export function createLeadColumns({ savedLeadIds, onSave, onSaveAsContact }: LeadColumnsOptions): ColumnDef<Lead>[] {
   return [
     {
       accessorKey: "name",
@@ -88,9 +89,20 @@ export function createLeadColumns({ savedLeadIds, onSave }: LeadColumnsOptions):
       cell: ({ row }) => {
         const isSaved = savedLeadIds.has(row.original.id);
         return (
-          <Button size="sm" variant={isSaved ? "secondary" : "outline"} onClick={() => onSave(row.original)}>
-            {isSaved ? "Saved" : "Save"}
-          </Button>
+          <div className="flex items-center gap-1.5">
+            <Button size="sm" variant={isSaved ? "secondary" : "outline"} onClick={() => onSave(row.original)}>
+              {isSaved ? "Saved" : "Save"}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              title="Save as Contact"
+              aria-label="Save as Contact"
+              onClick={() => onSaveAsContact(row.original)}
+            >
+              <BookUser className="size-3.5" />
+            </Button>
+          </div>
         );
       },
     },
