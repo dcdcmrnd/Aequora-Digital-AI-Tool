@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { BookUser, Bookmark, ExternalLink, MapPin, Phone, RefreshCw } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, BookUser, Bookmark, ExternalLink, MapPin, Phone, RefreshCw } from "lucide-react";
 
 import { AuditCard } from "@/components/leads/AuditCard";
 import { NotesEditor } from "@/components/leads/NotesEditor";
@@ -22,6 +23,7 @@ interface LeadDetailsViewProps {
 }
 
 export function LeadDetailsView({ lead: initialLead, initialSavedLead }: LeadDetailsViewProps) {
+  const router = useRouter();
   const audit = useLeadAudit(initialLead.id);
   const savedLeads = useSavedLeads();
   const [lead, setLead] = useState(initialLead);
@@ -35,7 +37,10 @@ export function LeadDetailsView({ lead: initialLead, initialSavedLead }: LeadDet
         ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(lead.address)}`
         : null;
 
-  const googleBusinessHref = `https://www.google.com/maps/place/?q=place_id:${lead.googlePlaceId}`;
+  const isMockLead = lead.googlePlaceId.startsWith("mock-");
+  const googleBusinessHref = isMockLead
+    ? null
+    : `https://www.google.com/maps/place/?q=place_id:${lead.googlePlaceId}`;
 
   function handleSave() {
     savedLeads.saveLead.mutate({ leadId: lead.id }, { onSuccess: (data) => setSavedLead(data.savedLead) });
@@ -62,6 +67,11 @@ export function LeadDetailsView({ lead: initialLead, initialSavedLead }: LeadDet
 
   return (
     <div className="space-y-6">
+      <Button variant="ghost" size="sm" className="-ml-3" onClick={() => router.back()}>
+        <ArrowLeft className="size-4" />
+        Back to search
+      </Button>
+
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-text-primary text-2xl font-semibold tracking-tight">{lead.name}</h1>
@@ -75,14 +85,23 @@ export function LeadDetailsView({ lead: initialLead, initialSavedLead }: LeadDet
           <div className="rounded-card border-border border bg-white p-4">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-text-primary text-sm font-semibold">Business Information</h3>
-              <a
-                href={googleBusinessHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-brand-primary inline-flex items-center gap-1 text-xs font-medium hover:underline"
-              >
-                View on Google <ExternalLink className="size-3" />
-              </a>
+              {googleBusinessHref ? (
+                <a
+                  href={googleBusinessHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-brand-primary inline-flex items-center gap-1 text-xs font-medium hover:underline"
+                >
+                  View on Google <ExternalLink className="size-3" />
+                </a>
+              ) : (
+                <span
+                  className="text-text-muted inline-flex items-center gap-1 text-xs font-medium"
+                  title="This is demo data — connect a real Google Places API key to link to actual business listings."
+                >
+                  View on Google <ExternalLink className="size-3" />
+                </span>
+              )}
             </div>
             <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
               <div className="flex items-center gap-2">

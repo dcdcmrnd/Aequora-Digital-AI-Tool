@@ -23,6 +23,17 @@ const SORT_OPTIONS = [
   { value: "createdAt", label: "Newest" },
 ] as const;
 
+const US_STATES = [
+  "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut",
+  "Delaware", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa",
+  "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan",
+  "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada",
+  "New Hampshire", "New Jersey", "New Mexico", "New York", "North Carolina",
+  "North Dakota", "Ohio", "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island",
+  "South Carolina", "South Dakota", "Tennessee", "Texas", "Utah", "Vermont",
+  "Virginia", "Washington", "West Virginia", "Wisconsin", "Wyoming",
+] as const;
+
 const searchFormSchema = z.object({
   keyword: z.string().min(1, "Enter a category or keyword"),
   location: z.string().min(1, "Enter a city or location"),
@@ -81,8 +92,13 @@ export function SearchForm({ defaultValues, onSubmit, isSearching }: SearchFormP
               <FormItem className="lg:col-span-2">
                 <FormLabel>Location</FormLabel>
                 <FormControl>
-                  <Input placeholder="e.g. Austin, TX" {...field} />
+                  <Input placeholder="e.g. Austin, TX" list="us-states" {...field} />
                 </FormControl>
+                <datalist id="us-states">
+                  {US_STATES.map((state) => (
+                    <option key={state} value={state} />
+                  ))}
+                </datalist>
                 <FormMessage />
               </FormItem>
             )}
