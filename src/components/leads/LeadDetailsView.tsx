@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { Bookmark, ExternalLink, MapPin, Phone, RefreshCw } from "lucide-react";
+import { BookUser, Bookmark, ExternalLink, MapPin, Phone, RefreshCw } from "lucide-react";
 
 import { AuditCard } from "@/components/leads/AuditCard";
 import { NotesEditor } from "@/components/leads/NotesEditor";
 import { OpportunityBadge } from "@/components/leads/OpportunityBadge";
 import { WebsiteStatus } from "@/components/leads/WebsiteStatus";
+import { ContactFormModal } from "@/components/contacts/ContactFormModal";
 import { Button } from "@/components/ui/Button";
+import { CopyButton } from "@/components/ui/CopyButton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/Select";
 import { useLeadAudit } from "@/hooks/useLeadAudit";
 import { useSavedLeads } from "@/hooks/useSavedLeads";
@@ -24,6 +26,7 @@ export function LeadDetailsView({ lead: initialLead, initialSavedLead }: LeadDet
   const savedLeads = useSavedLeads();
   const [lead, setLead] = useState(initialLead);
   const [savedLead, setSavedLead] = useState(initialSavedLead);
+  const [savingContact, setSavingContact] = useState(false);
 
   const mapHref =
     lead.lat !== null && lead.lng !== null
@@ -31,6 +34,8 @@ export function LeadDetailsView({ lead: initialLead, initialSavedLead }: LeadDet
       : lead.address
         ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(lead.address)}`
         : null;
+
+  const googleBusinessHref = `https://www.google.com/maps/place/?q=place_id:${lead.googlePlaceId}`;
 
   function handleSave() {
     savedLeads.saveLead.mutate({ leadId: lead.id }, { onSuccess: (data) => setSavedLead(data.savedLead) });
@@ -68,18 +73,31 @@ export function LeadDetailsView({ lead: initialLead, initialSavedLead }: LeadDet
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           <div className="rounded-card border-border border bg-white p-4">
-            <h3 className="text-text-primary mb-3 text-sm font-semibold">Business Information</h3>
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-text-primary text-sm font-semibold">Business Information</h3>
+              <a
+                href={googleBusinessHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-brand-primary inline-flex items-center gap-1 text-xs font-medium hover:underline"
+              >
+                View on Google <ExternalLink className="size-3" />
+              </a>
+            </div>
             <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
               <div className="flex items-center gap-2">
-                <Phone className="text-text-muted size-4" />
+                <Phone className="text-text-muted size-4 shrink-0" />
                 {lead.phone ?? "—"}
+                {lead.phone && <CopyButton value={lead.phone} label="Phone" />}
               </div>
-              <div>
+              <div className="flex items-center gap-2">
                 <WebsiteStatus website={lead.website} httpsEnabled={lead.audit?.httpsEnabled} />
+                {lead.website && <CopyButton value={lead.website} label="Website" />}
               </div>
               <div className="flex items-center gap-2 sm:col-span-2">
                 <MapPin className="text-text-muted size-4 shrink-0" />
                 {lead.address ?? "—"}
+                {lead.address && <CopyButton value={lead.address} label="Address" />}
                 {mapHref && (
                   <a
                     href={mapHref}
@@ -144,6 +162,14 @@ export function LeadDetailsView({ lead: initialLead, initialSavedLead }: LeadDet
                 Save Lead
               </Button>
             )}
+            <Button
+              variant="secondary"
+              className="mt-2 w-full"
+              onClick={() => setSavingContact(true)}
+            >
+              <BookUser className="size-4" />
+              Save as Contact
+            </Button>
           </div>
 
           {savedLead && (
@@ -158,6 +184,20 @@ export function LeadDetailsView({ lead: initialLead, initialSavedLead }: LeadDet
           )}
         </div>
       </div>
+
+      {savingContact && (
+        <ContactFormModal
+          open={savingContact}
+          onClose={() => setSavingContact(false)}
+          prefill={{
+            name: lead.name,
+            phone: lead.phone ?? undefined,
+            website: lead.website ?? undefined,
+            address: lead.address ?? undefined,
+            sourceLeadId: lead.id,
+          }}
+        />
+      )}
     </div>
   );
 }
