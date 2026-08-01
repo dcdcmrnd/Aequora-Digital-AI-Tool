@@ -1,4 +1,4 @@
-const CACHE = "aequora-v1";
+const CACHE = "aequora-v2";
 
 // On install: activate immediately
 self.addEventListener("install", () => self.skipWaiting());
