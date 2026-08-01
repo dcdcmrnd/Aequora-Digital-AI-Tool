@@ -1,8 +1,6 @@
 import { google } from "googleapis";
 import { prisma } from "@/lib/prisma";
 
-const SHARED_EMAIL = "info@aequoradigital.com";
-
 function createOAuthClient() {
   return new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
@@ -16,15 +14,21 @@ export function getAuthUrl() {
   return client.generateAuthUrl({
     access_type: "offline",
     prompt: "consent",
-    scope: ["https://www.googleapis.com/auth/gmail.modify"],
-    login_hint: SHARED_EMAIL,
+    scope: [
+      "https://www.googleapis.com/auth/gmail.modify",
+      "https://www.googleapis.com/auth/userinfo.email",
+    ],
   });
 }
 
+/** Only one agency inbox is supported at a time — whichever account last connected. */
+export async function getConnectedEmail(): Promise<string | null> {
+  const token = await prisma.gmailToken.findFirst();
+  return token?.email ?? null;
+}
+
 export async function getGmailClient() {
-  const token = await prisma.gmailToken.findUnique({
-    where: { email: SHARED_EMAIL },
-  });
+  const token = await prisma.gmailToken.findFirst();
 
   if (!token) throw new Error("Gmail not connected. Visit /api/gmail/auth to connect.");
 
@@ -40,7 +44,7 @@ export async function getGmailClient() {
   if (Date.now() > expiry - 60_000) {
     const { credentials } = await client.refreshAccessToken();
     await prisma.gmailToken.update({
-      where: { email: SHARED_EMAIL },
+      where: { email: token.email },
       data: {
         accessToken: credentials.access_token!,
         refreshToken: credentials.refresh_token ?? token.refreshToken,
@@ -51,6 +55,58 @@ export async function getGmailClient() {
   }
 
   return google.gmail({ version: "v1", auth: client });
+}
+
+function encodeEmail(fields: {
+  to: string;
+  from: string;
+  subject: string;
+  body: string;
+  threadId?: string;
+  inReplyTo?: string;
+  references?: string;
+}): string {
+  const lines = [
+    `From: ${fields.from}`,
+    `To: ${fields.to}`,
+    `Subject: ${fields.subject}`,
+    "MIME-Version: 1.0",
+    'Content-Type: text/html; charset="UTF-8"',
+  ];
+  if (fields.inReplyTo) lines.push(`In-Reply-To: ${fields.inReplyTo}`);
+  if (fields.references) lines.push(`References: ${fields.references}`);
+  lines.push("", fields.body);
+
+  return Buffer.from(lines.join("\r\n"))
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
+/** Shared send path for the Inbox UI and Automation actions alike. */
+export async function sendEmail(fields: {
+  to: string;
+  subject: string;
+  body: string;
+  threadId?: string;
+  inReplyTo?: string;
+  references?: string;
+}): Promise<{ id: string | null | undefined; threadId: string | null | undefined }> {
+  const gmail = await getGmailClient();
+  const connectedEmail = await getConnectedEmail();
+
+  const raw = encodeEmail({
+    ...fields,
+    from: `Aequora Digital <${connectedEmail}>`,
+  });
+
+  const res = await gmail.users.messages.send({
+    userId: "me",
+    requestBody: { raw, threadId: fields.threadId },
+  });
+
+  return { id: res.data.id, threadId: res.data.threadId };
 }
 
 export function decodeBody(data?: string | null): string {

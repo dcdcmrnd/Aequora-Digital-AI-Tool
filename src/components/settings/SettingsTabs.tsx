@@ -7,17 +7,19 @@ interface Props {
   companyPanel: React.ReactNode;
   documentsPanel: React.ReactNode;
   categoriesPanel: React.ReactNode;
+  emailPanel: React.ReactNode;
 }
 
 const TABS = [
   { id: "company", label: "Company Branding" },
   { id: "documents", label: "Documents" },
   { id: "categories", label: "Note Categories" },
+  { id: "email", label: "Agency Email" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
 
-export function SettingsTabs({ companyPanel, documentsPanel, categoriesPanel }: Props) {
+export function SettingsTabs({ companyPanel, documentsPanel, categoriesPanel, emailPanel }: Props) {
   const [active, setActive] = useState<TabId>("company");
 
   return (
@@ -42,6 +44,7 @@ export function SettingsTabs({ companyPanel, documentsPanel, categoriesPanel }: 
       {active === "company" && companyPanel}
       {active === "documents" && documentsPanel}
       {active === "categories" && categoriesPanel}
+      {active === "email" && emailPanel}
     </div>
   );
 }

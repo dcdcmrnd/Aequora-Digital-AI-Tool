@@ -1,7 +1,9 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getConnectedEmail } from "@/lib/gmail";
 import { redirect } from "next/navigation";
+import { AgencyEmailPanel } from "@/components/settings/AgencyEmailPanel";
 import { CategoryManager } from "@/components/settings/CategoryManager";
 import { CompanySettingsPanel } from "@/components/settings/CompanySettingsPanel";
 import { DocumentsManager } from "@/components/settings/DocumentsManager";
@@ -11,7 +13,7 @@ export default async function SettingsPage() {
   const session = await getServerSession(authOptions);
   if (!session || session.user.role !== "admin") redirect("/");
 
-  const [categories, companySettings, documents] = await Promise.all([
+  const [categories, companySettings, documents, connectedEmail] = await Promise.all([
     prisma.category.findMany({
       orderBy: { name: "asc" },
       include: { _count: { select: { notes: true } } },
@@ -25,6 +27,7 @@ export default async function SettingsPage() {
       include: { uploadedBy: { select: { name: true } } },
       orderBy: { createdAt: "desc" },
     }),
+    getConnectedEmail(),
   ]);
 
   const serializedDocuments = documents.map((d) => ({
@@ -52,6 +55,7 @@ export default async function SettingsPage() {
         }
         documentsPanel={<DocumentsManager initial={serializedDocuments as any} />}
         categoriesPanel={<CategoryManager categories={categories as any} />}
+        emailPanel={<AgencyEmailPanel initialEmail={connectedEmail} />}
       />
     </div>
   );

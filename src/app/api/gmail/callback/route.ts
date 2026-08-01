@@ -2,14 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
 import { prisma } from "@/lib/prisma";
 
-const SHARED_EMAIL = "info@aequoradigital.com";
-
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const code = searchParams.get("code");
 
   if (!code) {
-    return NextResponse.redirect(new URL("/inbox?error=no_code", req.url));
+    return NextResponse.redirect(new URL("/settings?error=no_code", req.url));
   }
 
   const client = new google.auth.OAuth2(
@@ -20,24 +18,24 @@ export async function GET(req: NextRequest) {
 
   try {
     const { tokens } = await client.getToken(code);
+    client.setCredentials(tokens);
 
-    await prisma.gmailToken.upsert({
-      where: { email: SHARED_EMAIL },
-      update: {
-        accessToken: tokens.access_token!,
-        refreshToken: tokens.refresh_token ?? "",
-        expiryDate: BigInt(tokens.expiry_date ?? 0),
-      },
-      create: {
-        email: SHARED_EMAIL,
+    const { data } = await google.oauth2({ version: "v2", auth: client }).userinfo.get();
+    if (!data.email) throw new Error("No email on Google account");
+
+    // Only one agency inbox is supported — connecting a new account replaces the old one.
+    await prisma.gmailToken.deleteMany({});
+    await prisma.gmailToken.create({
+      data: {
+        email: data.email,
         accessToken: tokens.access_token!,
         refreshToken: tokens.refresh_token ?? "",
         expiryDate: BigInt(tokens.expiry_date ?? 0),
       },
     });
 
-    return NextResponse.redirect(new URL("/inbox?connected=1", req.url));
+    return NextResponse.redirect(new URL("/settings?connected=1", req.url));
   } catch {
-    return NextResponse.redirect(new URL("/inbox?error=auth_failed", req.url));
+    return NextResponse.redirect(new URL("/settings?error=auth_failed", req.url));
   }
 }
