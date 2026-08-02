@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { useAutomations } from "@/hooks/useAutomations";
 import { usePermission } from "@/hooks/usePermission";
+import { cn } from "@/lib/utils";
 import type { Automation, AutomationTriggerType } from "@/types";
 
 const TRIGGER_LABELS: Record<AutomationTriggerType, string> = {
@@ -87,14 +88,18 @@ export function AutomationsListView() {
                 <div className="flex items-center gap-3 shrink-0 text-xs text-text-secondary">
                   <span className="flex items-center gap-1" title="Contacts entered this workflow">
                     <Users className="size-3.5" />
-                    {automation.contactsEntered ?? 0}
+                    {automation.contactsEntered ?? 0} entered
                   </span>
-                  {(automation.activeContacts ?? 0) > 0 && (
-                    <span className="flex items-center gap-1 text-brand-primary" title="Currently active in this workflow">
-                      <Loader2 className="size-3.5 animate-spin" />
-                      {automation.activeContacts} active
-                    </span>
-                  )}
+                  <span
+                    className={cn(
+                      "flex items-center gap-1",
+                      (automation.activeContacts ?? 0) > 0 && "text-brand-primary font-medium",
+                    )}
+                    title="Contacts currently active in this workflow"
+                  >
+                    <Loader2 className={cn("size-3.5", (automation.activeContacts ?? 0) > 0 && "animate-spin")} />
+                    {automation.activeContacts ?? 0} active
+                  </span>
                 </div>
                 <Badge variant={automation.isActive ? "success" : "muted"}>
                   {automation.isActive ? "Active" : "Inactive"}
