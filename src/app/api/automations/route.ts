@@ -5,18 +5,28 @@ import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { checkPermission } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
+import { EMPTY_FLOW } from "@/lib/automation/types";
 
-const actionSchema = z.object({
-  actionType: z.enum(["send_email", "add_tag", "move_pipeline_stage"]),
-  config: z.record(z.string()),
+const nodeSchema = z.object({
+  id: z.string(),
+  type: z.enum(["trigger", "send_email", "add_tag", "move_pipeline_stage", "condition", "wait"]),
+  position: z.object({ x: z.number(), y: z.number() }),
+  data: z.record(z.unknown()),
 });
+
+const edgeSchema = z.object({
+  id: z.string(),
+  source: z.string(),
+  target: z.string(),
+  sourceHandle: z.string().nullable().optional(),
+});
+
+const flowSchema = z.object({ nodes: z.array(nodeSchema), edges: z.array(edgeSchema) });
 
 const automationSchema = z.object({
   name: z.string().min(1, "Name is required."),
-  triggerType: z.enum(["contact_created", "tag_added", "opportunity_stage_changed"]),
-  triggerConfig: z.record(z.string()).default({}),
   isActive: z.boolean().default(true),
-  actions: z.array(actionSchema).min(1, "Add at least one action."),
+  flow: flowSchema.default(EMPTY_FLOW),
 });
 
 export async function GET() {
@@ -27,19 +37,12 @@ export async function GET() {
   if (!canView) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const automations = await prisma.automation.findMany({
-    include: {
-      actions: { orderBy: { order: "asc" } },
-      runs: { orderBy: { createdAt: "desc" }, take: 1 },
-    },
+    include: { runs: { orderBy: { createdAt: "desc" }, take: 1 } },
     orderBy: { createdAt: "desc" },
   });
 
   return NextResponse.json({
-    automations: automations.map((a) => ({
-      ...a,
-      triggerConfig: JSON.parse(a.triggerConfig),
-      actions: a.actions.map((action) => ({ ...action, config: JSON.parse(action.config) })),
-    })),
+    automations: automations.map((a) => ({ ...a, flow: JSON.parse(a.flow) })),
   });
 }
 
@@ -59,29 +62,11 @@ export async function POST(req: NextRequest) {
   const automation = await prisma.automation.create({
     data: {
       name: parsed.data.name,
-      triggerType: parsed.data.triggerType,
-      triggerConfig: JSON.stringify(parsed.data.triggerConfig),
       isActive: parsed.data.isActive,
+      flow: JSON.stringify(parsed.data.flow),
       createdById: session.user.id,
-      actions: {
-        create: parsed.data.actions.map((action, order) => ({
-          order,
-          actionType: action.actionType,
-          config: JSON.stringify(action.config),
-        })),
-      },
     },
-    include: { actions: { orderBy: { order: "asc" } } },
   });
 
-  return NextResponse.json(
-    {
-      automation: {
-        ...automation,
-        triggerConfig: JSON.parse(automation.triggerConfig),
-        actions: automation.actions.map((action) => ({ ...action, config: JSON.parse(action.config) })),
-      },
-    },
-    { status: 201 },
-  );
+  return NextResponse.json({ automation: { ...automation, flow: JSON.parse(automation.flow) } }, { status: 201 });
 }

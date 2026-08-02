@@ -4,19 +4,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 
 import { apiFetch, ApiError } from "@/lib/api-client";
-import type { Automation, AutomationActionType, AutomationTriggerType } from "@/types";
-
-export interface AutomationActionInput {
-  actionType: AutomationActionType;
-  config: Record<string, string>;
-}
+import type { Automation, AutomationFlow } from "@/types";
 
 export interface AutomationInput {
   name: string;
-  triggerType: AutomationTriggerType;
-  triggerConfig: Record<string, string>;
   isActive: boolean;
-  actions: AutomationActionInput[];
+  flow: AutomationFlow;
 }
 
 export interface AutomationUpdateInput extends Partial<AutomationInput> {

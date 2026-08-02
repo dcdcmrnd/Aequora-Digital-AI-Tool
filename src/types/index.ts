@@ -349,21 +349,34 @@ export interface Opportunity {
 }
 
 export type AutomationTriggerType = "contact_created" | "tag_added" | "opportunity_stage_changed";
-export type AutomationActionType = "send_email" | "add_tag" | "move_pipeline_stage";
+export type AutomationNodeType = "trigger" | "send_email" | "add_tag" | "move_pipeline_stage" | "condition" | "wait";
 
-export interface AutomationAction {
+export interface AutomationNode {
   id: string;
-  automationId: string;
-  order: number;
-  actionType: AutomationActionType;
-  config: Record<string, string>;
+  type: AutomationNodeType;
+  position: { x: number; y: number };
+  data: Record<string, unknown>;
+}
+
+export interface AutomationEdge {
+  id: string;
+  source: string;
+  target: string;
+  sourceHandle?: string | null;
+}
+
+export interface AutomationFlow {
+  nodes: AutomationNode[];
+  edges: AutomationEdge[];
 }
 
 export interface AutomationRun {
   id: string;
   automationId: string;
   contactId: string | null;
-  status: "success" | "error";
+  status: "running" | "waiting" | "completed" | "error";
+  currentNodeId: string | null;
+  waitUntil: string | null;
   detail: string | null;
   createdAt: string;
 }
@@ -372,10 +385,8 @@ export interface Automation {
   id: string;
   name: string;
   isActive: boolean;
-  triggerType: AutomationTriggerType;
-  triggerConfig: Record<string, string>;
+  flow: AutomationFlow;
   createdById: string;
-  actions: AutomationAction[];
   runs?: AutomationRun[];
   createdAt: string;
   updatedAt: string;

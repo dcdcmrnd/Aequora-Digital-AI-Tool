@@ -5,7 +5,6 @@ import { AutomationBuilder } from "@/components/automation/AutomationBuilder";
 import { authOptions } from "@/lib/auth";
 import { checkPermission } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
-import type { AutomationActionType, AutomationTriggerType } from "@/types";
 
 export default async function EditAutomationPage({ params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
@@ -14,10 +13,7 @@ export default async function EditAutomationPage({ params }: { params: { id: str
   const canManage = session.user.role === "admin" || (await checkPermission(session.user.id, "automation.manage"));
   if (!canManage) redirect("/automation");
 
-  const automation = await prisma.automation.findUnique({
-    where: { id: params.id },
-    include: { actions: { orderBy: { order: "asc" } } },
-  });
+  const automation = await prisma.automation.findUnique({ where: { id: params.id } });
   if (!automation) notFound();
 
   return (
@@ -26,16 +22,8 @@ export default async function EditAutomationPage({ params }: { params: { id: str
         id: automation.id,
         name: automation.name,
         isActive: automation.isActive,
-        triggerType: automation.triggerType as AutomationTriggerType,
-        triggerConfig: JSON.parse(automation.triggerConfig),
+        flow: JSON.parse(automation.flow),
         createdById: automation.createdById,
-        actions: automation.actions.map((action) => ({
-          id: action.id,
-          automationId: action.automationId,
-          order: action.order,
-          actionType: action.actionType as AutomationActionType,
-          config: JSON.parse(action.config),
-        })),
         createdAt: automation.createdAt.toISOString(),
         updatedAt: automation.updatedAt.toISOString(),
       }}

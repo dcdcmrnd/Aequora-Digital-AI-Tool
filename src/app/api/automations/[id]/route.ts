@@ -6,30 +6,27 @@ import { authOptions } from "@/lib/auth";
 import { checkPermission } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 
-const actionSchema = z.object({
-  actionType: z.enum(["send_email", "add_tag", "move_pipeline_stage"]),
-  config: z.record(z.string()),
+const nodeSchema = z.object({
+  id: z.string(),
+  type: z.enum(["trigger", "send_email", "add_tag", "move_pipeline_stage", "condition", "wait"]),
+  position: z.object({ x: z.number(), y: z.number() }),
+  data: z.record(z.unknown()),
 });
+
+const edgeSchema = z.object({
+  id: z.string(),
+  source: z.string(),
+  target: z.string(),
+  sourceHandle: z.string().nullable().optional(),
+});
+
+const flowSchema = z.object({ nodes: z.array(nodeSchema), edges: z.array(edgeSchema) });
 
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
-  triggerType: z.enum(["contact_created", "tag_added", "opportunity_stage_changed"]).optional(),
-  triggerConfig: z.record(z.string()).optional(),
   isActive: z.boolean().optional(),
-  actions: z.array(actionSchema).optional(),
+  flow: flowSchema.optional(),
 });
-
-function serialize(automation: {
-  triggerConfig: string;
-  actions: { config: string; [k: string]: unknown }[];
-  [k: string]: unknown;
-}) {
-  return {
-    ...automation,
-    triggerConfig: JSON.parse(automation.triggerConfig),
-    actions: automation.actions.map((action) => ({ ...action, config: JSON.parse(action.config) })),
-  };
-}
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
@@ -40,14 +37,11 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   const automation = await prisma.automation.findUnique({
     where: { id: params.id },
-    include: {
-      actions: { orderBy: { order: "asc" } },
-      runs: { orderBy: { createdAt: "desc" }, take: 20 },
-    },
+    include: { runs: { orderBy: { createdAt: "desc" }, take: 20 } },
   });
   if (!automation) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  return NextResponse.json({ automation: serialize(automation) });
+  return NextResponse.json({ automation: { ...automation, flow: JSON.parse(automation.flow) } });
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
@@ -66,33 +60,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     return NextResponse.json({ error: "Invalid update." }, { status: 400 });
   }
 
-  // Actions are replaced wholesale rather than diffed — simplest correct
-  // option given the builder always submits the full ordered list.
-  if (parsed.data.actions !== undefined) {
-    await prisma.automationAction.deleteMany({ where: { automationId: params.id } });
-  }
-
   const automation = await prisma.automation.update({
     where: { id: params.id },
     data: {
       ...(parsed.data.name !== undefined && { name: parsed.data.name }),
-      ...(parsed.data.triggerType !== undefined && { triggerType: parsed.data.triggerType }),
-      ...(parsed.data.triggerConfig !== undefined && { triggerConfig: JSON.stringify(parsed.data.triggerConfig) }),
       ...(parsed.data.isActive !== undefined && { isActive: parsed.data.isActive }),
-      ...(parsed.data.actions !== undefined && {
-        actions: {
-          create: parsed.data.actions.map((action, order) => ({
-            order,
-            actionType: action.actionType,
-            config: JSON.stringify(action.config),
-          })),
-        },
-      }),
+      ...(parsed.data.flow !== undefined && { flow: JSON.stringify(parsed.data.flow) }),
     },
-    include: { actions: { orderBy: { order: "asc" } } },
   });
 
-  return NextResponse.json({ automation: serialize(automation) });
+  return NextResponse.json({ automation: { ...automation, flow: JSON.parse(automation.flow) } });
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {

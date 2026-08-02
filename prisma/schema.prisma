@@ -465,34 +465,37 @@ model Opportunity {
 // --- Automation ---
 
 model Automation {
-  id            String             @id @default(cuid())
-  name          String
-  isActive      Boolean            @default(true)
-  triggerType   String             // contact_created | tag_added | opportunity_stage_changed
-  triggerConfig String             @default("{}") // JSON, shape depends on triggerType
-  createdById   String
-  createdBy     User               @relation("AutomationCreator", fields: [createdById], references: [id], onDelete: Cascade)
-  actions       AutomationAction[]
-  runs          AutomationRun[]
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
-}
-
-model AutomationAction {
-  id           String     @id @default(cuid())
-  automationId String
-  automation   Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
-  order        Int
-  actionType   String     // send_email | add_tag | move_pipeline_stage
-  config       String     @default("{}") // JSON, shape depends on actionType
+  id          String          @id @default(cuid())
+  name        String
+  isActive    Boolean         @default(true)
+  flow        String          @default("{\"nodes\":[],\"edges\":[]}") // React Flow nodes+edges, JSON string
+  createdById String
+  createdBy   User            @relation("AutomationCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  runs        AutomationRun[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
 }
 
 model AutomationRun {
-  id           String     @id @default(cuid())
-  automationId String
-  automation   Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
-  contactId    String?
-  status       String     // success | error
-  detail       String?
-  createdAt    DateTime   @default(now())
+  id            String                   @id @default(cuid())
+  automationId  String
+  automation    Automation               @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  contactId     String?
+  status        String                   // running | waiting | completed | error
+  currentNodeId String?
+  waitUntil     DateTime?
+  waitToken     String?                  @unique
+  detail        String?
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+  emailTracking AutomationEmailTracking[]
+}
+
+model AutomationEmailTracking {
+  id        String        @id @default(cuid())
+  token     String        @unique
+  runId     String
+  run       AutomationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  openedAt  DateTime?
+  createdAt DateTime      @default(now())
 }

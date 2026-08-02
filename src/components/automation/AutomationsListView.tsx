@@ -15,6 +15,21 @@ const TRIGGER_LABELS: Record<AutomationTriggerType, string> = {
   opportunity_stage_changed: "Opportunity Moved to Stage",
 };
 
+const STATUS_STYLES: Record<string, string> = {
+  error: "text-danger",
+  completed: "text-success",
+  waiting: "text-warning",
+  running: "text-text-secondary",
+};
+
+function summarizeAutomation(automation: Automation): string {
+  const triggerNode = automation.flow.nodes.find((n) => n.type === "trigger");
+  const triggerType = triggerNode?.data.triggerType as AutomationTriggerType | undefined;
+  const triggerLabel = triggerType ? TRIGGER_LABELS[triggerType] : "No trigger configured";
+  const stepCount = automation.flow.nodes.filter((n) => n.type !== "trigger").length;
+  return `${triggerLabel} · ${stepCount} step${stepCount === 1 ? "" : "s"}`;
+}
+
 export function AutomationsListView() {
   const { automations, isLoading, updateAutomation, deleteAutomation } = useAutomations();
   const canManage = usePermission("automation.manage");
@@ -60,14 +75,11 @@ export function AutomationsListView() {
                     {automation.name}
                   </Link>
                   <p className="text-text-muted text-xs mt-0.5">
-                    {TRIGGER_LABELS[automation.triggerType]} · {automation.actions.length}{" "}
-                    action{automation.actions.length === 1 ? "" : "s"}
+                    {summarizeAutomation(automation)}
                     {lastRun && (
                       <>
                         {" · Last run: "}
-                        <span className={lastRun.status === "error" ? "text-danger" : "text-success"}>
-                          {lastRun.status}
-                        </span>
+                        <span className={STATUS_STYLES[lastRun.status] ?? "text-text-secondary"}>{lastRun.status}</span>
                       </>
                     )}
                   </p>

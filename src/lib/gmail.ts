@@ -92,12 +92,20 @@ export async function sendEmail(fields: {
   threadId?: string;
   inReplyTo?: string;
   references?: string;
+  /** When set, appends a 1x1 open-tracking pixel pointed at /api/track/open/{token}. */
+  trackingToken?: string;
 }): Promise<{ id: string | null | undefined; threadId: string | null | undefined }> {
   const gmail = await getGmailClient();
   const connectedEmail = await getConnectedEmail();
 
+  const baseUrl = process.env.NEXTAUTH_URL || "https://app.aequoradigital.com";
+  const body = fields.trackingToken
+    ? `${fields.body}<img src="${baseUrl}/api/track/open/${fields.trackingToken}" width="1" height="1" style="display:none" alt="" />`
+    : fields.body;
+
   const raw = encodeEmail({
     ...fields,
+    body,
     from: `Aequora Digital <${connectedEmail}>`,
   });
 

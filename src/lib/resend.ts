@@ -1,13 +1,14 @@
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 // Falls back to Resend's shared sandbox sender until a real domain is
 // verified in the Resend dashboard and RESEND_FROM_EMAIL is set — the
 // sandbox sender can only deliver to the Resend account's own email.
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "Aequora Digital <onboarding@resend.dev>";
 
 export async function sendPasswordResetEmail({ to, resetUrl }: { to: string; resetUrl: string }): Promise<void> {
+  // Instantiated lazily (not at module load) so a missing key only breaks
+  // this call, not every route that transitively imports this module.
+  const resend = new Resend(process.env.RESEND_API_KEY);
   await resend.emails.send({
     from: FROM_EMAIL,
     to,
