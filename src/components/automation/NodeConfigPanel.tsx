@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
+import { CONTACT_MERGE_TAGS } from "@/lib/automation/mergeTags";
 import type { AutomationNode, AutomationNodeType, AutomationTriggerType, PipelineStage } from "@/types";
 
 const TRIGGER_OPTIONS: { value: AutomationTriggerType; label: string }[] = [
@@ -35,6 +36,9 @@ interface NodeConfigPanelProps {
 
 export function NodeConfigPanel({ node, stages, onClose, onSave, onDelete, canDelete }: NodeConfigPanelProps) {
   const [data, setData] = useState<Record<string, unknown>>(node.data);
+  const subjectRef = useRef<HTMLInputElement>(null);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
+  const [focusedField, setFocusedField] = useState<"subject" | "body">("body");
 
   useEffect(() => {
     setData(node.data);
@@ -42,6 +46,22 @@ export function NodeConfigPanel({ node, stages, onClose, onSave, onDelete, canDe
 
   function set(key: string, value: unknown) {
     setData((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function insertMergeTag(token: string) {
+    const key = focusedField;
+    const el = key === "subject" ? subjectRef.current : bodyRef.current;
+    const current = (data[key] as string) ?? "";
+    const start = el?.selectionStart ?? current.length;
+    const end = el?.selectionEnd ?? current.length;
+    const next = current.slice(0, start) + token + current.slice(end);
+    set(key, next);
+
+    requestAnimationFrame(() => {
+      el?.focus();
+      const caret = start + token.length;
+      el?.setSelectionRange(caret, caret);
+    });
   }
 
   function handleSave() {
@@ -101,11 +121,39 @@ export function NodeConfigPanel({ node, stages, onClose, onSave, onDelete, canDe
         {node.type === "send_email" && (
           <>
             <Field label="Subject">
-              <Input value={(data.subject as string) ?? ""} onChange={(e) => set("subject", e.target.value)} />
+              <Input
+                ref={subjectRef}
+                value={(data.subject as string) ?? ""}
+                onChange={(e) => set("subject", e.target.value)}
+                onFocus={() => setFocusedField("subject")}
+              />
             </Field>
             <Field label="Body">
-              <Textarea rows={6} value={(data.body as string) ?? ""} onChange={(e) => set("body", e.target.value)} />
+              <Textarea
+                ref={bodyRef}
+                rows={6}
+                value={(data.body as string) ?? ""}
+                onChange={(e) => set("body", e.target.value)}
+                onFocus={() => setFocusedField("body")}
+              />
             </Field>
+            <div>
+              <p className="text-text-secondary text-xs font-medium mb-1.5">
+                Custom values — click to insert into the {focusedField === "subject" ? "subject" : "body"}
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {CONTACT_MERGE_TAGS.map((tag) => (
+                  <button
+                    key={tag.token}
+                    type="button"
+                    onClick={() => insertMergeTag(tag.token)}
+                    className="rounded-full border border-border bg-surface-secondary px-2.5 py-1 text-xs text-text-secondary hover:border-brand-primary hover:text-brand-primary"
+                  >
+                    {tag.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </>
         )}
 

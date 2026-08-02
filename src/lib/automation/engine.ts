@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/gmail";
+import { applyMergeTags, contactMergeValues } from "./mergeTags";
 import type { AutomationEdge, AutomationFlow, AutomationNode, TriggerType, WaitUnit } from "./types";
 
 interface TriggerEvent {
@@ -134,9 +135,13 @@ async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string)
           if (!contact?.email) throw new Error("Contact has no email address");
 
           const data = node.data as { subject?: string; body?: string };
+          const mergeValues = contactMergeValues(contact);
+          const subject = applyMergeTags(data.subject ?? "", mergeValues);
+          const body = applyMergeTags(data.body ?? "", mergeValues);
+
           const trackingToken = crypto.randomBytes(16).toString("hex");
           await prisma.automationEmailTracking.create({ data: { token: trackingToken, runId: run.id } });
-          await sendEmail({ to: contact.email, subject: data.subject ?? "", body: data.body ?? "", trackingToken });
+          await sendEmail({ to: contact.email, subject, body, trackingToken });
 
           await logStep(run.id, node.id, node.type, "success", `Sent to ${contact.email}`);
         } catch (err) {
