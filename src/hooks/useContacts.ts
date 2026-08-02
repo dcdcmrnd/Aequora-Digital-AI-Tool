@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 
 import { apiFetch, ApiError } from "@/lib/api-client";
+import type { ImportedContact } from "@/lib/importContacts";
 import type { Contact } from "@/types";
 
 export interface ContactInput {
@@ -79,5 +80,19 @@ export function useContacts() {
     onError: (error) => toast.error(toastErrorMessage(error, "Failed to delete contact")),
   });
 
-  return { ...query, contacts: query.data?.contacts, createContact, updateContact, deleteContact };
+  const importContacts = useMutation({
+    mutationFn: (contacts: ImportedContact[]) =>
+      apiFetch<{ created: number; skipped: { row: number; reason: string }[] }>("/api/contacts/import", {
+        method: "POST",
+        body: JSON.stringify({ contacts }),
+      }),
+    onSuccess: (result) => {
+      invalidate();
+      const skippedNote = result.skipped.length > 0 ? `, ${result.skipped.length} skipped` : "";
+      toast.success(`Imported ${result.created} contact${result.created === 1 ? "" : "s"}${skippedNote}`);
+    },
+    onError: (error) => toast.error(toastErrorMessage(error, "Failed to import contacts")),
+  });
+
+  return { ...query, contacts: query.data?.contacts, createContact, updateContact, deleteContact, importContacts };
 }

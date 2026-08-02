@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Upload } from "lucide-react";
 
 import { ContactFormModal } from "@/components/contacts/ContactFormModal";
 import { ContactsTable } from "@/components/contacts/ContactsTable";
+import { ImportContactsModal } from "@/components/contacts/ImportContactsModal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useContacts } from "@/hooks/useContacts";
@@ -15,6 +16,7 @@ export function ContactsListView() {
   const canManage = usePermission("contacts.manage");
   const [search, setSearch] = useState("");
   const [adding, setAdding] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   const filtered = useMemo(() => {
     if (!contacts) return [];
@@ -37,10 +39,16 @@ export function ContactsListView() {
           <p className="text-text-muted text-sm">A shared list of business contacts for the whole team.</p>
         </div>
         {canManage && (
-          <Button onClick={() => setAdding(true)}>
-            <Plus className="size-4" />
-            Add Contact
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" onClick={() => setImporting(true)}>
+              <Upload className="size-4" />
+              Import
+            </Button>
+            <Button onClick={() => setAdding(true)}>
+              <Plus className="size-4" />
+              Add Contact
+            </Button>
+          </div>
         )}
       </div>
 
@@ -62,6 +70,7 @@ export function ContactsListView() {
       )}
 
       {adding && <ContactFormModal open={adding} onClose={() => setAdding(false)} />}
+      {importing && <ImportContactsModal open={importing} onClose={() => setImporting(false)} />}
     </div>
   );
 }
