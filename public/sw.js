@@ -1,87 +1,46 @@
-const CACHE = "aequora-v5";
+const CACHE = "aequora-v6";
 
 // On install: activate immediately
 self.addEventListener("install", () => self.skipWaiting());
 
-// On activate: clean up old caches
+// On activate: clean up old caches and take control right away
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) =>
-        Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
-      )
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
+
+// Allowlist-only: cache exactly these, unambiguously-static, rarely-changing
+// assets. Everything else (HTML, Next.js's RSC navigation payloads, JS
+// chunks, API calls, fonts served from other paths, etc.) is left
+// completely untouched -- the browser handles it natively, same as if this
+// service worker didn't exist. This is deliberately conservative after
+// repeatedly guessing wrong about which of Next.js's internal request
+// shapes were safe to intercept, each guess breaking page loads in a new
+// way. A small offline-icon cache is not worth that risk.
+const CACHEABLE_PATHS = ["/logo.png", "/icon.png", "/apple-icon.png", "/manifest.webmanifest"];
 
 self.addEventListener("fetch", (event) => {
   const { request } = event;
+  if (request.method !== "GET") return;
+
   const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
+  if (!CACHEABLE_PATHS.includes(url.pathname)) return;
 
-  // Only handle same-origin GET requests
-  if (request.method !== "GET" || url.origin !== self.location.origin) return;
-
-  // Never cache API calls — always hit the network
-  if (url.pathname.startsWith("/api/")) return;
-
-  // Never intercept Next.js's client-side navigation data fetches (RSC
-  // payloads for <Link>/router.push navigations, and prefetches). These
-  // aren't full HTML (so they don't hit the branch below) and aren't
-  // cacheable static assets either -- previously they fell through to the
-  // cache-first branch, and any hiccup there served Next's router a blank
-  // fallback response instead of the real payload, silently leaving the
-  // new page's content area empty while the persisted layout (sidebar,
-  // header) stayed rendered from the previous page.
-  if (
-    url.searchParams.has("_rsc") ||
-    request.headers.get("RSC") === "1" ||
-    request.headers.has("Next-Router-State-Tree") ||
-    request.headers.has("Next-Router-Prefetch")
-  ) {
-    return;
-  }
-
-  // Let the browser's own HTTP cache handle Next.js's hashed build chunks —
-  // they're already served with long-lived immutable Cache-Control headers,
-  // and webpack's own chunk-loading runtime expects to control retries on
-  // these requests itself. Intercepting them here previously caused a
-  // missing-catch fetch failure to surface as a hard network error for the
-  // whole page whenever one of these requests failed for any reason.
-  if (url.pathname.startsWith("/_next/static/")) return;
-
-  // Network-first for HTML navigation (always fresh data)
-  if (request.headers.get("Accept")?.includes("text/html")) {
-    event.respondWith(
-      fetch(request)
-        .then((res) => {
-          const clone = res.clone();
-          caches.open(CACHE).then((c) => c.put(request, clone)).catch(() => {});
-          return res;
-        })
-        .catch(() =>
-          caches
-            .match(request)
-            .then((cached) => cached || caches.match("/"))
-            .then((cached) => cached || new Response("", { status: 504, statusText: "Gateway Timeout" }))
-        )
-    );
-    return;
-  }
-
-  // Cache-first for other static assets (fonts, images, manifest icons).
   event.respondWith(
     caches.match(request).then((cached) => {
       if (cached) return cached;
-      return fetch(request)
-        .then((res) => {
-          if (res.ok) {
-            const clone = res.clone();
-            caches.open(CACHE).then((c) => c.put(request, clone)).catch(() => {});
-          }
-          return res;
-        })
-        .catch(() => new Response("", { status: 504, statusText: "Gateway Timeout" }));
+      return fetch(request).then((res) => {
+        if (res.ok) {
+          const clone = res.clone();
+          caches.open(CACHE).then((c) => c.put(request, clone)).catch(() => {});
+        }
+        return res;
+      });
     })
   );
 });
