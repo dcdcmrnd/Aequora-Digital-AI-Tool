@@ -3,8 +3,8 @@
 import { useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 
-import { ContactCard } from "@/components/contacts/ContactCard";
 import { ContactFormModal } from "@/components/contacts/ContactFormModal";
+import { ContactsTable } from "@/components/contacts/ContactsTable";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useContacts } from "@/hooks/useContacts";
@@ -54,11 +54,7 @@ export function ContactsListView() {
       {isLoading ? (
         <p className="text-text-muted text-sm">Loading...</p>
       ) : filtered.length > 0 ? (
-        <div className="flex flex-col gap-3">
-          {filtered.map((contact) => (
-            <ContactCard key={contact.id} contact={contact} canManage={canManage} />
-          ))}
-        </div>
+        <ContactsTable contacts={filtered} canManage={canManage} />
       ) : (
         <p className="text-text-muted text-sm">
           {search ? `No contacts match "${search}".` : "No contacts yet. Add one, or save a lead as a contact."}
