@@ -23,6 +23,7 @@ interface Props {
   inReplyTo?: string;
   references?: string;
   mode?: "compose" | "reply";
+  fromEmail?: string;
 }
 
 export function ComposeModal({
@@ -35,6 +36,7 @@ export function ComposeModal({
   inReplyTo,
   references,
   mode = "compose",
+  fromEmail,
 }: Props) {
   const [to, setTo] = useState(defaultTo);
   const [subject, setSubject] = useState(defaultSubject);
@@ -82,6 +84,7 @@ export function ComposeModal({
           threadId,
           inReplyTo,
           references,
+          fromEmail,
         }),
       });
 

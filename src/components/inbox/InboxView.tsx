@@ -60,12 +60,12 @@ function getInitials(name: string) {
 
 interface Props {
   isConnected: boolean;
-  connectedEmail: string | null;
+  accounts: string[];
   isAdmin: boolean;
   currentUserId: string;
 }
 
-export function InboxView({ isConnected, connectedEmail, isAdmin, currentUserId }: Props) {
+export function InboxView({ isConnected, accounts, isAdmin, currentUserId }: Props) {
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
   const [selected, setSelected] = useState<ThreadDetail | null>(null);
   const [loadingList, setLoadingList] = useState(false);
@@ -73,17 +73,20 @@ export function InboxView({ isConnected, connectedEmail, isAdmin, currentUserId 
   const [nextPageToken, setNextPageToken] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [activeLabel, setActiveLabel] = useState<Label>("INBOX");
+  const [activeAccount, setActiveAccount] = useState<string>(accounts[0] ?? "");
   const [composeOpen, setComposeOpen] = useState(false);
   const [replyOpen, setReplyOpen] = useState(false);
   const [signaturesOpen, setSignaturesOpen] = useState(false);
   // Mobile: show thread list (false) or email detail (true)
   const [mobileShowDetail, setMobileShowDetail] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const connectedEmail = activeAccount || null;
 
-  const fetchThreads = useCallback(async (label: Label, pageToken?: string) => {
+  const fetchThreads = useCallback(async (label: Label, account: string, pageToken?: string) => {
+    if (!account) return;
     setLoadingList(true);
     try {
-      const params = new URLSearchParams({ label });
+      const params = new URLSearchParams({ label, email: account });
       if (pageToken) params.set("pageToken", pageToken);
       const res = await fetch(`/api/gmail/threads?${params}`);
       const data = await res.json();
@@ -109,12 +112,12 @@ export function InboxView({ isConnected, connectedEmail, isAdmin, currentUserId 
   }, []);
 
   useEffect(() => {
-    if (!isConnected) return;
+    if (!isConnected || !activeAccount) return;
     setThreads([]);
     setSelected(null);
     setMobileShowDetail(false);
-    fetchThreads(activeLabel);
-  }, [isConnected, activeLabel, fetchThreads]);
+    fetchThreads(activeLabel, activeAccount);
+  }, [isConnected, activeLabel, activeAccount, fetchThreads]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -128,7 +131,7 @@ export function InboxView({ isConnected, connectedEmail, isAdmin, currentUserId 
       prev.map((t) => (t.id === thread.id ? { ...t, isUnread: false } : t))
     );
     try {
-      const res = await fetch(`/api/gmail/threads/${thread.id}`);
+      const res = await fetch(`/api/gmail/threads/${thread.id}?${new URLSearchParams({ email: activeAccount })}`);
       const data = await res.json();
       if (!res.ok || !Array.isArray(data.messages)) {
         toast.error("Couldn't load this conversation.");
@@ -199,7 +202,21 @@ export function InboxView({ isConnected, connectedEmail, isAdmin, currentUserId 
         ) : (
           <div>
             <h1 className="text-base md:text-lg font-semibold text-text-primary leading-tight">Inbox</h1>
-            {connectedEmail && <p className="text-[11px] text-text-muted hidden md:block">{connectedEmail}</p>}
+            {accounts.length > 1 ? (
+              <select
+                value={activeAccount}
+                onChange={(e) => setActiveAccount(e.target.value)}
+                className="hidden md:block text-[11px] text-text-muted border-0 bg-transparent p-0 focus:outline-none focus:ring-0 cursor-pointer"
+              >
+                {accounts.map((email) => (
+                  <option key={email} value={email}>
+                    {email}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              connectedEmail && <p className="text-[11px] text-text-muted hidden md:block">{connectedEmail}</p>
+            )}
           </div>
         )}
 
@@ -322,7 +339,7 @@ export function InboxView({ isConnected, connectedEmail, isAdmin, currentUserId 
                 })}
                 {nextPageToken && (
                   <button
-                    onClick={() => fetchThreads(activeLabel, nextPageToken)}
+                    onClick={() => fetchThreads(activeLabel, activeAccount, nextPageToken ?? undefined)}
                     className="w-full py-3 text-xs text-brand-primary hover:underline"
                     disabled={loadingList}
                   >
@@ -466,6 +483,7 @@ export function InboxView({ isConnected, connectedEmail, isAdmin, currentUserId 
         open={composeOpen}
         onClose={() => setComposeOpen(false)}
         mode="compose"
+        fromEmail={activeAccount}
       />
 
       {/* Reply modal */}
@@ -474,6 +492,7 @@ export function InboxView({ isConnected, connectedEmail, isAdmin, currentUserId 
           open={replyOpen}
           onClose={() => setReplyOpen(false)}
           mode="reply"
+          fromEmail={activeAccount}
           defaultTo={lastMessage.isOutgoing ? lastMessage.to : lastMessage.from}
           defaultSubject={selected.subject.startsWith("Re:") ? selected.subject : `Re: ${selected.subject}`}
           threadId={selected.id}

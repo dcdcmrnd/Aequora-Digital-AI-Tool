@@ -24,10 +24,11 @@ export async function GET(req: NextRequest) {
   const pageToken = searchParams.get("pageToken") ?? undefined;
   const labelId = searchParams.get("label");
   const q = searchParams.get("q") ?? undefined;
+  const account = searchParams.get("email") ?? undefined;
 
   try {
-    const gmail = await getGmailClient();
-    const connectedEmail = (await getConnectedEmail())?.toLowerCase() ?? "";
+    const gmail = await getGmailClient(account);
+    const connectedEmail = (account ?? (await getConnectedEmail()))?.toLowerCase() ?? "";
 
     // A contact-scoped search (q) intentionally omits the label filter so it
     // finds messages across Inbox and Sent, not just one folder.

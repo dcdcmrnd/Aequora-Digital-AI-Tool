@@ -21,14 +21,22 @@ export function getAuthUrl() {
   });
 }
 
-/** Only one agency inbox is supported at a time — whichever account last connected. */
+/** All connected agency accounts, oldest-connected first. */
+export async function getConnectedEmails(): Promise<string[]> {
+  const tokens = await prisma.gmailToken.findMany({ select: { email: true }, orderBy: { updatedAt: "asc" } });
+  return tokens.map((t) => t.email);
+}
+
+/** The default account — the first one connected — used when a caller doesn't specify which. */
 export async function getConnectedEmail(): Promise<string | null> {
-  const token = await prisma.gmailToken.findFirst();
+  const token = await prisma.gmailToken.findFirst({ orderBy: { updatedAt: "asc" } });
   return token?.email ?? null;
 }
 
-export async function getGmailClient() {
-  const token = await prisma.gmailToken.findFirst();
+export async function getGmailClient(email?: string) {
+  const token = email
+    ? await prisma.gmailToken.findUnique({ where: { email } })
+    : await prisma.gmailToken.findFirst({ orderBy: { updatedAt: "asc" } });
 
   if (!token) throw new Error("Gmail not connected. Visit /api/gmail/auth to connect.");
 
@@ -94,9 +102,11 @@ export async function sendEmail(fields: {
   references?: string;
   /** When set, appends a 1x1 open-tracking pixel pointed at /api/track/open/{token}. */
   trackingToken?: string;
+  /** Which connected agency account to send from. Defaults to the first connected account. */
+  fromEmail?: string;
 }): Promise<{ id: string | null | undefined; threadId: string | null | undefined }> {
-  const gmail = await getGmailClient();
-  const connectedEmail = await getConnectedEmail();
+  const gmail = await getGmailClient(fields.fromEmail);
+  const senderEmail = fields.fromEmail ?? (await getConnectedEmail());
 
   const baseUrl = process.env.NEXTAUTH_URL || "https://app.aequoradigital.com";
   const body = fields.trackingToken
@@ -106,7 +116,7 @@ export async function sendEmail(fields: {
   const raw = encodeEmail({
     ...fields,
     body,
-    from: `Aequora Digital <${connectedEmail}>`,
+    from: `Aequora Digital <${senderEmail}>`,
   });
 
   const res = await gmail.users.messages.send({

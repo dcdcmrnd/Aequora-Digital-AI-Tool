@@ -23,10 +23,18 @@ export async function GET(req: NextRequest) {
     const { data } = await google.oauth2({ version: "v2", auth: client }).userinfo.get();
     if (!data.email) throw new Error("No email on Google account");
 
-    // Only one agency inbox is supported — connecting a new account replaces the old one.
-    await prisma.gmailToken.deleteMany({});
-    await prisma.gmailToken.create({
-      data: {
+    // Multiple agency accounts can be connected side by side; reconnecting the
+    // same account just refreshes its token instead of adding a duplicate.
+    await prisma.gmailToken.upsert({
+      where: { email: data.email },
+      update: {
+        accessToken: tokens.access_token!,
+        // Google only returns a refresh_token on some grants even with
+        // prompt=consent forced; keep the existing one if this grant omitted it.
+        refreshToken: tokens.refresh_token ?? undefined,
+        expiryDate: BigInt(tokens.expiry_date ?? 0),
+      },
+      create: {
         email: data.email,
         accessToken: tokens.access_token!,
         refreshToken: tokens.refresh_token ?? "",

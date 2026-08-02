@@ -11,14 +11,14 @@ export async function POST(req: NextRequest) {
   const canAccessInbox = session.user.role === "admin" || (await checkPermission(session.user.id, "company.email"));
   if (!canAccessInbox) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const { to, subject, body, threadId, inReplyTo, references } = await req.json();
+  const { to, subject, body, threadId, inReplyTo, references, fromEmail } = await req.json();
 
   if (!to || !subject || !body) {
     return NextResponse.json({ error: "to, subject, and body are required" }, { status: 400 });
   }
 
   try {
-    const result = await sendEmail({ to, subject, body, threadId, inReplyTo, references });
+    const result = await sendEmail({ to, subject, body, threadId, inReplyTo, references, fromEmail });
     return NextResponse.json(result);
   } catch (err: any) {
     if (err.message?.includes("Gmail not connected")) {

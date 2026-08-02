@@ -11,9 +11,11 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const canAccessInbox = session.user.role === "admin" || (await checkPermission(session.user.id, "company.email"));
   if (!canAccessInbox) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+  const account = new URL(req.url).searchParams.get("email") ?? undefined;
+
   try {
-    const gmail = await getGmailClient();
-    const connectedEmail = (await getConnectedEmail())?.toLowerCase() ?? "";
+    const gmail = await getGmailClient(account);
+    const connectedEmail = (account ?? (await getConnectedEmail()))?.toLowerCase() ?? "";
 
     const thread = await gmail.users.threads.get({
       userId: "me",

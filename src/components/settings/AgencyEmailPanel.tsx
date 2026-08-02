@@ -2,19 +2,19 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Mail } from "lucide-react";
+import { Mail, Plus } from "lucide-react";
 import toast from "react-hot-toast";
 
 import { Button } from "@/components/ui/Button";
 
 interface AgencyEmailPanelProps {
-  initialEmail: string | null;
+  emails: string[];
 }
 
-export function AgencyEmailPanel({ initialEmail }: AgencyEmailPanelProps) {
+export function AgencyEmailPanel({ emails }: AgencyEmailPanelProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [disconnecting, setDisconnecting] = useState(false);
+  const [disconnecting, setDisconnecting] = useState<string | null>(null);
 
   useEffect(() => {
     if (searchParams.get("connected") === "1") {
@@ -26,18 +26,18 @@ export function AgencyEmailPanel({ initialEmail }: AgencyEmailPanelProps) {
     }
   }, [searchParams, router]);
 
-  async function handleDisconnect() {
-    if (!confirm("Disconnect the agency Gmail account? Automations that send email will stop working until you reconnect.")) return;
-    setDisconnecting(true);
+  async function handleDisconnect(email: string) {
+    if (!confirm(`Disconnect ${email}? Automations or inbox activity using this address will stop working until you reconnect.`)) return;
+    setDisconnecting(email);
     try {
-      const res = await fetch("/api/gmail/disconnect", { method: "DELETE" });
+      const res = await fetch(`/api/gmail/disconnect?email=${encodeURIComponent(email)}`, { method: "DELETE" });
       if (!res.ok) throw new Error();
       toast.success("Gmail disconnected");
       router.refresh();
     } catch {
       toast.error("Failed to disconnect Gmail");
     } finally {
-      setDisconnecting(false);
+      setDisconnecting(null);
     }
   }
 
@@ -50,26 +50,39 @@ export function AgencyEmailPanel({ initialEmail }: AgencyEmailPanelProps) {
         <div className="flex-1 min-w-0">
           <h3 className="text-sm font-semibold text-text-primary">Agency Email</h3>
           <p className="text-sm text-text-secondary mt-0.5">
-            Connect the Gmail account your agency sends from. Used by the Inbox and by Automation
-            email actions.
+            Connect the Gmail accounts your agency sends from. Used by the Inbox, Contact
+            Conversations, and Automation email actions.
           </p>
 
-          <div className="mt-4">
-            {initialEmail ? (
+          <div className="mt-4 space-y-2">
+            {emails.length === 0 && (
               <div className="flex items-center justify-between gap-3 rounded-input border border-border bg-surface-secondary px-3 py-2">
-                <span className="text-sm text-text-primary truncate">{initialEmail}</span>
-                <Button variant="secondary" size="sm" onClick={handleDisconnect} loading={disconnecting}>
+                <span className="text-sm text-text-muted">Not connected</span>
+              </div>
+            )}
+            {emails.map((email) => (
+              <div
+                key={email}
+                className="flex items-center justify-between gap-3 rounded-input border border-border bg-surface-secondary px-3 py-2"
+              >
+                <span className="text-sm text-text-primary truncate">{email}</span>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => handleDisconnect(email)}
+                  loading={disconnecting === email}
+                >
                   Disconnect
                 </Button>
               </div>
-            ) : (
-              <div className="flex items-center justify-between gap-3 rounded-input border border-border bg-surface-secondary px-3 py-2">
-                <span className="text-sm text-text-muted">Not connected</span>
-                <a href="/api/gmail/auth">
-                  <Button size="sm">Connect Gmail</Button>
-                </a>
-              </div>
-            )}
+            ))}
+
+            <a href="/api/gmail/auth" className="block">
+              <Button variant="secondary" size="sm" className="w-full">
+                <Plus className="size-4" />
+                {emails.length === 0 ? "Connect Gmail" : "Connect Another Account"}
+              </Button>
+            </a>
           </div>
         </div>
       </div>
