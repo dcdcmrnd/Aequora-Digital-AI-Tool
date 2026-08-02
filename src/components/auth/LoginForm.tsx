@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import toast from "react-hot-toast";
 
@@ -12,6 +13,7 @@ export function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ email: "", password: "" });
   const [remember, setRemember] = useState(true);
+  const [showPassword, setShowPassword] = useState(false);
 
   const callbackUrl = searchParams.get("callbackUrl") || "/";
 
@@ -65,15 +67,25 @@ export function LoginForm() {
         <label className="block text-sm font-medium text-text-primary mb-1.5">
           Password
         </label>
-        <input
-          type="password"
-          required
-          autoComplete="current-password"
-          placeholder="Your password"
-          value={form.password}
-          onChange={(e) => setForm({ ...form, password: e.target.value })}
-          className="w-full px-3 py-2 border border-border rounded-input text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary"
-        />
+        <div className="relative">
+          <input
+            type={showPassword ? "text" : "password"}
+            required
+            autoComplete="current-password"
+            placeholder="Your password"
+            value={form.password}
+            onChange={(e) => setForm({ ...form, password: e.target.value })}
+            className="w-full px-3 py-2 pr-10 border border-border rounded-input text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((v) => !v)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
+            aria-label={showPassword ? "Hide password" : "Show password"}
+          >
+            {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+          </button>
+        </div>
       </div>
 
       <label className="flex items-center gap-2 text-sm text-text-secondary select-none">
