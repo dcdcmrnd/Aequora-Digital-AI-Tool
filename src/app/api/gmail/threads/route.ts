@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { getGmailClient, getHeader } from "@/lib/gmail";
+import { getGmailClient, getConnectedEmail, getHeader } from "@/lib/gmail";
 import { checkPermission } from "@/lib/permissions";
-
-const SHARED_EMAIL = "info@aequoradigital.com";
 
 function extractContact(from: string, to: string, isOutgoing: boolean) {
   const raw = isOutgoing ? to : from;
@@ -28,6 +26,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const gmail = await getGmailClient();
+    const connectedEmail = (await getConnectedEmail())?.toLowerCase() ?? "";
 
     const listRes = await gmail.users.threads.list({
       userId: "me",
@@ -52,7 +51,7 @@ export async function GET(req: NextRequest) {
         const headers = last?.payload?.headers ?? [];
         const from = getHeader(headers, "From");
         const to = getHeader(headers, "To");
-        const isOutgoing = from.toLowerCase().includes(SHARED_EMAIL);
+        const isOutgoing = connectedEmail !== "" && from.toLowerCase().includes(connectedEmail);
         const contact = extractContact(from, to, isOutgoing);
         const isUnread = messages.some((m) => m.labelIds?.includes("UNREAD"));
 

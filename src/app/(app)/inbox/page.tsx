@@ -15,10 +15,14 @@ export default async function InboxPage() {
   const canAccessInbox = isAdmin || (await checkPermission(session.user.id, "company.email"));
   if (!canAccessInbox) redirect("/");
 
-  const token = await prisma.gmailToken.findUnique({
-    where: { email: "info@aequoradigital.com" },
-    select: { id: true },
-  });
+  const token = await prisma.gmailToken.findFirst({ select: { email: true } });
 
-  return <InboxView isConnected={!!token} isAdmin={isAdmin} currentUserId={session?.user?.id ?? ""} />;
+  return (
+    <InboxView
+      isConnected={!!token}
+      connectedEmail={token?.email ?? null}
+      isAdmin={isAdmin}
+      currentUserId={session?.user?.id ?? ""}
+    />
+  );
 }

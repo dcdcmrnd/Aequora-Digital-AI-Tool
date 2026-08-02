@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import toast from "react-hot-toast";
 import { Button } from "@/components/ui/Button";
 import { ComposeModal } from "./ComposeModal";
 import { SignatureManager } from "./SignatureManager";
@@ -59,16 +60,18 @@ function getInitials(name: string) {
 
 interface Props {
   isConnected: boolean;
+  connectedEmail: string | null;
   isAdmin: boolean;
   currentUserId: string;
 }
 
-export function InboxView({ isConnected, isAdmin, currentUserId }: Props) {
+export function InboxView({ isConnected, connectedEmail, isAdmin, currentUserId }: Props) {
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
   const [selected, setSelected] = useState<ThreadDetail | null>(null);
   const [loadingList, setLoadingList] = useState(false);
   const [loadingThread, setLoadingThread] = useState(false);
   const [nextPageToken, setNextPageToken] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [activeLabel, setActiveLabel] = useState<Label>("INBOX");
   const [composeOpen, setComposeOpen] = useState(false);
   const [replyOpen, setReplyOpen] = useState(false);
@@ -84,9 +87,22 @@ export function InboxView({ isConnected, isAdmin, currentUserId }: Props) {
       if (pageToken) params.set("pageToken", pageToken);
       const res = await fetch(`/api/gmail/threads?${params}`);
       const data = await res.json();
-      if (data.error === "not_connected") return;
-      setThreads((prev) => pageToken ? [...prev, ...data.threads] : data.threads);
+
+      if (!res.ok || !Array.isArray(data.threads)) {
+        const message =
+          data.error === "not_connected"
+            ? "Gmail isn't connected. Connect it in Settings → Agency Email."
+            : "Couldn't load your inbox. The Gmail connection may need to be refreshed in Settings → Agency Email.";
+        setLoadError(message);
+        if (data.error !== "not_connected") toast.error(message);
+        return;
+      }
+
+      setLoadError(null);
+      setThreads((prev) => (pageToken ? [...prev, ...data.threads] : data.threads));
       setNextPageToken(data.nextPageToken);
+    } catch {
+      setLoadError("Couldn't load your inbox. Please try again.");
     } finally {
       setLoadingList(false);
     }
@@ -114,7 +130,17 @@ export function InboxView({ isConnected, isAdmin, currentUserId }: Props) {
     try {
       const res = await fetch(`/api/gmail/threads/${thread.id}`);
       const data = await res.json();
+      if (!res.ok || !Array.isArray(data.messages)) {
+        toast.error("Couldn't load this conversation.");
+        setSelected(null);
+        setMobileShowDetail(false);
+        return;
+      }
       setSelected(data);
+    } catch {
+      toast.error("Couldn't load this conversation.");
+      setSelected(null);
+      setMobileShowDetail(false);
     } finally {
       setLoadingThread(false);
     }
@@ -132,7 +158,7 @@ export function InboxView({ isConnected, isAdmin, currentUserId }: Props) {
         </div>
         <h2 className="text-lg font-semibold text-text-primary mb-2">Inbox not connected</h2>
         <p className="text-sm text-text-secondary mb-6 max-w-sm">
-          Connect your <strong>info@aequoradigital.com</strong> Google account to view and send emails from the workspace.
+          Connect your agency Google account to view and send emails from the workspace.
         </p>
         {isAdmin ? (
           <Button onClick={() => (window.location.href = "/api/gmail/auth")}>
@@ -173,7 +199,7 @@ export function InboxView({ isConnected, isAdmin, currentUserId }: Props) {
         ) : (
           <div>
             <h1 className="text-base md:text-lg font-semibold text-text-primary leading-tight">Inbox</h1>
-            <p className="text-[11px] text-text-muted hidden md:block">info@aequoradigital.com</p>
+            {connectedEmail && <p className="text-[11px] text-text-muted hidden md:block">{connectedEmail}</p>}
           </div>
         )}
 
@@ -233,6 +259,8 @@ export function InboxView({ isConnected, isAdmin, currentUserId }: Props) {
               <div className="flex items-center justify-center py-12">
                 <Spinner />
               </div>
+            ) : loadError ? (
+              <div className="text-center py-12 px-4 text-sm text-text-muted">{loadError}</div>
             ) : threads.length === 0 ? (
               <div className="text-center py-12 text-sm text-text-muted">No conversations</div>
             ) : (

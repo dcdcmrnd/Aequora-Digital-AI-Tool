@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { getGmailClient, getHeader, extractBody } from "@/lib/gmail";
+import { getGmailClient, getConnectedEmail, getHeader, extractBody } from "@/lib/gmail";
 import { checkPermission } from "@/lib/permissions";
-
-const SHARED_EMAIL = "info@aequoradigital.com";
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
@@ -15,6 +13,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   try {
     const gmail = await getGmailClient();
+    const connectedEmail = (await getConnectedEmail())?.toLowerCase() ?? "";
 
     const thread = await gmail.users.threads.get({
       userId: "me",
@@ -45,7 +44,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       const headers = msg.payload?.headers ?? [];
       const from = getHeader(headers, "From");
       const to = getHeader(headers, "To");
-      const isOutgoing = from.toLowerCase().includes(SHARED_EMAIL);
+      const isOutgoing = connectedEmail !== "" && from.toLowerCase().includes(connectedEmail);
       const { html, text } = extractBody(msg.payload);
 
       return {
