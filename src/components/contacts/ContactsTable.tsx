@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { ExternalLink, Pencil, Trash2 } from "lucide-react";
+import { ExternalLink, MessageSquare, Pencil, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/Badge";
 import { CopyButton } from "@/components/ui/CopyButton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/Table";
+import { ContactConversationModal } from "@/components/contacts/ContactConversationModal";
 import { ContactFormModal } from "@/components/contacts/ContactFormModal";
 import { useContacts } from "@/hooks/useContacts";
+import { usePermission } from "@/hooks/usePermission";
 import type { Contact } from "@/types";
 
 interface ContactsTableProps {
@@ -18,6 +20,8 @@ interface ContactsTableProps {
 export function ContactsTable({ contacts, canManage }: ContactsTableProps) {
   const { deleteContact } = useContacts();
   const [editing, setEditing] = useState<Contact | null>(null);
+  const [conversationContact, setConversationContact] = useState<Contact | null>(null);
+  const canAccessInbox = usePermission("company.email");
 
   function handleDelete(contact: Contact) {
     if (!confirm(`Delete contact "${contact.name}"?`)) return;
@@ -110,6 +114,16 @@ export function ContactsTable({ contacts, canManage }: ContactsTableProps) {
                 {canManage && (
                   <TableCell>
                     <div className="flex justify-end gap-2">
+                      {contact.email && canAccessInbox && (
+                        <button
+                          onClick={() => setConversationContact(contact)}
+                          className="text-text-muted hover:text-brand-primary"
+                          aria-label="View conversation"
+                          title="View conversation"
+                        >
+                          <MessageSquare className="size-3.5" />
+                        </button>
+                      )}
                       <button
                         onClick={() => setEditing(contact)}
                         className="text-text-muted hover:text-brand-primary"
@@ -134,6 +148,14 @@ export function ContactsTable({ contacts, canManage }: ContactsTableProps) {
       </Table>
 
       {editing && <ContactFormModal open={!!editing} onClose={() => setEditing(null)} contact={editing} />}
+      {conversationContact?.email && (
+        <ContactConversationModal
+          open={!!conversationContact}
+          onClose={() => setConversationContact(null)}
+          contactEmail={conversationContact.email}
+          contactName={conversationContact.name}
+        />
+      )}
     </div>
   );
 }

@@ -16,6 +16,8 @@ export const CONTACT_MERGE_TAGS: MergeTag[] = [
 
 interface MergeContact {
   name: string;
+  firstName?: string | null;
+  lastName?: string | null;
   email: string | null;
   phone: string | null;
   company: string | null;
@@ -24,10 +26,15 @@ interface MergeContact {
 }
 
 export function contactMergeValues(contact: MergeContact): Record<string, string> {
+  // Prefer explicit firstName/lastName; fall back to splitting the display
+  // name for contacts created before those fields existed (e.g. imported
+  // from a lead search, or via the older single-field contact form).
   const parts = contact.name.trim().split(/\s+/).filter(Boolean);
+  const firstName = contact.firstName?.trim() || parts[0] || "";
+  const lastName = contact.lastName?.trim() || parts.slice(1).join(" ");
   return {
-    "{{contact.first_name}}": parts[0] ?? "",
-    "{{contact.last_name}}": parts.slice(1).join(" "),
+    "{{contact.first_name}}": firstName,
+    "{{contact.last_name}}": lastName,
     "{{contact.email}}": contact.email ?? "",
     "{{contact.phone}}": contact.phone ?? "",
     "{{contact.company}}": contact.company ?? "",

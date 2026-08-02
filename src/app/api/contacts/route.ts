@@ -10,6 +10,8 @@ import { prisma } from "@/lib/prisma";
 
 const contactSchema = z.object({
   name: z.string().min(1, "Name is required."),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
   company: z.string().optional(),
   email: z.string().optional(),
   phone: z.string().optional(),

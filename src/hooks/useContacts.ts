@@ -8,6 +8,8 @@ import type { Contact } from "@/types";
 
 export interface ContactInput {
   name: string;
+  firstName?: string;
+  lastName?: string;
   company?: string;
   email?: string;
   phone?: string;

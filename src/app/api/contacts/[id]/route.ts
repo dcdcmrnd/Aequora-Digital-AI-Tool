@@ -11,6 +11,8 @@ import { prisma } from "@/lib/prisma";
 
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
+  firstName: z.string().nullable().optional(),
+  lastName: z.string().nullable().optional(),
   company: z.string().nullable().optional(),
   email: z.string().nullable().optional(),
   phone: z.string().nullable().optional(),
@@ -58,6 +60,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const data: Prisma.ContactUpdateInput = {};
   if (parsed.data.name !== undefined) data.name = parsed.data.name;
+  if (parsed.data.firstName !== undefined) data.firstName = parsed.data.firstName;
+  if (parsed.data.lastName !== undefined) data.lastName = parsed.data.lastName;
   if (parsed.data.company !== undefined) data.company = parsed.data.company;
   if (parsed.data.email !== undefined) data.email = parsed.data.email;
   if (parsed.data.phone !== undefined) data.phone = parsed.data.phone;

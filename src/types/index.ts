@@ -301,6 +301,8 @@ export interface Contact {
   createdById: string;
   createdBy?: { id: string; name: string };
   name: string;
+  firstName: string | null;
+  lastName: string | null;
   company: string | null;
   email: string | null;
   phone: string | null;

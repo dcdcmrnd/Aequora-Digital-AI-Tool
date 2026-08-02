@@ -1,12 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { MessageSquare } from "lucide-react";
 
+import { ContactConversationModal } from "@/components/contacts/ContactConversationModal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { Textarea } from "@/components/ui/Textarea";
 import { type ContactInput, useContacts } from "@/hooks/useContacts";
+import { usePermission } from "@/hooks/usePermission";
 import type { Contact } from "@/types";
 
 interface ContactFormModalProps {
@@ -18,7 +21,8 @@ interface ContactFormModalProps {
 }
 
 type FormState = {
-  name: string;
+  firstName: string;
+  lastName: string;
   company: string;
   email: string;
   phone: string;
@@ -33,8 +37,13 @@ type FormState = {
 };
 
 function toFormState(source?: Partial<Contact> | Partial<ContactInput>): FormState {
+  // Older contacts (created before firstName/lastName existed, or converted
+  // from a lead search) only have a single `name` — split it as a best-effort
+  // fallback so editing them doesn't show blank name fields.
+  const nameParts = (source?.name ?? "").trim().split(/\s+/).filter(Boolean);
   return {
-    name: source?.name ?? "",
+    firstName: source?.firstName ?? nameParts[0] ?? "",
+    lastName: source?.lastName ?? nameParts.slice(1).join(" "),
     company: source?.company ?? "",
     email: source?.email ?? "",
     phone: source?.phone ?? "",
@@ -54,6 +63,8 @@ export function ContactFormModal({ open, onClose, contact, prefill, onSaved }: C
   const [form, setForm] = useState<FormState>(() => toFormState(contact ?? prefill));
   const isEditing = !!contact;
   const isSaving = createContact.isPending || updateContact.isPending;
+  const canAccessInbox = usePermission("company.email");
+  const [conversationOpen, setConversationOpen] = useState(false);
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -66,10 +77,15 @@ export function ContactFormModal({ open, onClose, contact, prefill, onSaved }: C
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.name.trim()) return;
+    const firstName = form.firstName.trim();
+    const lastName = form.lastName.trim();
+    const name = [firstName, lastName].filter(Boolean).join(" ");
+    if (!name) return;
 
     const input: ContactInput = {
-      name: form.name.trim(),
+      name,
+      firstName: firstName || undefined,
+      lastName: lastName || undefined,
       company: form.company.trim() || undefined,
       email: form.email.trim() || undefined,
       phone: form.phone.trim() || undefined,
@@ -104,9 +120,24 @@ export function ContactFormModal({ open, onClose, contact, prefill, onSaved }: C
   return (
     <Modal open={open} onClose={handleClose} title={isEditing ? "Edit Contact" : "Add Contact"} size="lg">
       <form onSubmit={handleSubmit} className="space-y-4 p-6">
+        {isEditing && contact.email && canAccessInbox && (
+          <div className="flex justify-end -mt-1 -mb-2">
+            <button
+              type="button"
+              onClick={() => setConversationOpen(true)}
+              className="inline-flex items-center gap-1.5 text-xs text-brand-primary hover:underline"
+            >
+              <MessageSquare className="size-3.5" />
+              View Conversation
+            </button>
+          </div>
+        )}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Name" required>
-            <Input value={form.name} onChange={(e) => set("name", e.target.value)} required />
+          <Field label="First Name" required>
+            <Input value={form.firstName} onChange={(e) => set("firstName", e.target.value)} required />
+          </Field>
+          <Field label="Last Name">
+            <Input value={form.lastName} onChange={(e) => set("lastName", e.target.value)} />
           </Field>
           <Field label="Company">
             <Input value={form.company} onChange={(e) => set("company", e.target.value)} />
@@ -149,11 +180,19 @@ export function ContactFormModal({ open, onClose, contact, prefill, onSaved }: C
           <Button type="button" variant="secondary" onClick={handleClose}>
             Cancel
           </Button>
-          <Button type="submit" loading={isSaving} disabled={!form.name.trim()}>
+          <Button type="submit" loading={isSaving} disabled={!form.firstName.trim() && !form.lastName.trim()}>
             {isEditing ? "Save Changes" : "Add Contact"}
           </Button>
         </div>
       </form>
+      {isEditing && contact.email && (
+        <ContactConversationModal
+          open={conversationOpen}
+          onClose={() => setConversationOpen(false)}
+          contactEmail={contact.email}
+          contactName={contact.name}
+        />
+      )}
     </Modal>
   );
 }

@@ -406,6 +406,8 @@ model Contact {
   createdById  String
   createdBy    User     @relation("ContactCreator", fields: [createdById], references: [id], onDelete: Cascade)
   name         String
+  firstName    String?
+  lastName     String?
   company      String?
   email        String?
   phone        String?
