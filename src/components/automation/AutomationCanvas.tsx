@@ -15,6 +15,7 @@ import {
 } from "@xyflow/react";
 
 import { CanvasNode } from "@/components/automation/CanvasNode";
+import { InsertableEdge } from "@/components/automation/InsertableEdge";
 import { NodeConfigPanel } from "@/components/automation/NodeConfigPanel";
 import { PlaceholderNode } from "@/components/automation/PlaceholderNode";
 import type { AutomationFlow, AutomationNode, AutomationNodeType, PipelineStage } from "@/types";
@@ -28,6 +29,8 @@ const nodeTypes = {
   wait: CanvasNode,
   placeholder: PlaceholderNode,
 };
+
+const edgeTypes = { insertable: InsertableEdge };
 
 const COL_WIDTH = 260;
 const ROW_HEIGHT = 150;
@@ -78,6 +81,7 @@ function withPlaceholders(
   nodes: AutomationNode[],
   edges: AutomationFlow["edges"],
   onPick: (sourceId: string, branch: string | undefined, type: AutomationNodeType) => void,
+  onInsert: (edge: AutomationFlow["edges"][number], type: AutomationNodeType) => void,
 ): { nodes: RFNode[]; edges: RFEdge[] } {
   const phNodes: RFNode[] = [];
   const phEdges: RFEdge[] = [];
@@ -107,7 +111,10 @@ function withPlaceholders(
       ...nodes.map((n) => ({ id: n.id, type: n.type, position: n.position, data: n.data })),
       ...phNodes,
     ],
-    edges: [...edges.map((e) => ({ ...e, type: "smoothstep" })), ...phEdges],
+    edges: [
+      ...edges.map((e) => ({ ...e, type: "insertable", data: { onInsert: (type: AutomationNodeType) => onInsert(e, type) } })),
+      ...phEdges,
+    ],
   };
 }
 
@@ -137,6 +144,22 @@ function CanvasInner({ flow, onChange, stages }: AutomationCanvasProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [realEdges]);
 
+  // Splices a brand-new node into an existing connection: source -> [new node] -> target,
+  // so an action can be inserted before/after/between any existing steps, not just appended at a leaf.
+  const handleInsertOnEdge = useCallback((edge: AutomationFlow["edges"][number], type: AutomationNodeType) => {
+    const newId = crypto.randomUUID();
+    const toTarget = { id: crypto.randomUUID(), source: newId, target: edge.target, sourceHandle: type === "condition" ? "yes" : null };
+    const fromSource = { id: crypto.randomUUID(), source: edge.source, target: newId, sourceHandle: edge.sourceHandle ?? null };
+
+    setRealNodes((prev) => {
+      const newNode: AutomationNode = { id: newId, type, position: { x: 0, y: 0 }, data: defaultDataFor(type) };
+      const nextEdges = [...realEdges.filter((e) => e.id !== edge.id), fromSource, toTarget];
+      return layout([...prev, newNode], nextEdges);
+    });
+    setRealEdges((prev) => [...prev.filter((e) => e.id !== edge.id), fromSource, toTarget]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [realEdges]);
+
   // React Flow owns rendering + measurement state. We rebuild the desired
   // node/edge list (real + freshly computed placeholders) whenever the real
   // structure changes and hand it to React Flow's own setters, which merge
@@ -147,11 +170,11 @@ function CanvasInner({ flow, onChange, stages }: AutomationCanvasProps) {
   const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState<RFEdge>([]);
 
   useEffect(() => {
-    const { nodes, edges } = withPlaceholders(realNodes, realEdges, handlePick);
+    const { nodes, edges } = withPlaceholders(realNodes, realEdges, handlePick, handleInsertOnEdge);
     setRfNodes(nodes.map((n) => ({ ...n, selected: n.id === selectedId })));
     setRfEdges(edges);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [realNodes, realEdges, handlePick, selectedId]);
+  }, [realNodes, realEdges, handlePick, handleInsertOnEdge, selectedId]);
 
   // Report the real (non-placeholder) structure upward for saving.
   useEffect(() => {
@@ -186,6 +209,7 @@ function CanvasInner({ flow, onChange, stages }: AutomationCanvasProps) {
   }
 
   const memoNodeTypes = useMemo(() => nodeTypes, []);
+  const memoEdgeTypes = useMemo(() => edgeTypes, []);
 
   return (
     <div className="relative h-[70vh] w-full rounded-card border border-border bg-surface-secondary">
@@ -193,6 +217,7 @@ function CanvasInner({ flow, onChange, stages }: AutomationCanvasProps) {
         nodes={rfNodes}
         edges={rfEdges}
         nodeTypes={memoNodeTypes}
+        edgeTypes={memoEdgeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeClick={handleNodeClick}

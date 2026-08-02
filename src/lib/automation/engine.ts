@@ -204,14 +204,38 @@ async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string)
       }
 
       if (node.type === "condition") {
-        // v1: single supported check — was the most recent tracked email on this run opened?
-        const lastTracked = await prisma.automationEmailTracking.findFirst({
-          where: { runId: run.id },
-          orderBy: { createdAt: "desc" },
-        });
-        const opened = !!lastTracked?.openedAt;
-        await logStep(run.id, node.id, node.type, "success", opened ? "Email was opened — Yes" : "Email not opened — No");
-        currentNodeId = nextNodeId(flow, node.id, opened ? "yes" : "no");
+        try {
+          const data = node.data as { conditionType?: string; tag?: string; stageId?: string };
+          let result = false;
+          let detail: string;
+
+          if (data.conditionType === "has_tag") {
+            const contact = run.contactId ? await prisma.contact.findUnique({ where: { id: run.contactId } }) : null;
+            const tags = contact ? (JSON.parse(contact.tags) as string[]) : [];
+            result = !!data.tag && tags.includes(data.tag);
+            detail = `Contact has tag "${data.tag ?? ""}"`;
+          } else if (data.conditionType === "opportunity_at_stage") {
+            const opportunity = run.contactId
+              ? await prisma.opportunity.findFirst({ where: { contactId: run.contactId, status: "open" }, orderBy: { createdAt: "desc" } })
+              : null;
+            result = !!data.stageId && opportunity?.stageId === data.stageId;
+            detail = "Opportunity at configured stage";
+          } else {
+            // "email_opened" (also the fallback for older runs saved before conditionType existed)
+            const lastTracked = await prisma.automationEmailTracking.findFirst({
+              where: { runId: run.id },
+              orderBy: { createdAt: "desc" },
+            });
+            result = !!lastTracked?.openedAt;
+            detail = "Email was opened";
+          }
+
+          await logStep(run.id, node.id, node.type, "success", `${detail} — ${result ? "Yes" : "No"}`);
+          currentNodeId = nextNodeId(flow, node.id, result ? "yes" : "no");
+        } catch (err) {
+          await logStep(run.id, node.id, node.type, "error", err instanceof Error ? err.message : "Unknown error");
+          throw err;
+        }
         continue;
       }
 

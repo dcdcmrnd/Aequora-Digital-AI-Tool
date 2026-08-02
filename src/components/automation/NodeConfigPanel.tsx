@@ -8,12 +8,18 @@ import { Input } from "@/components/ui/Input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
 import { CONTACT_MERGE_TAGS } from "@/lib/automation/mergeTags";
-import type { AutomationNode, AutomationNodeType, AutomationTriggerType, PipelineStage } from "@/types";
+import type { AutomationConditionType, AutomationNode, AutomationNodeType, AutomationTriggerType, PipelineStage } from "@/types";
 
 const TRIGGER_OPTIONS: { value: AutomationTriggerType; label: string }[] = [
   { value: "contact_created", label: "Contact Created" },
   { value: "tag_added", label: "Tag Added to Contact" },
   { value: "opportunity_stage_changed", label: "Opportunity Moved to Stage" },
+];
+
+const CONDITION_OPTIONS: { value: AutomationConditionType; label: string }[] = [
+  { value: "email_opened", label: "Email was opened" },
+  { value: "has_tag", label: "Contact has tag" },
+  { value: "opportunity_at_stage", label: "Contact's opportunity is at stage" },
 ];
 
 const NODE_TITLES: Record<AutomationNodeType, string> = {
@@ -187,10 +193,63 @@ export function NodeConfigPanel({ node, stages, onClose, onSave, onDelete, canDe
         )}
 
         {node.type === "condition" && (
-          <p className="text-text-secondary text-sm">
-            Checks whether the most recent email sent by this workflow was opened. Connect the <strong>Yes</strong>{" "}
-            and <strong>No</strong> branches to whatever should happen next.
-          </p>
+          <>
+            <Field label="Check whether">
+              <Select value={(data.conditionType as string) ?? ""} onValueChange={(v) => set("conditionType", v)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a condition" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CONDITION_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+
+            {data.conditionType === "email_opened" && (
+              <p className="text-text-secondary text-xs">
+                Checks whether the most recent email sent by this workflow was opened.
+              </p>
+            )}
+
+            {data.conditionType === "has_tag" && (
+              <Field label="Tag">
+                <Input value={(data.tag as string) ?? ""} onChange={(e) => set("tag", e.target.value)} placeholder="e.g. hot lead" />
+              </Field>
+            )}
+
+            {data.conditionType === "opportunity_at_stage" && (
+              <Field label="Stage">
+                <Select
+                  value={(data.stageId as string) ?? ""}
+                  onValueChange={(v) => {
+                    set("stageId", v);
+                    set("stageName", stages.find((s) => s.id === v)?.name);
+                  }}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select a stage" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {stages.map((stage) => (
+                      <SelectItem key={stage.id} value={stage.id}>
+                        {stage.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
+
+            {data.conditionType && (
+              <p className="text-text-muted text-xs">
+                Connect the <strong>Yes</strong> and <strong>No</strong> branches to whatever should happen next.
+              </p>
+            )}
+          </>
         )}
 
         {node.type === "wait" && (

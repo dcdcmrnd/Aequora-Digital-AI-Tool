@@ -21,6 +21,14 @@ const TRIGGER_LABELS: Record<string, string> = {
   opportunity_stage_changed: "Opportunity Moved to Stage",
 };
 
+function summarizeCondition(data: Record<string, unknown>): string {
+  const conditionType = data.conditionType as string | undefined;
+  if (conditionType === "email_opened") return "Was the email opened?";
+  if (conditionType === "has_tag") return data.tag ? `Contact has tag: "${data.tag}"?` : "Click to configure";
+  if (conditionType === "opportunity_at_stage") return data.stageName ? `Opportunity at stage "${data.stageName}"?` : "Click to configure";
+  return "Click to configure";
+}
+
 function summarize(type: AutomationNodeType, data: Record<string, unknown>): string {
   switch (type) {
     case "trigger": {
@@ -36,7 +44,7 @@ function summarize(type: AutomationNodeType, data: Record<string, unknown>): str
     case "move_pipeline_stage":
       return data.stageName ? `Move to "${data.stageName}"` : "Click to configure";
     case "condition":
-      return "Was the email opened?";
+      return summarizeCondition(data);
     case "wait":
       if (data.mode === "condition") return "Until email is opened";
       if (data.amount) return `${data.amount} ${data.unit ?? "hours"}`;

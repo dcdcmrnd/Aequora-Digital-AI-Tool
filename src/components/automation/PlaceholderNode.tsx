@@ -7,7 +7,7 @@ import { GitBranch, Mail, Plus, Tag, Clock } from "lucide-react";
 import { Dropdown } from "@/components/ui/Dropdown";
 import type { AutomationNodeType } from "@/types";
 
-const OPTIONS: { type: AutomationNodeType; label: string; icon: typeof Mail }[] = [
+export const ADD_STEP_OPTIONS: { type: AutomationNodeType; label: string; icon: typeof Mail }[] = [
   { type: "send_email", label: "Send Email", icon: Mail },
   { type: "add_tag", label: "Add Tag", icon: Tag },
   { type: "move_pipeline_stage", label: "Move Pipeline Stage", icon: GitBranch },
@@ -32,7 +32,7 @@ export function PlaceholderNode({ data }: NodeProps) {
             Add Step
           </button>
         }
-        items={OPTIONS.map((opt) => ({
+        items={ADD_STEP_OPTIONS.map((opt) => ({
           label: opt.label,
           icon: <opt.icon className="size-3.5" />,
           onClick: () => onPick(opt.type),
