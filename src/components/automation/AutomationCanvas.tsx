@@ -113,10 +113,11 @@ function CanvasInner({ flow, onChange, stages }: AutomationCanvasProps) {
         const has = outgoing.some((e) => (branch === undefined ? true : e.sourceHandle === branch));
         if (has) continue;
         const phId = `placeholder-${node.id}-${branch ?? "default"}`;
+        const xOffset = branch === "yes" ? -90 : branch === "no" ? 90 : 0;
         pNodes.push({
           id: phId,
           type: "placeholder",
-          position: { x: 0, y: 0 },
+          position: { x: node.position.x + xOffset, y: node.position.y + ROW_HEIGHT },
           data: { onPick: (type: AutomationNodeType) => handlePick(node.id, branch, type) },
           draggable: false,
         });
