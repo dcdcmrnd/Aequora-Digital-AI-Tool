@@ -1,4 +1,4 @@
-const CACHE = "aequora-v4";
+const CACHE = "aequora-v5";
 
 // On install: activate immediately
 self.addEventListener("install", () => self.skipWaiting());
@@ -24,6 +24,23 @@ self.addEventListener("fetch", (event) => {
 
   // Never cache API calls — always hit the network
   if (url.pathname.startsWith("/api/")) return;
+
+  // Never intercept Next.js's client-side navigation data fetches (RSC
+  // payloads for <Link>/router.push navigations, and prefetches). These
+  // aren't full HTML (so they don't hit the branch below) and aren't
+  // cacheable static assets either -- previously they fell through to the
+  // cache-first branch, and any hiccup there served Next's router a blank
+  // fallback response instead of the real payload, silently leaving the
+  // new page's content area empty while the persisted layout (sidebar,
+  // header) stayed rendered from the previous page.
+  if (
+    url.searchParams.has("_rsc") ||
+    request.headers.get("RSC") === "1" ||
+    request.headers.has("Next-Router-State-Tree") ||
+    request.headers.has("Next-Router-Prefetch")
+  ) {
+    return;
+  }
 
   // Let the browser's own HTTP cache handle Next.js's hashed build chunks —
   // they're already served with long-lived immutable Cache-Control headers,
