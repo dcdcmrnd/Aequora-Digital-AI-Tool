@@ -1,6 +1,6 @@
 export type UserRole = "admin" | "member";
 export type UserStatus = "invited" | "active" | "suspended";
-export type ProjectStatus = "active" | "on-hold" | "completed" | "archived";
+export type ProjectStatus = "active" | "on-hol d" | "completed" | "archived";
 export type TaskStatus = "backlog" | "todo" | "in-progress" | "review" | "done";
 export type TaskPriority = "low" | "medium" | "high" | "urgent";
 export type AccessLevel = "viewer" | "contributor" | "manager";
@@ -370,15 +370,27 @@ export interface AutomationFlow {
   edges: AutomationEdge[];
 }
 
+export interface AutomationRunStep {
+  id: string;
+  runId: string;
+  nodeId: string;
+  nodeType: AutomationNodeType;
+  status: "success" | "error" | "waiting";
+  detail: string | null;
+  createdAt: string;
+}
+
 export interface AutomationRun {
   id: string;
   automationId: string;
   contactId: string | null;
+  contact?: Pick<Contact, "id" | "name" | "email" | "company"> | null;
   status: "running" | "waiting" | "completed" | "error";
   currentNodeId: string | null;
   waitUntil: string | null;
   detail: string | null;
   createdAt: string;
+  steps?: AutomationRunStep[];
 }
 
 export interface Automation {

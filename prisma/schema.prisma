@@ -423,6 +423,7 @@ model Contact {
   updatedAt    DateTime @updatedAt
 
   opportunities Opportunity[]
+  automationRuns AutomationRun[]
 }
 
 // --- Pipeline / Opportunities ---
@@ -477,18 +478,31 @@ model Automation {
 }
 
 model AutomationRun {
-  id            String                   @id @default(cuid())
+  id            String                    @id @default(cuid())
   automationId  String
-  automation    Automation               @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  automation    Automation                @relation(fields: [automationId], references: [id], onDelete: Cascade)
   contactId     String?
-  status        String                   // running | waiting | completed | error
+  contact       Contact?                  @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  status        String                    // running | waiting | completed | error
   currentNodeId String?
   waitUntil     DateTime?
-  waitToken     String?                  @unique
+  waitToken     String?                   @unique
   detail        String?
-  createdAt     DateTime                 @default(now())
-  updatedAt     DateTime                 @updatedAt
+  createdAt     DateTime                  @default(now())
+  updatedAt     DateTime                  @updatedAt
   emailTracking AutomationEmailTracking[]
+  steps         AutomationRunStep[]
+}
+
+model AutomationRunStep {
+  id       String        @id @default(cuid())
+  runId    String
+  run      AutomationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  nodeId   String
+  nodeType String
+  status   String        // success | error | waiting
+  detail   String?
+  createdAt DateTime     @default(now())
 }
 
 model AutomationEmailTracking {

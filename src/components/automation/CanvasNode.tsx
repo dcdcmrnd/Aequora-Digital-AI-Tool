@@ -6,7 +6,7 @@ import { Clock, GitBranch, Mail, Tag, Zap, type LucideIcon } from "lucide-react"
 import { cn } from "@/lib/utils";
 import type { AutomationNodeType } from "@/types";
 
-const NODE_META: Record<AutomationNodeType, { icon: LucideIcon; label: string; accent: string }> = {
+export const NODE_META: Record<AutomationNodeType, { icon: LucideIcon; label: string; accent: string }> = {
   trigger: { icon: Zap, label: "Trigger", accent: "bg-brand-primary/10 text-brand-primary" },
   send_email: { icon: Mail, label: "Send Email", accent: "bg-brand-primary/10 text-brand-primary" },
   add_tag: { icon: Tag, label: "Add Tag", accent: "bg-emerald-50 text-emerald-600" },

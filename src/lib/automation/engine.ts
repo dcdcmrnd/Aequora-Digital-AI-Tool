@@ -45,6 +45,23 @@ function durationMs(amount: number, unit: WaitUnit): number {
   return amount * (unitMs[unit] ?? unitMs.hours);
 }
 
+function triggerDetail(event: TriggerEvent): string {
+  if (event.triggerType === "tag_added") return `Tag added: ${event.tag ?? ""}`;
+  if (event.triggerType === "opportunity_stage_changed") return "Opportunity moved stage";
+  return "Contact created";
+}
+
+/** Records one step of a run's path through the flow, for the execution log UI. */
+async function logStep(
+  runId: string,
+  nodeId: string,
+  nodeType: string,
+  status: "success" | "error" | "waiting",
+  detail?: string,
+): Promise<void> {
+  await prisma.automationRunStep.create({ data: { runId, nodeId, nodeType, status, detail } });
+}
+
 /** Finds active automations whose trigger matches the fired event and starts a run for each. */
 export async function runAutomationsForTrigger(event: TriggerEvent): Promise<void> {
   try {
@@ -67,6 +84,7 @@ export async function runAutomationsForTrigger(event: TriggerEvent): Promise<voi
         },
       });
 
+      await logStep(run.id, triggerNode.id, triggerNode.type, "success", triggerDetail(event));
       await runLoop(run.id, flow, firstNodeId);
     }
   } catch {
@@ -110,45 +128,71 @@ async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string)
       if (!node) break;
 
       if (node.type === "send_email") {
-        if (!run.contactId) throw new Error("No contact for this run");
-        const contact = await prisma.contact.findUnique({ where: { id: run.contactId } });
-        if (!contact?.email) throw new Error("Contact has no email address");
+        try {
+          if (!run.contactId) throw new Error("No contact for this run");
+          const contact = await prisma.contact.findUnique({ where: { id: run.contactId } });
+          if (!contact?.email) throw new Error("Contact has no email address");
 
-        const data = node.data as { subject?: string; body?: string };
-        const trackingToken = crypto.randomBytes(16).toString("hex");
-        await prisma.automationEmailTracking.create({ data: { token: trackingToken, runId: run.id } });
-        await sendEmail({ to: contact.email, subject: data.subject ?? "", body: data.body ?? "", trackingToken });
+          const data = node.data as { subject?: string; body?: string };
+          const trackingToken = crypto.randomBytes(16).toString("hex");
+          await prisma.automationEmailTracking.create({ data: { token: trackingToken, runId: run.id } });
+          await sendEmail({ to: contact.email, subject: data.subject ?? "", body: data.body ?? "", trackingToken });
 
+          await logStep(run.id, node.id, node.type, "success", `Sent to ${contact.email}`);
+        } catch (err) {
+          await logStep(run.id, node.id, node.type, "error", err instanceof Error ? err.message : "Unknown error");
+          throw err;
+        }
         currentNodeId = nextNodeId(flow, node.id);
         continue;
       }
 
       if (node.type === "add_tag") {
-        if (run.contactId) {
-          const contact = await prisma.contact.findUnique({ where: { id: run.contactId } });
-          const data = node.data as { tag?: string };
-          if (contact && data.tag) {
-            const tags = JSON.parse(contact.tags) as string[];
-            if (!tags.includes(data.tag)) {
-              tags.push(data.tag);
-              await prisma.contact.update({ where: { id: contact.id }, data: { tags: JSON.stringify(tags) } });
+        try {
+          if (run.contactId) {
+            const contact = await prisma.contact.findUnique({ where: { id: run.contactId } });
+            const data = node.data as { tag?: string };
+            if (contact && data.tag) {
+              const tags = JSON.parse(contact.tags) as string[];
+              if (!tags.includes(data.tag)) {
+                tags.push(data.tag);
+                await prisma.contact.update({ where: { id: contact.id }, data: { tags: JSON.stringify(tags) } });
+              }
+              await logStep(run.id, node.id, node.type, "success", `Tag added: ${data.tag}`);
+            } else {
+              await logStep(run.id, node.id, node.type, "success", "No tag configured");
             }
+          } else {
+            await logStep(run.id, node.id, node.type, "success", "No contact for this run");
           }
+        } catch (err) {
+          await logStep(run.id, node.id, node.type, "error", err instanceof Error ? err.message : "Unknown error");
+          throw err;
         }
         currentNodeId = nextNodeId(flow, node.id);
         continue;
       }
 
       if (node.type === "move_pipeline_stage") {
-        const data = node.data as { stageId?: string };
-        if (run.contactId && data.stageId) {
-          const opportunity = await prisma.opportunity.findFirst({
-            where: { contactId: run.contactId, status: "open" },
-            orderBy: { createdAt: "desc" },
-          });
-          if (opportunity) {
-            await prisma.opportunity.update({ where: { id: opportunity.id }, data: { stageId: data.stageId } });
+        try {
+          const data = node.data as { stageId?: string };
+          if (run.contactId && data.stageId) {
+            const opportunity = await prisma.opportunity.findFirst({
+              where: { contactId: run.contactId, status: "open" },
+              orderBy: { createdAt: "desc" },
+            });
+            if (opportunity) {
+              await prisma.opportunity.update({ where: { id: opportunity.id }, data: { stageId: data.stageId } });
+              await logStep(run.id, node.id, node.type, "success", "Opportunity moved to new stage");
+            } else {
+              await logStep(run.id, node.id, node.type, "success", "No open opportunity found for this contact");
+            }
+          } else {
+            await logStep(run.id, node.id, node.type, "success", "No stage configured");
           }
+        } catch (err) {
+          await logStep(run.id, node.id, node.type, "error", err instanceof Error ? err.message : "Unknown error");
+          throw err;
         }
         currentNodeId = nextNodeId(flow, node.id);
         continue;
@@ -161,6 +205,7 @@ async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string)
           orderBy: { createdAt: "desc" },
         });
         const opened = !!lastTracked?.openedAt;
+        await logStep(run.id, node.id, node.type, "success", opened ? "Email was opened — Yes" : "Email not opened — No");
         currentNodeId = nextNodeId(flow, node.id, opened ? "yes" : "no");
         continue;
       }
@@ -177,17 +222,20 @@ async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string)
             where: { id: run.id },
             data: { status: "waiting", currentNodeId: node.id, waitToken: lastTracked?.token ?? null },
           });
+          await logStep(run.id, node.id, node.type, "waiting", "Waiting for email to be opened");
         } else {
           const ms = durationMs(data.amount ?? 1, data.unit ?? "hours");
           await prisma.automationRun.update({
             where: { id: run.id },
             data: { status: "waiting", currentNodeId: node.id, waitUntil: new Date(Date.now() + ms) },
           });
+          await logStep(run.id, node.id, node.type, "waiting", `Waiting ${data.amount ?? 1} ${data.unit ?? "hours"}`);
         }
         return; // pause here until resumed
       }
 
-      break; // unknown node type
+      await logStep(run.id, node.id, node.type, "error", "Unknown node type");
+      break;
     }
 
     await prisma.automationRun.update({ where: { id: run.id }, data: { status: "completed", currentNodeId: null } });

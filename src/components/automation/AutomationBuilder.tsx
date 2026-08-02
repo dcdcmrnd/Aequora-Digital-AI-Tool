@@ -5,8 +5,10 @@ import { useState } from "react";
 import { ArrowLeft } from "lucide-react";
 
 import { AutomationCanvas } from "@/components/automation/AutomationCanvas";
+import { ExecutionLogView } from "@/components/automation/ExecutionLogView";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/Tabs";
 import { useAutomations } from "@/hooks/useAutomations";
 import { usePipeline } from "@/hooks/usePipeline";
 import type { Automation, AutomationFlow } from "@/types";
@@ -28,6 +30,7 @@ export function AutomationBuilder({ automation }: AutomationBuilderProps) {
   const [name, setName] = useState(automation?.name ?? "");
   const [isActive, setIsActive] = useState(automation?.isActive ?? true);
   const [flow, setFlow] = useState<AutomationFlow>(automation?.flow ?? blankFlow());
+  const [tab, setTab] = useState("builder");
 
   const isSaving = createAutomation.isPending || updateAutomation.isPending;
   const stages = pipeline?.stages ? [...pipeline.stages].sort((a, b) => a.order - b.order) : [];
@@ -77,7 +80,22 @@ export function AutomationBuilder({ automation }: AutomationBuilderProps) {
         className="max-w-md text-base font-medium"
       />
 
-      <AutomationCanvas flow={flow} onChange={setFlow} stages={stages} />
+      {isEditing ? (
+        <Tabs value={tab} onValueChange={setTab}>
+          <TabsList>
+            <TabsTrigger value="builder">Builder</TabsTrigger>
+            <TabsTrigger value="logs">Execution Log</TabsTrigger>
+          </TabsList>
+          <TabsContent value="builder">
+            <AutomationCanvas flow={flow} onChange={setFlow} stages={stages} />
+          </TabsContent>
+          <TabsContent value="logs">
+            <ExecutionLogView automationId={automation.id} enabled={tab === "logs"} />
+          </TabsContent>
+        </Tabs>
+      ) : (
+        <AutomationCanvas flow={flow} onChange={setFlow} stages={stages} />
+      )}
     </div>
   );
 }

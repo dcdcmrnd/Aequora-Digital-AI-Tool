@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 
 import { apiFetch, ApiError } from "@/lib/api-client";
-import type { Automation, AutomationFlow } from "@/types";
+import type { Automation, AutomationFlow, AutomationRun } from "@/types";
 
 export interface AutomationInput {
   name: string;
@@ -68,4 +68,15 @@ export function useAutomations() {
   });
 
   return { ...query, automations: query.data?.automations, createAutomation, updateAutomation, deleteAutomation };
+}
+
+export function useAutomationRuns(automationId: string, enabled: boolean) {
+  const query = useQuery({
+    queryKey: ["automation-runs", automationId],
+    queryFn: () => apiFetch<{ runs: AutomationRun[] }>(`/api/automations/${automationId}/runs`),
+    enabled,
+    refetchInterval: enabled ? 10_000 : false,
+  });
+
+  return { ...query, runs: query.data?.runs };
 }
