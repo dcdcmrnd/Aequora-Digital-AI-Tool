@@ -400,6 +400,8 @@ export interface Automation {
   flow: AutomationFlow;
   createdById: string;
   runs?: AutomationRun[];
+  contactsEntered?: number;
+  activeContacts?: number;
   createdAt: string;
   updatedAt: string;
 }

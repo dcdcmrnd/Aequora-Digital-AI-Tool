@@ -41,8 +41,22 @@ export async function GET() {
     orderBy: { createdAt: "desc" },
   });
 
+  const counts = await prisma.automationRun.groupBy({ by: ["automationId", "status"], _count: true });
+  const statsByAutomation = new Map<string, { total: number; active: number }>();
+  for (const c of counts) {
+    const entry = statsByAutomation.get(c.automationId) ?? { total: 0, active: 0 };
+    entry.total += c._count;
+    if (c.status === "running" || c.status === "waiting") entry.active += c._count;
+    statsByAutomation.set(c.automationId, entry);
+  }
+
   return NextResponse.json({
-    automations: automations.map((a) => ({ ...a, flow: JSON.parse(a.flow) })),
+    automations: automations.map((a) => ({
+      ...a,
+      flow: JSON.parse(a.flow),
+      contactsEntered: statsByAutomation.get(a.id)?.total ?? 0,
+      activeContacts: statsByAutomation.get(a.id)?.active ?? 0,
+    })),
   });
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Plus, Trash2, Zap } from "lucide-react";
+import { Loader2, Plus, Trash2, Users, Zap } from "lucide-react";
 
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -83,6 +83,18 @@ export function AutomationsListView() {
                       </>
                     )}
                   </p>
+                </div>
+                <div className="flex items-center gap-3 shrink-0 text-xs text-text-secondary">
+                  <span className="flex items-center gap-1" title="Contacts entered this workflow">
+                    <Users className="size-3.5" />
+                    {automation.contactsEntered ?? 0}
+                  </span>
+                  {(automation.activeContacts ?? 0) > 0 && (
+                    <span className="flex items-center gap-1 text-brand-primary" title="Currently active in this workflow">
+                      <Loader2 className="size-3.5 animate-spin" />
+                      {automation.activeContacts} active
+                    </span>
+                  )}
                 </div>
                 <Badge variant={automation.isActive ? "success" : "muted"}>
                   {automation.isActive ? "Active" : "Inactive"}
