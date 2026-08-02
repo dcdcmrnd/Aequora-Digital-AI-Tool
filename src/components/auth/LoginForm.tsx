@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { signIn } from "next-auth/react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -64,9 +65,12 @@ export function LoginForm() {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-text-primary mb-1.5">
-          Password
-        </label>
+        <div className="flex items-center justify-between mb-1.5">
+          <label className="block text-sm font-medium text-text-primary">Password</label>
+          <Link href="/forgot-password" className="text-xs font-medium text-brand-primary hover:underline">
+            Forgot password?
+          </Link>
+        </div>
         <div className="relative">
           <input
             type={showPassword ? "text" : "password"}
