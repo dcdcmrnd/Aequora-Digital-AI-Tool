@@ -197,7 +197,8 @@ function CanvasInner({ flow, onChange, stages }: AutomationCanvasProps) {
         nodeTypes={nodeTypes}
         onNodesChange={handleNodesChange}
         onNodeClick={handleNodeClick}
-        fitView
+        defaultViewport={{ x: 120, y: 60, zoom: 1 }}
+        minZoom={0.3}
         proOptions={{ hideAttribution: true }}
       >
         <Background gap={20} />
