@@ -13,6 +13,7 @@ import {
   type Node as RFNode,
   type Edge as RFEdge,
 } from "@xyflow/react";
+import { Redo2, Undo2 } from "lucide-react";
 
 import { CanvasNode } from "@/components/automation/CanvasNode";
 import { InsertableEdge } from "@/components/automation/InsertableEdge";
@@ -134,15 +135,74 @@ function CanvasInner({ flow, onChange, stages }: AutomationCanvasProps) {
   const [realNodes, setRealNodes] = useState<AutomationNode[]>(flow.nodes);
   const [realEdges, setRealEdges] = useState<AutomationFlow["edges"]>(flow.edges);
 
+  // Undo/redo: a history of {nodes, edges} snapshots taken before each
+  // structural edit (add/insert/duplicate/delete/reconfigure). Node dragging
+  // isn't tracked here — positions are ephemeral and recomputed by layout().
+  const [past, setPast] = useState<AutomationFlow[]>([]);
+  const [future, setFuture] = useState<AutomationFlow[]>([]);
+
+  const commit = useCallback(
+    (nextNodes: AutomationNode[], nextEdges: AutomationFlow["edges"]) => {
+      setPast((prev) => [...prev, { nodes: realNodes, edges: realEdges }].slice(-50));
+      setFuture([]);
+      setRealNodes(nextNodes);
+      setRealEdges(nextEdges);
+    },
+    [realNodes, realEdges],
+  );
+
+  const undo = useCallback(() => {
+    setPast((prevPast) => {
+      if (prevPast.length === 0) return prevPast;
+      const last = prevPast[prevPast.length - 1];
+      setFuture((prevFuture) => [{ nodes: realNodes, edges: realEdges }, ...prevFuture].slice(0, 50));
+      setRealNodes(last.nodes);
+      setRealEdges(last.edges);
+      setSelectedId(null);
+      return prevPast.slice(0, -1);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [realNodes, realEdges]);
+
+  const redo = useCallback(() => {
+    setFuture((prevFuture) => {
+      if (prevFuture.length === 0) return prevFuture;
+      const next = prevFuture[0];
+      setPast((prevPast) => [...prevPast, { nodes: realNodes, edges: realEdges }].slice(-50));
+      setRealNodes(next.nodes);
+      setRealEdges(next.edges);
+      setSelectedId(null);
+      return prevFuture.slice(1);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [realNodes, realEdges]);
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      const isMod = e.metaKey || e.ctrlKey;
+      if (!isMod) return;
+      if (e.key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      } else if (e.key === "z" && e.shiftKey) {
+        e.preventDefault();
+        redo();
+      } else if (e.key === "y") {
+        e.preventDefault();
+        redo();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [undo, redo]);
+
   const handlePick = useCallback((sourceId: string, branch: string | undefined, type: AutomationNodeType) => {
     const newId = crypto.randomUUID();
-    setRealNodes((prev) => {
-      const newNode: AutomationNode = { id: newId, type, position: { x: 0, y: 0 }, data: defaultDataFor(type) };
-      return layout([...prev, newNode], [...realEdges, { id: "", source: sourceId, target: newId, sourceHandle: branch ?? null }]);
-    });
-    setRealEdges((prev) => [...prev, { id: crypto.randomUUID(), source: sourceId, target: newId, sourceHandle: branch ?? null }]);
+    const newNode: AutomationNode = { id: newId, type, position: { x: 0, y: 0 }, data: defaultDataFor(type) };
+    const nextEdges = [...realEdges, { id: crypto.randomUUID(), source: sourceId, target: newId, sourceHandle: branch ?? null }];
+    commit(layout([...realNodes, newNode], nextEdges), nextEdges);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [realEdges]);
+  }, [realNodes, realEdges, commit]);
 
   // Splices a brand-new node into an existing connection: source -> [new node] -> target,
   // so an action can be inserted before/after/between any existing steps, not just appended at a leaf.
@@ -150,15 +210,38 @@ function CanvasInner({ flow, onChange, stages }: AutomationCanvasProps) {
     const newId = crypto.randomUUID();
     const toTarget = { id: crypto.randomUUID(), source: newId, target: edge.target, sourceHandle: type === "condition" ? "yes" : null };
     const fromSource = { id: crypto.randomUUID(), source: edge.source, target: newId, sourceHandle: edge.sourceHandle ?? null };
-
-    setRealNodes((prev) => {
-      const newNode: AutomationNode = { id: newId, type, position: { x: 0, y: 0 }, data: defaultDataFor(type) };
-      const nextEdges = [...realEdges.filter((e) => e.id !== edge.id), fromSource, toTarget];
-      return layout([...prev, newNode], nextEdges);
-    });
-    setRealEdges((prev) => [...prev.filter((e) => e.id !== edge.id), fromSource, toTarget]);
+    const newNode: AutomationNode = { id: newId, type, position: { x: 0, y: 0 }, data: defaultDataFor(type) };
+    const nextEdges = [...realEdges.filter((e) => e.id !== edge.id), fromSource, toTarget];
+    commit(layout([...realNodes, newNode], nextEdges), nextEdges);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [realEdges]);
+  }, [realNodes, realEdges, commit]);
+
+  // Duplicates a single node (its own config only, not its downstream steps —
+  // duplicating a whole branch isn't safe here since each node/branch can
+  // only have one outgoing connection) and splices the copy in immediately
+  // after the original, ahead of whatever it already led to.
+  const handleDuplicateNode = useCallback((nodeId: string) => {
+    const original = realNodes.find((n) => n.id === nodeId);
+    if (!original) return;
+
+    const newId = crypto.randomUUID();
+    const copy: AutomationNode = { id: newId, type: original.type, position: { x: 0, y: 0 }, data: { ...original.data } };
+    const outgoing = realEdges.find((e) => e.source === nodeId && e.sourceHandle == null);
+
+    let nextEdges: AutomationFlow["edges"];
+    if (outgoing) {
+      nextEdges = [
+        ...realEdges.filter((e) => e.id !== outgoing.id),
+        { id: crypto.randomUUID(), source: nodeId, target: newId, sourceHandle: null },
+        { id: crypto.randomUUID(), source: newId, target: outgoing.target, sourceHandle: outgoing.sourceHandle ?? null },
+      ];
+    } else {
+      nextEdges = [...realEdges, { id: crypto.randomUUID(), source: nodeId, target: newId, sourceHandle: null }];
+    }
+
+    commit(layout([...realNodes, copy], nextEdges), nextEdges);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [realNodes, realEdges, commit]);
 
   // React Flow owns rendering + measurement state. We rebuild the desired
   // node/edge list (real + freshly computed placeholders) whenever the real
@@ -191,7 +274,7 @@ function CanvasInner({ flow, onChange, stages }: AutomationCanvasProps) {
 
   function handleSaveNode(data: Record<string, unknown>) {
     if (!selectedId) return;
-    setRealNodes((prev) => prev.map((n) => (n.id === selectedId ? { ...n, data } : n)));
+    commit(realNodes.map((n) => (n.id === selectedId ? { ...n, data } : n)), realEdges);
     setSelectedId(null);
   }
 
@@ -203,8 +286,16 @@ function CanvasInner({ flow, onChange, stages }: AutomationCanvasProps) {
       realEdges.filter((e) => e.source === id).forEach((e) => collect(e.target));
     }
     collect(selectedId);
-    setRealNodes((prev) => prev.filter((n) => !toRemove.has(n.id)));
-    setRealEdges((prev) => prev.filter((e) => !toRemove.has(e.source) && !toRemove.has(e.target)));
+    commit(
+      realNodes.filter((n) => !toRemove.has(n.id)),
+      realEdges.filter((e) => !toRemove.has(e.source) && !toRemove.has(e.target)),
+    );
+    setSelectedId(null);
+  }
+
+  function handleDuplicateAndClose() {
+    if (!selectedId) return;
+    handleDuplicateNode(selectedId);
     setSelectedId(null);
   }
 
@@ -213,6 +304,27 @@ function CanvasInner({ flow, onChange, stages }: AutomationCanvasProps) {
 
   return (
     <div className="relative h-[70vh] w-full rounded-card border border-border bg-surface-secondary">
+      <div className="absolute left-3 top-3 z-10 flex gap-1 rounded-card border border-border bg-white p-1 shadow-sm">
+        <button
+          type="button"
+          onClick={undo}
+          disabled={past.length === 0}
+          title="Undo (Ctrl+Z)"
+          className="rounded px-1.5 py-1 text-text-secondary hover:bg-surface-secondary disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <Undo2 className="size-4" />
+        </button>
+        <button
+          type="button"
+          onClick={redo}
+          disabled={future.length === 0}
+          title="Redo (Ctrl+Shift+Z)"
+          className="rounded px-1.5 py-1 text-text-secondary hover:bg-surface-secondary disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <Redo2 className="size-4" />
+        </button>
+      </div>
+
       <ReactFlow
         nodes={rfNodes}
         edges={rfEdges}
@@ -237,6 +349,8 @@ function CanvasInner({ flow, onChange, stages }: AutomationCanvasProps) {
           onSave={handleSaveNode}
           onDelete={handleDeleteNode}
           canDelete={selectedNode.type !== "trigger"}
+          onDuplicate={handleDuplicateAndClose}
+          canDuplicate={selectedNode.type !== "trigger" && selectedNode.type !== "condition"}
         />
       )}
     </div>

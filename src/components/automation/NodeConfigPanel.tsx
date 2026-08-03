@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { X, Trash2 } from "lucide-react";
+import { Copy, X, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
 
 import { EmailBodyEditor } from "@/components/automation/EmailBodyEditor";
@@ -40,9 +40,11 @@ interface NodeConfigPanelProps {
   onSave: (data: Record<string, unknown>) => void;
   onDelete: () => void;
   canDelete: boolean;
+  onDuplicate: () => void;
+  canDuplicate: boolean;
 }
 
-export function NodeConfigPanel({ node, stages, onClose, onSave, onDelete, canDelete }: NodeConfigPanelProps) {
+export function NodeConfigPanel({ node, stages, onClose, onSave, onDelete, canDelete, onDuplicate, canDuplicate }: NodeConfigPanelProps) {
   const [data, setData] = useState<Record<string, unknown>>(node.data);
   const subjectRef = useRef<HTMLInputElement>(null);
   const [accounts, setAccounts] = useState<string[]>([]);
@@ -379,14 +381,20 @@ export function NodeConfigPanel({ node, stages, onClose, onSave, onDelete, canDe
       </div>
 
       <div className="flex items-center justify-between border-t border-border p-4">
-        {canDelete ? (
-          <Button variant="ghost" className="text-danger" onClick={onDelete}>
-            <Trash2 className="size-4" />
-            Delete
-          </Button>
-        ) : (
-          <span />
-        )}
+        <div className="flex gap-2">
+          {canDelete && (
+            <Button variant="ghost" className="text-danger" onClick={onDelete}>
+              <Trash2 className="size-4" />
+              Delete
+            </Button>
+          )}
+          {canDuplicate && (
+            <Button variant="ghost" onClick={onDuplicate} title="Insert a copy of this step right after it">
+              <Copy className="size-4" />
+              Duplicate
+            </Button>
+          )}
+        </div>
         <div className="flex gap-2">
           <Button variant="secondary" onClick={onClose}>
             Cancel
