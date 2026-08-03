@@ -153,9 +153,17 @@ export function ComposeModal({
             </select>
           </div>
           {selectedSig ? (
-            <div className="px-3 py-2 text-xs text-text-muted whitespace-pre-wrap font-sans leading-relaxed">
-              {selectedSig.content}
-            </div>
+            <iframe
+              srcDoc={selectedSig.content}
+              className="w-full border-none"
+              style={{ minHeight: "40px" }}
+              sandbox="allow-same-origin"
+              title="Signature preview"
+              onLoad={(e) => {
+                const iframe = e.currentTarget;
+                iframe.style.height = (iframe.contentDocument?.body?.scrollHeight ?? 40) + "px";
+              }}
+            />
           ) : (
             <div className="px-3 py-2 text-xs text-text-muted italic">No signature selected</div>
           )}
