@@ -28,6 +28,7 @@ export default async function LeadDetailsPage({ params }: { params: { id: string
         createdAt: lead.createdAt.toISOString(),
         updatedAt: lead.updatedAt.toISOString(),
         opportunityScoreUpdatedAt: lead.opportunityScoreUpdatedAt?.toISOString() ?? null,
+        enrichedAt: lead.enrichedAt?.toISOString() ?? null,
         audit: lead.audit
           ? {
               ...lead.audit,

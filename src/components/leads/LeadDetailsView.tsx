@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, BookUser, Bookmark, ExternalLink, MapPin, Phone, RefreshCw } from "lucide-react";
+import { ArrowLeft, BookUser, Bookmark, ExternalLink, Mail, MapPin, Phone, RefreshCw, Search } from "lucide-react";
 
 import { AuditCard } from "@/components/leads/AuditCard";
 import { NotesEditor } from "@/components/leads/NotesEditor";
@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/Button";
 import { CopyButton } from "@/components/ui/CopyButton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/Select";
 import { useLeadAudit } from "@/hooks/useLeadAudit";
+import { useLeadEnrich } from "@/hooks/useLeadEnrich";
 import { useSavedLeads } from "@/hooks/useSavedLeads";
 import { cn, formatDate } from "@/lib/utils";
 import { LEAD_STATUSES, type Lead, type LeadStatus, type SavedLead } from "@/types";
@@ -25,6 +26,7 @@ interface LeadDetailsViewProps {
 export function LeadDetailsView({ lead: initialLead, initialSavedLead }: LeadDetailsViewProps) {
   const router = useRouter();
   const audit = useLeadAudit(initialLead.id);
+  const enrich = useLeadEnrich(initialLead.id);
   const savedLeads = useSavedLeads();
   const [lead, setLead] = useState(initialLead);
   const [savedLead, setSavedLead] = useState(initialSavedLead);
@@ -56,9 +58,17 @@ export function LeadDetailsView({ lead: initialLead, initialSavedLead }: LeadDet
     savedLeads.updateLead.mutate({ id: savedLead.id, notes }, { onSuccess: (data) => setSavedLead(data.savedLead) });
   }
 
+  const enrichedLinks = [
+    { label: "Facebook", href: lead.enrichedFacebookUrl },
+    { label: "Instagram", href: lead.enrichedInstagramUrl },
+    { label: "LinkedIn", href: lead.enrichedLinkedinUrl },
+    { label: "X / Twitter", href: lead.enrichedTwitterUrl },
+  ].filter((s) => s.href);
+
   const timeline = [
     { label: "Discovered", date: lead.createdAt },
     ...(lead.audit ? [{ label: "Website audited", date: lead.audit.lastScanned }] : []),
+    ...(lead.enrichedAt ? [{ label: "Website checked for email/social links", date: lead.enrichedAt }] : []),
     ...(savedLead ? [{ label: "Saved as lead", date: savedLead.createdAt }] : []),
     ...(savedLead && savedLead.updatedAt !== savedLead.createdAt
       ? [{ label: "Lead updated", date: savedLead.updatedAt }]
@@ -128,7 +138,44 @@ export function LeadDetailsView({ lead: initialLead, initialSavedLead }: LeadDet
                   </a>
                 )}
               </div>
+              {lead.enrichedAt && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <Mail className="text-text-muted size-4 shrink-0" />
+                    {lead.enrichedEmail ?? "—"}
+                    {lead.enrichedEmail && <CopyButton value={lead.enrichedEmail} label="Email" />}
+                  </div>
+                  {enrichedLinks.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
+                      {enrichedLinks.map((s) => (
+                        <a
+                          key={s.label}
+                          href={s.href!}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-brand-primary inline-flex items-center gap-1 hover:underline"
+                        >
+                          {s.label} <ExternalLink className="size-3" />
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
+
+            {lead.website && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3"
+                onClick={() => enrich.mutate(undefined, { onSuccess: (data) => setLead(data.lead) })}
+                disabled={enrich.isPending}
+              >
+                <Search className={cn("size-3.5", enrich.isPending && "animate-spin")} />
+                {enrich.isPending ? "Checking website..." : lead.enrichedAt ? "Re-check Website" : "Find Email & Social Links"}
+              </Button>
+            )}
           </div>
 
           <div className="flex items-center justify-between">
@@ -213,6 +260,11 @@ export function LeadDetailsView({ lead: initialLead, initialSavedLead }: LeadDet
             phone: lead.phone ?? undefined,
             website: lead.website ?? undefined,
             address: lead.address ?? undefined,
+            email: lead.enrichedEmail ?? undefined,
+            facebookUrl: lead.enrichedFacebookUrl ?? undefined,
+            instagramUrl: lead.enrichedInstagramUrl ?? undefined,
+            linkedinUrl: lead.enrichedLinkedinUrl ?? undefined,
+            twitterUrl: lead.enrichedTwitterUrl ?? undefined,
             sourceLeadId: lead.id,
           }}
         />

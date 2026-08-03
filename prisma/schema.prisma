@@ -345,6 +345,12 @@ model Lead {
   lng                       Float?
   opportunityScore          Int       @default(0)
   opportunityScoreUpdatedAt DateTime?
+  enrichedEmail             String?
+  enrichedFacebookUrl       String?
+  enrichedInstagramUrl      String?
+  enrichedLinkedinUrl       String?
+  enrichedTwitterUrl        String?
+  enrichedAt                DateTime?
   createdAt                 DateTime  @default(now())
   updatedAt                 DateTime  @updatedAt
 

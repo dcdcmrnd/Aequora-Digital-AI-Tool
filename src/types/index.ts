@@ -268,6 +268,12 @@ export interface Lead {
   lng: number | null;
   opportunityScore: number;
   opportunityScoreUpdatedAt: string | null;
+  enrichedEmail: string | null;
+  enrichedFacebookUrl: string | null;
+  enrichedInstagramUrl: string | null;
+  enrichedLinkedinUrl: string | null;
+  enrichedTwitterUrl: string | null;
+  enrichedAt: string | null;
   createdAt: string;
   updatedAt: string;
   audit?: LeadAudit | null;

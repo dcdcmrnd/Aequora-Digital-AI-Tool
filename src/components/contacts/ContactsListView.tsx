@@ -99,6 +99,8 @@ export function ContactsListView() {
           selectedIds={Array.from(selectedIds)}
           onClear={() => setSelectedIds(new Set())}
           onDone={() => setSelectedIds(new Set())}
+          totalAvailable={filtered.length}
+          onSelectAllAvailable={() => setSelectedIds(new Set(filtered.map((c) => c.id)))}
         />
       )}
 

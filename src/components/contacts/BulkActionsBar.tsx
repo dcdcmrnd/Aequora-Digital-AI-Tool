@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { GitBranch, Pencil, Tag, Trash2, Workflow, X } from "lucide-react";
+import { GitBranch, Pencil, Tag, TagsIcon, Trash2, Workflow, X } from "lucide-react";
 import toast from "react-hot-toast";
 
 import { Button } from "@/components/ui/Button";
@@ -19,13 +19,18 @@ interface BulkActionsBarProps {
   selectedIds: string[];
   onClear: () => void;
   onDone: () => void;
+  /** Total contacts matching the current search (may span multiple pages). */
+  totalAvailable?: number;
+  onSelectAllAvailable?: () => void;
 }
 
-type ModalKind = "tag" | "pipeline" | "workflow" | "update" | null;
+type ModalKind = "tag" | "untag" | "pipeline" | "workflow" | "update" | null;
 
-export function BulkActionsBar({ selectedIds, onClear, onDone }: BulkActionsBarProps) {
+export function BulkActionsBar({ selectedIds, onClear, onDone, totalAvailable, onSelectAllAvailable }: BulkActionsBarProps) {
   const [openModal, setOpenModal] = useState<ModalKind>(null);
   const [submitting, setSubmitting] = useState(false);
+  const canExpandSelection =
+    totalAvailable !== undefined && onSelectAllAvailable && selectedIds.length < totalAvailable;
 
   async function handleDelete() {
     if (!confirm(`Delete ${selectedIds.length} contact${selectedIds.length === 1 ? "" : "s"}? This cannot be undone.`)) return;
@@ -46,37 +51,55 @@ export function BulkActionsBar({ selectedIds, onClear, onDone }: BulkActionsBarP
 
   return (
     <>
-      <div className="border-brand-primary bg-brand-primary/5 sticky top-0 z-10 flex items-center gap-3 rounded-card border px-4 py-2.5">
-        <span className="text-text-primary text-sm font-medium">{selectedIds.length} selected</span>
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          <Button size="sm" variant="secondary" onClick={() => setOpenModal("workflow")}>
-            <Workflow className="size-3.5" />
-            Add to Workflow
-          </Button>
-          <Button size="sm" variant="secondary" onClick={() => setOpenModal("tag")}>
-            <Tag className="size-3.5" />
-            Add Tags
-          </Button>
-          <Button size="sm" variant="secondary" onClick={() => setOpenModal("pipeline")}>
-            <GitBranch className="size-3.5" />
-            Add to Pipeline
-          </Button>
-          <Button size="sm" variant="secondary" onClick={() => setOpenModal("update")}>
-            <Pencil className="size-3.5" />
-            Bulk Update
-          </Button>
-          <Button size="sm" variant="secondary" className="text-danger" onClick={handleDelete} loading={submitting}>
-            <Trash2 className="size-3.5" />
-            Delete
-          </Button>
-          <button onClick={onClear} className="text-text-muted hover:text-text-primary ml-1" aria-label="Clear selection">
-            <X className="size-4" />
-          </button>
+      <div className="border-brand-primary bg-brand-primary/5 sticky top-0 z-10 rounded-card border px-4 py-2.5">
+        <div className="flex items-center gap-3">
+          <span className="text-text-primary text-sm font-medium">{selectedIds.length} selected</span>
+          {canExpandSelection && (
+            <button
+              type="button"
+              onClick={onSelectAllAvailable}
+              className="text-brand-primary text-xs font-medium hover:underline"
+            >
+              Select all {totalAvailable} contacts
+            </button>
+          )}
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <Button size="sm" variant="secondary" onClick={() => setOpenModal("workflow")}>
+              <Workflow className="size-3.5" />
+              Add to Workflow
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => setOpenModal("tag")}>
+              <Tag className="size-3.5" />
+              Add Tags
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => setOpenModal("untag")}>
+              <TagsIcon className="size-3.5" />
+              Remove Tags
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => setOpenModal("pipeline")}>
+              <GitBranch className="size-3.5" />
+              Add to Pipeline
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => setOpenModal("update")}>
+              <Pencil className="size-3.5" />
+              Bulk Update
+            </Button>
+            <Button size="sm" variant="secondary" className="text-danger" onClick={handleDelete} loading={submitting}>
+              <Trash2 className="size-3.5" />
+              Delete
+            </Button>
+            <button onClick={onClear} className="text-text-muted hover:text-text-primary ml-1" aria-label="Clear selection">
+              <X className="size-4" />
+            </button>
+          </div>
         </div>
       </div>
 
       {openModal === "tag" && (
         <BulkTagModal selectedIds={selectedIds} onClose={() => setOpenModal(null)} onDone={onDone} />
+      )}
+      {openModal === "untag" && (
+        <BulkUntagModal selectedIds={selectedIds} onClose={() => setOpenModal(null)} onDone={onDone} />
       )}
       {openModal === "pipeline" && (
         <BulkPipelineModal selectedIds={selectedIds} onClose={() => setOpenModal(null)} onDone={onDone} />
@@ -124,6 +147,46 @@ function BulkTagModal({ selectedIds, onClose, onDone }: { selectedIds: string[];
           </Button>
           <Button onClick={handleApply} loading={saving} disabled={tags.length === 0}>
             Apply
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function BulkUntagModal({ selectedIds, onClose, onDone }: { selectedIds: string[]; onClose: () => void; onDone: () => void }) {
+  const [tags, setTags] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
+  const { tags: tagSuggestions } = useContactTags();
+
+  async function handleApply() {
+    if (tags.length === 0) return;
+    setSaving(true);
+    try {
+      const result = await apiFetch<{ updated: number }>("/api/contacts/bulk-untag", {
+        method: "POST",
+        body: JSON.stringify({ contactIds: selectedIds, tags }),
+      });
+      toast.success(`Updated ${result.updated} contact${result.updated === 1 ? "" : "s"}`);
+      onDone();
+      onClose();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Failed to remove tags");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal open onClose={onClose} title={`Remove Tags from ${selectedIds.length} Contact${selectedIds.length === 1 ? "" : "s"}`}>
+      <div className="space-y-4 p-6">
+        <TagInput tags={tags} onChange={setTags} placeholder="Type a tag to remove and press Enter" suggestions={tagSuggestions} />
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={handleApply} loading={saving} disabled={tags.length === 0}>
+            Remove
           </Button>
         </div>
       </div>
