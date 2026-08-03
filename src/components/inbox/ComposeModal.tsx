@@ -61,10 +61,11 @@ export function ComposeModal({
   const selectedSig = signatures.find((s) => s.id === selectedSigId);
 
   const buildFullBody = () => {
-    const sigBlock = selectedSig
-      ? `\n\n--\n${selectedSig.content}`
-      : "";
-    return (body + sigBlock).replace(/\n/g, "<br>");
+    // Only the freeform body is plain text needing \n -> <br> conversion —
+    // a pasted-HTML signature must pass through untouched or its markup breaks.
+    const bodyHtml = body.replace(/\n/g, "<br>");
+    const sigBlock = selectedSig ? `<br><br>--<br>${selectedSig.content}` : "";
+    return bodyHtml + sigBlock;
   };
 
   const handleSend = async () => {

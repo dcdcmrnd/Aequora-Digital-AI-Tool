@@ -152,7 +152,9 @@ export function SignatureManager({ open, onClose, currentUserId }: Props) {
                   placeholder={"e.g.\nDC Miranda\nCEO, Aequora Digital\ninfo@aequoradigital.com\nwww.aequoradigital.com"}
                   className="w-full px-3 py-2 border border-border rounded-input text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary resize-none font-mono"
                 />
-                <p className="text-xs text-text-muted mt-1">Plain text or HTML supported. Line breaks are preserved.</p>
+                <p className="text-xs text-text-muted mt-1">
+                  Paste HTML to build a custom signature — it's rendered as-is (not treated as plain text).
+                </p>
               </div>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -268,8 +270,18 @@ function SignatureCard({
         </div>
       </div>
       {showPreview && (
-        <div className="border-t border-border px-4 py-3 bg-surface-secondary/30 text-sm text-text-secondary whitespace-pre-wrap font-sans">
-          {sig.content}
+        <div className="border-t border-border bg-surface-secondary/30 px-4 py-3">
+          <iframe
+            srcDoc={sig.content}
+            className="w-full border-none"
+            style={{ minHeight: "40px" }}
+            sandbox="allow-same-origin"
+            title={`${sig.name} preview`}
+            onLoad={(e) => {
+              const iframe = e.currentTarget;
+              iframe.style.height = (iframe.contentDocument?.body?.scrollHeight ?? 40) + "px";
+            }}
+          />
         </div>
       )}
     </div>

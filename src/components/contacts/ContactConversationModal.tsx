@@ -1,11 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowLeft, Reply } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import toast from "react-hot-toast";
 
 import { ComposeModal } from "@/components/inbox/ComposeModal";
-import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { cn } from "@/lib/utils";
 
@@ -115,10 +114,6 @@ export function ContactConversationModal({ open, onClose, contactEmail, contactN
                   <ArrowLeft className="size-3.5" />
                   Back to conversations
                 </button>
-                <Button size="sm" variant="secondary" onClick={() => setReplyOpen(true)}>
-                  <Reply className="size-3.5" />
-                  Reply
-                </Button>
               </div>
               <div className="flex-1 space-y-4 overflow-y-auto p-4">
                 {loadingThread ? (
@@ -150,6 +145,14 @@ export function ContactConversationModal({ open, onClose, contactEmail, contactN
                     </div>
                   ))
                 )}
+              </div>
+              <div className="flex items-center gap-2 border-t border-border px-4 py-3">
+                <button
+                  onClick={() => setReplyOpen(true)}
+                  className="border-border text-text-muted hover:border-brand-primary hover:text-text-primary bg-surface-secondary/40 flex-1 rounded-full border px-4 py-2.5 text-left text-sm transition-colors"
+                >
+                  Reply to {contactName}…
+                </button>
               </div>
             </>
           ) : (
