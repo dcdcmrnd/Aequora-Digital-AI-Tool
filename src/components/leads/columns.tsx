@@ -47,6 +47,15 @@ export function createLeadColumns({ savedLeadIds, onSave, onSaveAsContact }: Lea
       cell: ({ row }) => row.original.category ?? "—",
     },
     {
+      id: "location",
+      header: "Location",
+      cell: ({ row }) => {
+        const { city, state } = row.original;
+        const label = [city, state].filter(Boolean).join(", ");
+        return label || "—";
+      },
+    },
+    {
       accessorKey: "rating",
       header: ({ column }) => <SortableHeader column={column} label="Rating" />,
       cell: ({ row }) =>
