@@ -81,6 +81,20 @@ export async function listLeads(params: ListLeadsParams = {}): Promise<ListLeads
     prisma.lead.count({ where }),
   ]);
 
+  if (process.env.DEBUG_LEADS === "1") {
+    const categoryOnly = category
+      ? await prisma.lead.findMany({
+          where: { category: { contains: category, mode: "insensitive" } },
+          select: { name: true, category: true, city: true, state: true, country: true },
+          take: 20,
+        })
+      : [];
+    console.log("[DEBUG_LEADS] params:", JSON.stringify({ category, location }));
+    console.log("[DEBUG_LEADS] where:", JSON.stringify(where));
+    console.log("[DEBUG_LEADS] total with full filter:", total);
+    console.log("[DEBUG_LEADS] category-only matches:", JSON.stringify(categoryOnly, null, 2));
+  }
+
   return { leads, total, page, pageSize };
 }
 
