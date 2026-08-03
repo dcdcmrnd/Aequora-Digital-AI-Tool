@@ -11,6 +11,22 @@ export interface LeadWithAudit extends Lead {
 
 export type LeadSortColumn = "opportunityScore" | "reviewCount" | "rating" | "createdAt";
 
+/**
+ * Google's Places category taxonomy rarely matches the user's typed keyword
+ * verbatim (e.g. searching "consulting" returns businesses categorized as
+ * "Consultant") — a plain substring match on the raw keyword misses almost
+ * everything. Stripping a trailing "ing"/"ies"/"es"/"s" and matching on that
+ * stem too bridges the common English word-form gaps (consulting/consultant,
+ * plumbers/plumber, bakeries/bakery) without needing a real stemming library.
+ */
+function categoryMatchCandidates(category: string): string[] {
+  const trimmed = category.trim();
+  const candidates = new Set([trimmed]);
+  const stemmed = trimmed.replace(/(ing|ies|es|s)$/i, "");
+  if (stemmed.length >= 3 && stemmed !== trimmed) candidates.add(stemmed);
+  return Array.from(candidates);
+}
+
 export interface ListLeadsParams {
   category?: string;
   /** Free-text location as typed in the search form (e.g. "Austin, TX") — matched against city/state/country. */
@@ -48,7 +64,11 @@ export async function listLeads(params: ListLeadsParams = {}): Promise<ListLeads
   } = params;
 
   const where: Prisma.LeadWhereInput = {};
-  if (category) where.category = { contains: category, mode: "insensitive" };
+  if (category) {
+    where.OR = categoryMatchCandidates(category).map((c) => ({
+      category: { contains: c, mode: "insensitive" as const },
+    }));
+  }
   if (location) {
     // Free text like "Austin, TX" — every comma-separated token must match
     // somewhere in city/state/country, so a two-part location narrows
@@ -80,26 +100,6 @@ export async function listLeads(params: ListLeadsParams = {}): Promise<ListLeads
     }),
     prisma.lead.count({ where }),
   ]);
-
-  if (process.env.DEBUG_LEADS === "1") {
-    const categoryOnly = category
-      ? await prisma.lead.findMany({
-          where: { category: { contains: category, mode: "insensitive" } },
-          select: { name: true, category: true, city: true, state: true, country: true },
-          take: 20,
-        })
-      : [];
-    const mostRecent = await prisma.lead.findMany({
-      orderBy: { createdAt: "desc" },
-      select: { name: true, category: true, city: true, state: true, country: true, createdAt: true },
-      take: 20,
-    });
-    console.log("[DEBUG_LEADS] params:", JSON.stringify({ category, location }));
-    console.log("[DEBUG_LEADS] where:", JSON.stringify(where));
-    console.log("[DEBUG_LEADS] total with full filter:", total);
-    console.log("[DEBUG_LEADS] category-only matches:", JSON.stringify(categoryOnly, null, 2));
-    console.log("[DEBUG_LEADS] most recently created leads (any category):", JSON.stringify(mostRecent, null, 2));
-  }
 
   return { leads, total, page, pageSize };
 }
