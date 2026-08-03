@@ -134,14 +134,15 @@ async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string)
           const contact = await prisma.contact.findUnique({ where: { id: run.contactId } });
           if (!contact?.email) throw new Error("Contact has no email address");
 
-          const data = node.data as { subject?: string; body?: string };
+          const data = node.data as { subject?: string; body?: string; cc?: string; fromEmail?: string };
           const mergeValues = contactMergeValues(contact);
           const subject = applyMergeTags(data.subject ?? "", mergeValues);
           const body = applyMergeTags(data.body ?? "", mergeValues);
+          const cc = data.cc ? applyMergeTags(data.cc, mergeValues) : undefined;
 
           const trackingToken = crypto.randomBytes(16).toString("hex");
           await prisma.automationEmailTracking.create({ data: { token: trackingToken, runId: run.id } });
-          await sendEmail({ to: contact.email, subject, body, trackingToken });
+          await sendEmail({ to: contact.email, subject, body, cc, fromEmail: data.fromEmail, trackingToken });
 
           await logStep(run.id, node.id, node.type, "success", `Sent to ${contact.email}`);
         } catch (err) {

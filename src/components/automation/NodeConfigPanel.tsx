@@ -2,11 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { X, Trash2 } from "lucide-react";
+import toast from "react-hot-toast";
 
+import { EmailBodyEditor } from "@/components/automation/EmailBodyEditor";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/Select";
-import { Textarea } from "@/components/ui/Textarea";
 import { CONTACT_MERGE_TAGS } from "@/lib/automation/mergeTags";
 import type { AutomationConditionType, AutomationNode, AutomationNodeType, AutomationTriggerType, PipelineStage } from "@/types";
 
@@ -43,31 +44,63 @@ interface NodeConfigPanelProps {
 export function NodeConfigPanel({ node, stages, onClose, onSave, onDelete, canDelete }: NodeConfigPanelProps) {
   const [data, setData] = useState<Record<string, unknown>>(node.data);
   const subjectRef = useRef<HTMLInputElement>(null);
-  const bodyRef = useRef<HTMLTextAreaElement>(null);
-  const [focusedField, setFocusedField] = useState<"subject" | "body">("body");
+  const [accounts, setAccounts] = useState<string[]>([]);
+  const [testEmail, setTestEmail] = useState("");
+  const [testSending, setTestSending] = useState(false);
 
   useEffect(() => {
     setData(node.data);
   }, [node.id, node.data]);
+
+  useEffect(() => {
+    fetch("/api/gmail/accounts")
+      .then((res) => res.json())
+      .then((d) => setAccounts(d.emails ?? []))
+      .catch(() => {});
+  }, []);
 
   function set(key: string, value: unknown) {
     setData((prev) => ({ ...prev, [key]: value }));
   }
 
   function insertMergeTag(token: string) {
-    const key = focusedField;
-    const el = key === "subject" ? subjectRef.current : bodyRef.current;
-    const current = (data[key] as string) ?? "";
+    const el = subjectRef.current;
+    const current = (data.subject as string) ?? "";
     const start = el?.selectionStart ?? current.length;
     const end = el?.selectionEnd ?? current.length;
     const next = current.slice(0, start) + token + current.slice(end);
-    set(key, next);
+    set("subject", next);
 
     requestAnimationFrame(() => {
       el?.focus();
       const caret = start + token.length;
       el?.setSelectionRange(caret, caret);
     });
+  }
+
+  async function handleTestSend() {
+    if (!testEmail.trim()) return;
+    setTestSending(true);
+    try {
+      const res = await fetch("/api/automations/test-send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: testEmail.trim(),
+          subject: (data.subject as string) ?? "",
+          body: (data.body as string) ?? "",
+          cc: (data.cc as string) || undefined,
+          fromEmail: (data.fromEmail as string) || undefined,
+        }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error ?? "Failed to send test email.");
+      toast.success(`Test email sent to ${testEmail.trim()}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to send test email.");
+    } finally {
+      setTestSending(false);
+    }
   }
 
   function handleSave() {
@@ -126,27 +159,34 @@ export function NodeConfigPanel({ node, stages, onClose, onSave, onDelete, canDe
 
         {node.type === "send_email" && (
           <>
-            <Field label="Subject">
-              <Input
-                ref={subjectRef}
-                value={(data.subject as string) ?? ""}
-                onChange={(e) => set("subject", e.target.value)}
-                onFocus={() => setFocusedField("subject")}
-              />
+            <Field label="From">
+              {accounts.length > 1 ? (
+                <Select value={(data.fromEmail as string) || accounts[0]} onValueChange={(v) => set("fromEmail", v)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select an account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {accounts.map((email) => (
+                      <SelectItem key={email} value={email}>
+                        {email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="border-border bg-surface-secondary text-text-secondary flex h-9 w-full items-center rounded-input border px-3 text-sm">
+                  {accounts[0] ?? "No agency email connected"}
+                </div>
+              )}
             </Field>
-            <Field label="Body">
-              <Textarea
-                ref={bodyRef}
-                rows={6}
-                value={(data.body as string) ?? ""}
-                onChange={(e) => set("body", e.target.value)}
-                onFocus={() => setFocusedField("body")}
-              />
+            <Field label="CC" hint="optional">
+              <Input value={(data.cc as string) ?? ""} onChange={(e) => set("cc", e.target.value)} placeholder="cc@example.com" />
+            </Field>
+            <Field label="Subject">
+              <Input ref={subjectRef} value={(data.subject as string) ?? ""} onChange={(e) => set("subject", e.target.value)} />
             </Field>
             <div>
-              <p className="text-text-secondary text-xs font-medium mb-1.5">
-                Custom values — click to insert into the {focusedField === "subject" ? "subject" : "body"}
-              </p>
+              <p className="text-text-secondary text-xs font-medium mb-1.5">Custom values — click to insert into the subject</p>
               <div className="flex flex-wrap gap-1.5">
                 {CONTACT_MERGE_TAGS.map((tag) => (
                   <button
@@ -159,6 +199,33 @@ export function NodeConfigPanel({ node, stages, onClose, onSave, onDelete, canDe
                   </button>
                 ))}
               </div>
+            </div>
+            <Field label="Body">
+              <EmailBodyEditor value={(data.body as string) ?? ""} onChange={(html) => set("body", html)} />
+            </Field>
+
+            <div className="border-border border-t pt-3">
+              <p className="text-text-secondary mb-1.5 text-xs font-medium">Send a test email</p>
+              <div className="flex gap-2">
+                <Input
+                  type="email"
+                  value={testEmail}
+                  onChange={(e) => setTestEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleTestSend}
+                  loading={testSending}
+                  disabled={!testEmail.trim()}
+                >
+                  Send Test
+                </Button>
+              </div>
+              <p className="text-text-muted mt-1 text-[11px]">Sends with sample contact data so you can check the output.</p>
             </div>
           </>
         )}
@@ -318,10 +385,13 @@ export function NodeConfigPanel({ node, stages, onClose, onSave, onDelete, canDe
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
     <label className="block space-y-1">
-      <span className="text-text-secondary text-xs font-medium">{label}</span>
+      <span className="text-text-secondary text-xs font-medium">
+        {label}
+        {hint && <span className="text-text-muted font-normal"> ({hint})</span>}
+      </span>
       {children}
     </label>
   );

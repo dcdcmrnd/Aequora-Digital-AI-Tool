@@ -65,24 +65,31 @@ export async function getGmailClient(email?: string) {
   return google.gmail({ version: "v1", auth: client });
 }
 
+/** Strips CR/LF so header values can't inject extra headers (e.g. a stray Bcc). */
+function sanitizeHeaderValue(value: string): string {
+  return value.replace(/[\r\n]+/g, " ").trim();
+}
+
 function encodeEmail(fields: {
   to: string;
   from: string;
   subject: string;
   body: string;
+  cc?: string;
   threadId?: string;
   inReplyTo?: string;
   references?: string;
 }): string {
   const lines = [
-    `From: ${fields.from}`,
-    `To: ${fields.to}`,
-    `Subject: ${fields.subject}`,
+    `From: ${sanitizeHeaderValue(fields.from)}`,
+    `To: ${sanitizeHeaderValue(fields.to)}`,
+    ...(fields.cc ? [`Cc: ${sanitizeHeaderValue(fields.cc)}`] : []),
+    `Subject: ${sanitizeHeaderValue(fields.subject)}`,
     "MIME-Version: 1.0",
     'Content-Type: text/html; charset="UTF-8"',
   ];
-  if (fields.inReplyTo) lines.push(`In-Reply-To: ${fields.inReplyTo}`);
-  if (fields.references) lines.push(`References: ${fields.references}`);
+  if (fields.inReplyTo) lines.push(`In-Reply-To: ${sanitizeHeaderValue(fields.inReplyTo)}`);
+  if (fields.references) lines.push(`References: ${sanitizeHeaderValue(fields.references)}`);
   lines.push("", fields.body);
 
   return Buffer.from(lines.join("\r\n"))
@@ -97,6 +104,7 @@ export async function sendEmail(fields: {
   to: string;
   subject: string;
   body: string;
+  cc?: string;
   threadId?: string;
   inReplyTo?: string;
   references?: string;

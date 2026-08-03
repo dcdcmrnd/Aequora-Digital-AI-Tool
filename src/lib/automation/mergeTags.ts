@@ -43,6 +43,17 @@ export function contactMergeValues(contact: MergeContact): Record<string, string
   };
 }
 
+/** Placeholder values used when sending a test email from the builder, where there's no real contact yet. */
+export const SAMPLE_MERGE_VALUES: Record<string, string> = {
+  "{{contact.first_name}}": "John",
+  "{{contact.last_name}}": "Doe",
+  "{{contact.email}}": "john.doe@example.com",
+  "{{contact.phone}}": "(555) 123-4567",
+  "{{contact.company}}": "Acme Inc.",
+  "{{contact.website}}": "https://acme.com",
+  "{{contact.details}}": "Sample details",
+};
+
 export function applyMergeTags(text: string, values: Record<string, string>): string {
   let result = text;
   for (const [token, value] of Object.entries(values)) {
