@@ -35,6 +35,7 @@ function parseFiltersFromParams(params: URLSearchParams): SearchFormValues | nul
     minRating: minRatingRaw ? Number(minRatingRaw) : undefined,
     minReviews: minReviewsRaw ? Number(minReviewsRaw) : undefined,
     hasWebsite: (params.get("hasWebsite") as SearchFormValues["hasWebsite"]) || "any",
+    hasEmail: (params.get("hasEmail") as SearchFormValues["hasEmail"]) || "any",
     sortBy: (params.get("sortBy") as SearchFormValues["sortBy"]) || "opportunityScore",
   };
 }
@@ -47,6 +48,7 @@ function buildSearchParams(filters: SearchFormValues, page: number, searchId: st
   if (filters.minRating !== undefined) params.set("minRating", String(filters.minRating));
   if (filters.minReviews !== undefined) params.set("minReviews", String(filters.minReviews));
   params.set("hasWebsite", filters.hasWebsite);
+  params.set("hasEmail", filters.hasEmail);
   params.set("sortBy", filters.sortBy);
   params.set("page", String(page));
   if (searchId) params.set("searchId", searchId);
@@ -81,6 +83,7 @@ export function LeadsSearchView() {
           minRating: filters.minRating,
           minReviews: filters.minReviews,
           hasWebsite: filters.hasWebsite === "any" ? undefined : filters.hasWebsite === "has",
+          hasEmail: filters.hasEmail === "any" ? undefined : filters.hasEmail === "has",
           sortBy: filters.sortBy,
           sortDirection: "desc",
           page,

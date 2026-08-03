@@ -13,6 +13,8 @@ export interface UseLeadsParams {
   minReviews?: number;
   /** true = has a website, false = no website, undefined = both */
   hasWebsite?: boolean;
+  /** true = has an enriched email on file, false = no email found, undefined = both */
+  hasEmail?: boolean;
   search?: string;
   sortBy?: "opportunityScore" | "reviewCount" | "rating" | "createdAt";
   sortDirection?: "asc" | "desc";

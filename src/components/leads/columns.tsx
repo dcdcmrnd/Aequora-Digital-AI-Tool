@@ -81,6 +81,20 @@ export function createLeadColumns({ savedLeadIds, onSave, onSaveAsContact, searc
       cell: ({ row }) => <WebsiteStatus website={row.original.website} httpsEnabled={row.original.audit?.httpsEnabled} />,
     },
     {
+      id: "email",
+      header: "Email",
+      cell: ({ row }) => {
+        const email = row.original.enrichedEmail;
+        return email ? (
+          <a href={`mailto:${email}`} className="text-brand-primary hover:underline" onClick={(e) => e.stopPropagation()}>
+            {email}
+          </a>
+        ) : (
+          <span className="text-text-muted">—</span>
+        );
+      },
+    },
+    {
       id: "performance",
       header: "Performance",
       cell: ({ row }) => <ScoreGauge value={row.original.audit?.performanceScore ?? null} size={44} />,

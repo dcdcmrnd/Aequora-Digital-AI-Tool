@@ -16,6 +16,12 @@ const HAS_WEBSITE_OPTIONS = [
   { value: "none", label: "No Website" },
 ] as const;
 
+const HAS_EMAIL_OPTIONS = [
+  { value: "any", label: "Any" },
+  { value: "has", label: "Has Email" },
+  { value: "none", label: "No Email Found" },
+] as const;
+
 const SORT_OPTIONS = [
   { value: "opportunityScore", label: "Opportunity Score" },
   { value: "reviewCount", label: "Reviews" },
@@ -58,6 +64,7 @@ const searchFormSchema = z.object({
   minRating: z.coerce.number().min(0).max(5).optional(),
   minReviews: z.coerce.number().int().min(0).optional(),
   hasWebsite: z.enum(["any", "has", "none"]),
+  hasEmail: z.enum(["any", "has", "none"]),
   sortBy: z.enum(["opportunityScore", "reviewCount", "rating", "createdAt"]),
 });
 
@@ -76,6 +83,7 @@ const DEFAULT_VALUES: SearchFormValues = {
   minRating: undefined,
   minReviews: undefined,
   hasWebsite: "any",
+  hasEmail: "any",
   sortBy: "opportunityScore",
 };
 
@@ -178,6 +186,30 @@ export function SearchForm({ defaultValues, onSubmit, isSearching }: SearchFormP
                   </FormControl>
                   <SelectContent>
                     {HAS_WEBSITE_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="hasEmail"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Email</FormLabel>
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <FormControl>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {HAS_EMAIL_OPTIONS.map((option) => (
                       <SelectItem key={option.value} value={option.value}>
                         {option.label}
                       </SelectItem>

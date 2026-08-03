@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { mapWithConcurrency } from "@/lib/utils/concurrency";
 import { auditLead } from "@/services/audit";
 import { type LeadWithAudit, upsertLeads } from "@/services/business";
+import { enrichLead } from "@/services/enrichment";
 import { searchBusinesses } from "@/services/google";
 
 const SEARCH_MAX_RESULTS = 20;
@@ -23,10 +24,11 @@ export interface ExecuteSearchResult {
 
 /**
  * The full prospecting pipeline for one search: find businesses, save them
- * as leads, audit each website (or mark "No Website"), recompute
- * opportunity scores, and record the search in history. Audits run with
- * bounded concurrency so one search doesn't fan out unbounded PageSpeed
- * calls, and one lead's audit failing doesn't fail the whole search.
+ * as leads, audit each website (or mark "No Website") and scan it for a
+ * contact email/social links, recompute opportunity scores, and record the
+ * search in history. Audits and enrichment run with bounded concurrency so
+ * one search doesn't fan out unbounded PageSpeed/website calls, and one
+ * lead's audit or enrichment failing never fails the whole search.
  */
 export async function executeSearch(params: ExecuteSearchParams): Promise<ExecuteSearchResult> {
   const radiusMeters = params.radiusMeters ?? 5_000;
@@ -57,13 +59,23 @@ export async function executeSearch(params: ExecuteSearchParams): Promise<Execut
     leads,
     SEARCH_AUDIT_CONCURRENCY,
     async (lead): Promise<LeadWithAudit> => {
+      let current = lead;
+      let audit = null;
       try {
-        const { lead: updated, audit } = await auditLead(lead);
-        return { ...updated, audit };
+        const outcome = await auditLead(current);
+        current = outcome.lead;
+        audit = outcome.audit;
       } catch (error) {
         console.error(`Audit failed for lead ${lead.id}:`, error);
-        return { ...lead, audit: null };
       }
+      // enrichLead is already best-effort internally (never throws), but
+      // guard anyway so a future change to it can't take down the search.
+      try {
+        current = await enrichLead(current);
+      } catch (error) {
+        console.error(`Enrichment failed for lead ${lead.id}:`, error);
+      }
+      return { ...current, audit };
     },
   );
 

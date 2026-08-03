@@ -42,6 +42,8 @@ export interface ListLeadsParams {
   minReviews?: number;
   /** true = has a website, false = no website, undefined = both */
   hasWebsite?: boolean;
+  /** true = has an enriched email on file, false = no email found, undefined = both */
+  hasEmail?: boolean;
   search?: string;
   sortBy?: LeadSortColumn;
   sortDirection?: "asc" | "desc";
@@ -64,6 +66,7 @@ export async function listLeads(params: ListLeadsParams = {}): Promise<ListLeads
     minRating,
     minReviews,
     hasWebsite,
+    hasEmail,
     search,
     sortBy = "opportunityScore",
     sortDirection = "desc",
@@ -100,6 +103,8 @@ export async function listLeads(params: ListLeadsParams = {}): Promise<ListLeads
   if (minReviews !== undefined) where.reviewCount = { gte: minReviews };
   if (hasWebsite === true) where.website = { not: null };
   if (hasWebsite === false) where.website = null;
+  if (hasEmail === true) where.enrichedEmail = { not: null };
+  if (hasEmail === false) where.enrichedEmail = null;
   if (search) where.name = { contains: search, mode: "insensitive" };
 
   const [leads, total] = await Promise.all([

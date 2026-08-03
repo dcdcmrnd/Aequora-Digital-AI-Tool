@@ -19,6 +19,7 @@ export async function GET(req: NextRequest) {
   const minRating = searchParams.get("minRating");
   const minReviews = searchParams.get("minReviews");
   const hasWebsiteParam = searchParams.get("hasWebsite");
+  const hasEmailParam = searchParams.get("hasEmail");
   const sortByParam = searchParams.get("sortBy") as LeadSortColumn | null;
   const page = searchParams.get("page");
   const pageSize = searchParams.get("pageSize");
@@ -31,6 +32,7 @@ export async function GET(req: NextRequest) {
     minRating: minRating ? Number(minRating) : undefined,
     minReviews: minReviews ? Number(minReviews) : undefined,
     hasWebsite: hasWebsiteParam === "true" ? true : hasWebsiteParam === "false" ? false : undefined,
+    hasEmail: hasEmailParam === "true" ? true : hasEmailParam === "false" ? false : undefined,
     sortBy: sortByParam && SORTABLE_COLUMNS.includes(sortByParam) ? sortByParam : undefined,
     sortDirection: searchParams.get("sortDirection") === "asc" ? "asc" : "desc",
     page: page ? Number(page) : undefined,
