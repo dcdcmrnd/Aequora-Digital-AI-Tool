@@ -101,9 +101,9 @@ export function ContactConversationModal({ open, onClose, contactEmail, contactN
         open={open && !replyOpen}
         onClose={onClose}
         title={selected ? selected.subject || "(no subject)" : `Conversation with ${contactName}`}
-        size="lg"
+        size="xl"
       >
-        <div className="flex h-[60vh] flex-col">
+        <div className="flex h-[70vh] flex-col">
           {selected ? (
             <>
               <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
