@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { hasProjectAccess } from "@/lib/permissions";
 import { logActivity, createNotification } from "@/lib/activity";
+import { runAutomationsForTrigger } from "@/lib/automation/engine";
 
 export async function GET(
   req: NextRequest,
@@ -93,6 +94,10 @@ export async function PATCH(
     entityName: updated.title,
     metadata: body,
   });
+
+  if (action === "completed" && task.status !== "done") {
+    await runAutomationsForTrigger({ triggerType: "task_completed" });
+  }
 
   // Notify new assignee
   if (

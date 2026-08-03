@@ -47,6 +47,7 @@ model User {
   automationsCreated   Automation[]  @relation("AutomationCreator")
   passwordResetTokens  PasswordResetToken[]
   gmailTokens          GmailToken[]         @relation("GmailTokenOwner")
+  assignedContacts     Contact[]            @relation("ContactAssignee")
 }
 
 model Invitation {
@@ -433,6 +434,8 @@ model Contact {
   tags         String   @default("[]") // JSON array of strings
   sourceLeadId String?
   sourceLead   Lead?    @relation(fields: [sourceLeadId], references: [id], onDelete: SetNull)
+  assignedToId String?
+  assignedTo   User?    @relation("ContactAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

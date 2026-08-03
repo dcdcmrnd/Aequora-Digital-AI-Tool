@@ -1,42 +1,75 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Copy, X, Trash2 } from "lucide-react";
+import { Copy, Plus as PlusIcon, X, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
 
 import { EmailBodyEditor } from "@/components/automation/EmailBodyEditor";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { Textarea } from "@/components/ui/Textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/Select";
 import { CONTACT_MERGE_TAGS } from "@/lib/automation/mergeTags";
-import type { AutomationConditionType, AutomationNode, AutomationNodeType, AutomationTriggerType, PipelineStage } from "@/types";
+import { NODE_DEFINITIONS } from "@/lib/automation/nodeRegistry";
+import type {
+  Automation,
+  AutomationConditionType,
+  AutomationNode,
+  AutomationTriggerType,
+  ConditionCombinator,
+  ConditionRule,
+  ContactTextField,
+  FieldComparisonOperator,
+  PipelineStage,
+} from "@/types";
+import { CONTACT_FIELD_LABELS, CONTACT_TEXT_FIELDS } from "@/types";
 
 const TRIGGER_OPTIONS: { value: AutomationTriggerType; label: string }[] = [
   { value: "contact_created", label: "Contact Created" },
   { value: "tag_added", label: "Tag Added to Contact" },
   { value: "opportunity_stage_changed", label: "Opportunity Moved to Stage" },
+  { value: "opportunity_created", label: "Opportunity Created" },
+  { value: "opportunity_won", label: "Opportunity Won" },
+  { value: "opportunity_lost", label: "Opportunity Lost" },
+  { value: "task_completed", label: "Task Completed" },
+  { value: "note_added", label: "Note Added" },
 ];
+
+const CONTACTLESS_TRIGGERS: AutomationTriggerType[] = ["task_completed", "note_added"];
 
 const CONDITION_OPTIONS: { value: AutomationConditionType; label: string }[] = [
   { value: "email_opened", label: "Email was opened" },
   { value: "has_tag", label: "Contact has tag" },
   { value: "opportunity_at_stage", label: "Contact's opportunity is at stage" },
   { value: "days_since_entered", label: "Days have passed" },
+  { value: "field_comparison", label: "Contact field comparison" },
 ];
 
-const NODE_TITLES: Record<AutomationNodeType, string> = {
-  trigger: "Trigger",
-  send_email: "Send Email",
-  add_tag: "Add Tag",
-  remove_tag: "Remove Tag",
-  move_pipeline_stage: "Move Pipeline Stage",
-  condition: "Condition",
-  wait: "Wait",
-};
+const OPERATOR_OPTIONS: { value: FieldComparisonOperator; label: string }[] = [
+  { value: "equals", label: "equals" },
+  { value: "not_equals", label: "does not equal" },
+  { value: "contains", label: "contains" },
+  { value: "is_empty", label: "is empty" },
+  { value: "is_not_empty", label: "is not empty" },
+];
+
+interface SimpleUser {
+  id: string;
+  name: string;
+}
+interface SimpleProject {
+  id: string;
+  name: string;
+}
+interface SimpleCategory {
+  id: string;
+  name: string;
+}
 
 interface NodeConfigPanelProps {
   node: AutomationNode;
   stages: PipelineStage[];
+  automationId?: string;
   onClose: () => void;
   onSave: (data: Record<string, unknown>) => void;
   onDelete: () => void;
@@ -45,13 +78,17 @@ interface NodeConfigPanelProps {
   canDuplicate: boolean;
 }
 
-export function NodeConfigPanel({ node, stages, onClose, onSave, onDelete, canDelete, onDuplicate, canDuplicate }: NodeConfigPanelProps) {
+export function NodeConfigPanel({ node, stages, automationId, onClose, onSave, onDelete, canDelete, onDuplicate, canDuplicate }: NodeConfigPanelProps) {
   const [data, setData] = useState<Record<string, unknown>>(node.data);
   const subjectRef = useRef<HTMLInputElement>(null);
   const [accounts, setAccounts] = useState<string[]>([]);
   const [testEmail, setTestEmail] = useState("");
   const [testSending, setTestSending] = useState(false);
   const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
+  const [users, setUsers] = useState<SimpleUser[]>([]);
+  const [projects, setProjects] = useState<SimpleProject[]>([]);
+  const [categories, setCategories] = useState<SimpleCategory[]>([]);
+  const [automations, setAutomations] = useState<Automation[]>([]);
 
   useEffect(() => {
     setData(node.data);
@@ -71,23 +108,54 @@ export function NodeConfigPanel({ node, stages, onClose, onSave, onDelete, canDe
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    fetch("/api/users")
+      .then((res) => res.json())
+      .then((d) => setUsers((d.users ?? []).map((u: SimpleUser) => ({ id: u.id, name: u.name }))))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/projects")
+      .then((res) => res.json())
+      .then((d) => setProjects(d.projects ?? []))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/categories")
+      .then((res) => res.json())
+      .then((d) => setCategories(d.categories ?? []))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/automations")
+      .then((res) => res.json())
+      .then((d) => setAutomations(d.automations ?? []))
+      .catch(() => {});
+  }, []);
+
   function set(key: string, value: unknown) {
     setData((prev) => ({ ...prev, [key]: value }));
   }
 
-  function insertMergeTag(token: string) {
+  function insertMergeTagIntoSubject(token: string) {
     const el = subjectRef.current;
     const current = (data.subject as string) ?? "";
     const start = el?.selectionStart ?? current.length;
     const end = el?.selectionEnd ?? current.length;
     const next = current.slice(0, start) + token + current.slice(end);
     set("subject", next);
-
     requestAnimationFrame(() => {
       el?.focus();
       const caret = start + token.length;
       el?.setSelectionRange(caret, caret);
     });
+  }
+
+  function insertMergeTagAppend(key: string) {
+    return (token: string) => set(key, `${(data[key] as string) ?? ""}${token}`);
   }
 
   async function handleTestSend() {
@@ -119,10 +187,46 @@ export function NodeConfigPanel({ node, stages, onClose, onSave, onDelete, canDe
     onSave(data);
   }
 
+  const rules = (data.rules as ConditionRule[] | undefined) ?? [];
+  const inCompoundMode = rules.length > 0;
+
+  function updateLegacyField(key: string, value: unknown) {
+    set(key, value);
+  }
+
+  function startCompoundMode() {
+    const first: ConditionRule = {
+      id: crypto.randomUUID(),
+      conditionType: (data.conditionType as AutomationConditionType) ?? "email_opened",
+      tag: data.tag as string | undefined,
+      stageId: data.stageId as string | undefined,
+      days: data.days as number | undefined,
+      field: data.field as ContactTextField | undefined,
+      operator: data.operator as FieldComparisonOperator | undefined,
+      value: data.value as string | undefined,
+    };
+    const second: ConditionRule = { id: crypto.randomUUID(), conditionType: "has_tag" };
+    set("rules", [first, second]);
+    set("combinator", "AND" as ConditionCombinator);
+  }
+
+  function updateRule(id: string, patch: Partial<ConditionRule>) {
+    set("rules", rules.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  }
+
+  function removeRule(id: string) {
+    if (rules.length <= 1) return;
+    set("rules", rules.filter((r) => r.id !== id));
+  }
+
+  function addRule() {
+    set("rules", [...rules, { id: crypto.randomUUID(), conditionType: "has_tag" }]);
+  }
+
   return (
     <div className="fixed inset-y-0 right-0 z-40 w-96 border-l border-border bg-white shadow-2xl flex flex-col">
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
-        <h3 className="text-text-primary text-sm font-semibold">{NODE_TITLES[node.type]}</h3>
+        <h3 className="text-text-primary text-sm font-semibold">{NODE_DEFINITIONS[node.type].label}</h3>
         <button onClick={onClose} className="text-text-muted hover:text-text-primary">
           <X className="size-4" />
         </button>
@@ -166,6 +270,12 @@ export function NodeConfigPanel({ node, stages, onClose, onSave, onDelete, canDe
                 </Select>
               </Field>
             )}
+            {CONTACTLESS_TRIGGERS.includes(data.triggerType as AutomationTriggerType) && (
+              <p className="text-text-muted text-xs">
+                This trigger has no associated contact — pair it with Notification, Webhook, Create Task, or End
+                Workflow steps rather than contact-scoped ones.
+              </p>
+            )}
           </>
         )}
 
@@ -197,21 +307,7 @@ export function NodeConfigPanel({ node, stages, onClose, onSave, onDelete, canDe
             <Field label="Subject">
               <Input ref={subjectRef} value={(data.subject as string) ?? ""} onChange={(e) => set("subject", e.target.value)} />
             </Field>
-            <div>
-              <p className="text-text-secondary text-xs font-medium mb-1.5">Custom values — click to insert into the subject</p>
-              <div className="flex flex-wrap gap-1.5">
-                {CONTACT_MERGE_TAGS.map((tag) => (
-                  <button
-                    key={tag.token}
-                    type="button"
-                    onClick={() => insertMergeTag(tag.token)}
-                    className="rounded-full border border-border bg-surface-secondary px-2.5 py-1 text-xs text-text-secondary hover:border-brand-primary hover:text-brand-primary"
-                  >
-                    {tag.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <MergeTagRow onInsert={insertMergeTagIntoSubject} hint="click to insert into the subject" />
             <Field label="Body">
               <EmailBodyEditor value={(data.body as string) ?? ""} onChange={(html) => set("body", html)} />
             </Field>
@@ -297,73 +393,116 @@ export function NodeConfigPanel({ node, stages, onClose, onSave, onDelete, canDe
 
         {node.type === "condition" && (
           <>
-            <Field label="Check whether">
-              <Select value={(data.conditionType as string) ?? ""} onValueChange={(v) => set("conditionType", v)}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select a condition" />
-                </SelectTrigger>
-                <SelectContent>
-                  {CONDITION_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
+            {!inCompoundMode ? (
+              <>
+                <Field label="Check whether">
+                  <Select value={(data.conditionType as string) ?? ""} onValueChange={(v) => set("conditionType", v)}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select a condition" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CONDITION_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
 
-            {data.conditionType === "email_opened" && (
-              <p className="text-text-secondary text-xs">
-                Checks whether the most recent email sent by this workflow was opened.
-              </p>
-            )}
-
-            {data.conditionType === "has_tag" && (
-              <Field label="Tag">
-                <Input value={(data.tag as string) ?? ""} onChange={(e) => set("tag", e.target.value)} placeholder="e.g. hot lead" />
-              </Field>
-            )}
-
-            {data.conditionType === "opportunity_at_stage" && (
-              <Field label="Stage">
-                <Select
-                  value={(data.stageId as string) ?? ""}
-                  onValueChange={(v) => {
-                    set("stageId", v);
-                    set("stageName", stages.find((s) => s.id === v)?.name);
+                <ConditionRuleFields
+                  conditionType={(data.conditionType as AutomationConditionType) ?? "email_opened"}
+                  tag={data.tag as string | undefined}
+                  stageId={data.stageId as string | undefined}
+                  days={data.days as number | undefined}
+                  field={data.field as ContactTextField | undefined}
+                  operator={data.operator as FieldComparisonOperator | undefined}
+                  value={data.value as string | undefined}
+                  stages={stages}
+                  onChange={(patch) => {
+                    if (patch.stageId !== undefined) updateLegacyField("stageName", stages.find((s) => s.id === patch.stageId)?.name);
+                    Object.entries(patch).forEach(([k, v]) => updateLegacyField(k, v));
                   }}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select a stage" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {stages.map((stage) => (
-                      <SelectItem key={stage.id} value={stage.id}>
-                        {stage.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-            )}
-
-            {data.conditionType === "days_since_entered" && (
-              <Field label="Days since entering this workflow">
-                <Input
-                  type="number"
-                  min={1}
-                  value={(data.days as number) ?? ""}
-                  onChange={(e) => set("days", Number(e.target.value))}
-                  placeholder="e.g. 4"
                 />
-              </Field>
+
+                <button
+                  type="button"
+                  onClick={startCompoundMode}
+                  className="text-brand-primary flex items-center gap-1 text-xs font-medium hover:underline"
+                >
+                  <PlusIcon className="size-3" />
+                  Add another condition
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-2">
+                  <span className="text-text-secondary text-xs font-medium">Match</span>
+                  <Select value={(data.combinator as string) ?? "AND"} onValueChange={(v) => set("combinator", v)}>
+                    <SelectTrigger className="h-7 w-24 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="AND">All (AND)</SelectItem>
+                      <SelectItem value="OR">Any (OR)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <span className="text-text-secondary text-xs font-medium">of these:</span>
+                </div>
+
+                {rules.map((rule, i) => (
+                  <div key={rule.id} className="border-border space-y-2 rounded-card border p-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-text-muted text-[10px] font-semibold uppercase tracking-widest">Condition {i + 1}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeRule(rule.id)}
+                        disabled={rules.length <= 1}
+                        className="text-text-muted hover:text-danger disabled:opacity-30"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </div>
+                    <Select value={rule.conditionType} onValueChange={(v) => updateRule(rule.id, { conditionType: v as AutomationConditionType })}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CONDITION_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <ConditionRuleFields
+                      conditionType={rule.conditionType}
+                      tag={rule.tag}
+                      stageId={rule.stageId}
+                      days={rule.days}
+                      field={rule.field}
+                      operator={rule.operator}
+                      value={rule.value}
+                      stages={stages}
+                      onChange={(patch) => updateRule(rule.id, patch)}
+                    />
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={addRule}
+                  className="text-brand-primary flex items-center gap-1 text-xs font-medium hover:underline"
+                >
+                  <PlusIcon className="size-3" />
+                  Add condition
+                </button>
+              </>
             )}
 
-            {data.conditionType && (
-              <p className="text-text-muted text-xs">
-                Connect the <strong>Yes</strong> and <strong>No</strong> branches to whatever should happen next.
-              </p>
-            )}
+            <p className="text-text-muted text-xs">
+              Connect the <strong>Yes</strong> and <strong>No</strong> branches to whatever should happen next.
+            </p>
           </>
         )}
 
@@ -411,6 +550,247 @@ export function NodeConfigPanel({ node, stages, onClose, onSave, onDelete, canDe
             </p>
           </>
         )}
+
+        {node.type === "create_task" && (
+          <>
+            <Field label="Project">
+              <Select value={(data.projectId as string) ?? ""} onValueChange={(v) => set("projectId", v)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a project" />
+                </SelectTrigger>
+                <SelectContent>
+                  {projects.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Title">
+              <Input value={(data.title as string) ?? ""} onChange={(e) => set("title", e.target.value)} />
+            </Field>
+            <MergeTagRow onInsert={insertMergeTagAppend("title")} hint="click to insert into the title" />
+            <Field label="Description" hint="optional">
+              <Textarea value={(data.description as string) ?? ""} onChange={(e) => set("description", e.target.value)} rows={3} />
+            </Field>
+            <Field label="Priority">
+              <Select value={(data.priority as string) ?? "medium"} onValueChange={(v) => set("priority", v)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="urgent">Urgent</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Due" hint="optional">
+              <Input
+                type="number"
+                min={0}
+                value={(data.dueDateOffsetDays as number) ?? ""}
+                onChange={(e) => set("dueDateOffsetDays", e.target.value ? Number(e.target.value) : undefined)}
+                placeholder="Days from creation"
+              />
+            </Field>
+            <AssigneeFields
+              mode={(data.assigneeMode as string) ?? "none"}
+              assigneeId={data.assigneeId as string | undefined}
+              roundRobinUserIds={(data.roundRobinUserIds as string[]) ?? []}
+              users={users}
+              onModeChange={(v) => set("assigneeMode", v)}
+              onAssigneeChange={(v) => set("assigneeId", v)}
+              onRoundRobinChange={(v) => set("roundRobinUserIds", v)}
+              includeNone
+            />
+          </>
+        )}
+
+        {node.type === "create_note" && (
+          <>
+            <Field label="Project" hint="optional">
+              <Select value={(data.projectId as string) ?? "__none"} onValueChange={(v) => set("projectId", v === "__none" ? undefined : v)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="No project" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none">No project</SelectItem>
+                  {projects.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Category" hint="optional">
+              <Select value={(data.categoryId as string) ?? "__none"} onValueChange={(v) => set("categoryId", v === "__none" ? undefined : v)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="No category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none">No category</SelectItem>
+                  {categories.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Title">
+              <Input value={(data.title as string) ?? ""} onChange={(e) => set("title", e.target.value)} />
+            </Field>
+            <MergeTagRow onInsert={insertMergeTagAppend("title")} hint="click to insert into the title" />
+            <Field label="Content">
+              <Textarea value={(data.content as string) ?? ""} onChange={(e) => set("content", e.target.value)} rows={5} />
+            </Field>
+          </>
+        )}
+
+        {node.type === "create_opportunity" && (
+          <>
+            <Field label="Name">
+              <Input value={(data.name as string) ?? ""} onChange={(e) => set("name", e.target.value)} placeholder="Defaults to the contact's name" />
+            </Field>
+            <MergeTagRow onInsert={insertMergeTagAppend("name")} hint="click to insert into the name" />
+            <Field label="Value" hint="optional">
+              <Input
+                type="number"
+                min={0}
+                value={(data.value as number) ?? ""}
+                onChange={(e) => set("value", e.target.value ? Number(e.target.value) : undefined)}
+              />
+            </Field>
+            <Field label="Stage">
+              <Select value={(data.stageId as string) ?? ""} onValueChange={(v) => set("stageId", v)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a stage" />
+                </SelectTrigger>
+                <SelectContent>
+                  {stages.map((stage) => (
+                    <SelectItem key={stage.id} value={stage.id}>
+                      {stage.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          </>
+        )}
+
+        {node.type === "update_contact_field" && (
+          <>
+            <Field label="Field">
+              <Select value={(data.field as string) ?? ""} onValueChange={(v) => set("field", v)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a field" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CONTACT_TEXT_FIELDS.map((f) => (
+                    <SelectItem key={f} value={f}>
+                      {CONTACT_FIELD_LABELS[f]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="New value">
+              <Input value={(data.value as string) ?? ""} onChange={(e) => set("value", e.target.value)} />
+            </Field>
+          </>
+        )}
+
+        {node.type === "update_opportunity" && (
+          <>
+            <Field label="Set status" hint="optional">
+              <Select value={(data.status as string) ?? "__unchanged"} onValueChange={(v) => set("status", v === "__unchanged" ? undefined : v)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Leave unchanged" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__unchanged">Leave unchanged</SelectItem>
+                  <SelectItem value="open">Open</SelectItem>
+                  <SelectItem value="won">Won</SelectItem>
+                  <SelectItem value="lost">Lost</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Set value" hint="optional">
+              <Input
+                type="number"
+                min={0}
+                value={(data.value as number) ?? ""}
+                onChange={(e) => set("value", e.target.value ? Number(e.target.value) : undefined)}
+              />
+            </Field>
+            <p className="text-text-muted text-xs">Applies to the contact's most recent open opportunity.</p>
+          </>
+        )}
+
+        {node.type === "assign_contact_to_user" && (
+          <AssigneeFields
+            mode={(data.mode as string) ?? "single"}
+            assigneeId={data.assigneeId as string | undefined}
+            roundRobinUserIds={(data.roundRobinUserIds as string[]) ?? []}
+            users={users}
+            onModeChange={(v) => set("mode", v)}
+            onAssigneeChange={(v) => set("assigneeId", v)}
+            onRoundRobinChange={(v) => set("roundRobinUserIds", v)}
+          />
+        )}
+
+        {node.type === "send_notification" && (
+          <>
+            <AssigneeFields
+              mode={(data.recipientMode as string) ?? "single"}
+              assigneeId={data.recipientId as string | undefined}
+              roundRobinUserIds={(data.roundRobinUserIds as string[]) ?? []}
+              users={users}
+              onModeChange={(v) => set("recipientMode", v)}
+              onAssigneeChange={(v) => set("recipientId", v)}
+              onRoundRobinChange={(v) => set("roundRobinUserIds", v)}
+              label="Recipient"
+            />
+            <Field label="Title">
+              <Input value={(data.title as string) ?? ""} onChange={(e) => set("title", e.target.value)} />
+            </Field>
+            <Field label="Message">
+              <Textarea value={(data.body as string) ?? ""} onChange={(e) => set("body", e.target.value)} rows={3} />
+            </Field>
+          </>
+        )}
+
+        {node.type === "webhook" && (
+          <WebhookFields data={data} onChange={set} />
+        )}
+
+        {node.type === "enroll_in_automation" && (
+          <>
+            <Field label="Automation">
+              <Select value={(data.automationId as string) ?? ""} onValueChange={(v) => set("automationId", v)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a workflow" />
+                </SelectTrigger>
+                <SelectContent>
+                  {automations.filter((a) => a.id !== automationId).map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <p className="text-text-muted text-xs">Enrolls this contact into the selected workflow from its trigger.</p>
+          </>
+        )}
+
+        {node.type === "end_workflow" && (
+          <p className="text-text-secondary text-sm">Ends this contact's run here, regardless of any other steps.</p>
+        )}
       </div>
 
       <div className="flex items-center justify-between border-t border-border p-4">
@@ -448,5 +828,227 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
       </span>
       {children}
     </label>
+  );
+}
+
+function MergeTagRow({ onInsert, hint }: { onInsert: (token: string) => void; hint: string }) {
+  return (
+    <div>
+      <p className="text-text-secondary text-xs font-medium mb-1.5">Custom values — {hint}</p>
+      <div className="flex flex-wrap gap-1.5">
+        {CONTACT_MERGE_TAGS.map((tag) => (
+          <button
+            key={tag.token}
+            type="button"
+            onClick={() => onInsert(tag.token)}
+            className="rounded-full border border-border bg-surface-secondary px-2.5 py-1 text-xs text-text-secondary hover:border-brand-primary hover:text-brand-primary"
+          >
+            {tag.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** The type-specific fields for a single condition predicate — shared by the simple and compound-rules UI. */
+function ConditionRuleFields({
+  conditionType, tag, stageId, days, field, operator, value, stages, onChange,
+}: {
+  conditionType: AutomationConditionType;
+  tag?: string;
+  stageId?: string;
+  days?: number;
+  field?: ContactTextField;
+  operator?: FieldComparisonOperator;
+  value?: string;
+  stages: PipelineStage[];
+  onChange: (patch: Partial<ConditionRule>) => void;
+}) {
+  if (conditionType === "email_opened") {
+    return <p className="text-text-secondary text-xs">Checks whether the most recent email sent by this workflow was opened.</p>;
+  }
+  if (conditionType === "has_tag") {
+    return (
+      <Field label="Tag">
+        <Input value={tag ?? ""} onChange={(e) => onChange({ tag: e.target.value })} placeholder="e.g. hot lead" />
+      </Field>
+    );
+  }
+  if (conditionType === "opportunity_at_stage") {
+    return (
+      <Field label="Stage">
+        <Select value={stageId ?? ""} onValueChange={(v) => onChange({ stageId: v })}>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Select a stage" />
+          </SelectTrigger>
+          <SelectContent>
+            {stages.map((s) => (
+              <SelectItem key={s.id} value={s.id}>
+                {s.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
+    );
+  }
+  if (conditionType === "days_since_entered") {
+    return (
+      <Field label="Days since entering this workflow">
+        <Input type="number" min={1} value={days ?? ""} onChange={(e) => onChange({ days: Number(e.target.value) })} placeholder="e.g. 4" />
+      </Field>
+    );
+  }
+  // field_comparison
+  return (
+    <div className="space-y-2">
+      <Field label="Contact field">
+        <Select value={field ?? ""} onValueChange={(v) => onChange({ field: v as ContactTextField })}>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Select a field" />
+          </SelectTrigger>
+          <SelectContent>
+            {CONTACT_TEXT_FIELDS.map((f) => (
+              <SelectItem key={f} value={f}>
+                {CONTACT_FIELD_LABELS[f]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
+      <Field label="Operator">
+        <Select value={operator ?? "equals"} onValueChange={(v) => onChange({ operator: v as FieldComparisonOperator })}>
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {OPERATOR_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
+      {operator !== "is_empty" && operator !== "is_not_empty" && (
+        <Field label="Value">
+          <Input value={value ?? ""} onChange={(e) => onChange({ value: e.target.value })} />
+        </Field>
+      )}
+    </div>
+  );
+}
+
+/** Single-user or round-robin assignee picker — shared by Create Task, Assign to User, and Send Notification. */
+function AssigneeFields({
+  mode, assigneeId, roundRobinUserIds, users, onModeChange, onAssigneeChange, onRoundRobinChange, label = "Assignee", includeNone = false,
+}: {
+  mode: string;
+  assigneeId?: string;
+  roundRobinUserIds: string[];
+  users: SimpleUser[];
+  onModeChange: (v: string) => void;
+  onAssigneeChange: (v: string) => void;
+  onRoundRobinChange: (v: string[]) => void;
+  label?: string;
+  includeNone?: boolean;
+}) {
+  return (
+    <>
+      <Field label={label}>
+        <Select value={mode} onValueChange={onModeChange}>
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {includeNone && <SelectItem value="none">None</SelectItem>}
+            <SelectItem value="single">A specific person</SelectItem>
+            <SelectItem value="round_robin">Round robin</SelectItem>
+          </SelectContent>
+        </Select>
+      </Field>
+      {mode === "single" && (
+        <Field label="Person">
+          <Select value={assigneeId ?? ""} onValueChange={onAssigneeChange}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select a person" />
+            </SelectTrigger>
+            <SelectContent>
+              {users.map((u) => (
+                <SelectItem key={u.id} value={u.id}>
+                  {u.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+      )}
+      {mode === "round_robin" && (
+        <Field label="Rotate between">
+          <div className="border-border max-h-36 space-y-1.5 overflow-y-auto rounded-input border p-2">
+            {users.map((u) => {
+              const checked = roundRobinUserIds.includes(u.id);
+              return (
+                <label key={u.id} className="flex items-center gap-2 text-sm text-text-primary">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={(e) =>
+                      onRoundRobinChange(e.target.checked ? [...roundRobinUserIds, u.id] : roundRobinUserIds.filter((id) => id !== u.id))
+                    }
+                    className="h-4 w-4 rounded border-border text-brand-primary focus:ring-brand-primary"
+                  />
+                  {u.name}
+                </label>
+              );
+            })}
+          </div>
+        </Field>
+      )}
+    </>
+  );
+}
+
+function WebhookFields({ data, onChange }: { data: Record<string, unknown>; onChange: (key: string, value: unknown) => void }) {
+  const extraFields = (data.extraFields as { key: string; value: string }[]) ?? [];
+
+  function updateField(i: number, patch: Partial<{ key: string; value: string }>) {
+    onChange("extraFields", extraFields.map((f, idx) => (idx === i ? { ...f, ...patch } : f)));
+  }
+  function removeField(i: number) {
+    onChange("extraFields", extraFields.filter((_, idx) => idx !== i));
+  }
+  function addField() {
+    onChange("extraFields", [...extraFields, { key: "", value: "" }]);
+  }
+
+  return (
+    <>
+      <Field label="URL">
+        <Input value={(data.url as string) ?? ""} onChange={(e) => onChange("url", e.target.value)} placeholder="https://..." />
+      </Field>
+      <div>
+        <p className="text-text-secondary mb-1.5 text-xs font-medium">Extra fields</p>
+        <div className="space-y-2">
+          {extraFields.map((f, i) => (
+            <div key={i} className="flex gap-1.5">
+              <Input value={f.key} onChange={(e) => updateField(i, { key: e.target.value })} placeholder="key" className="w-24" />
+              <Input value={f.value} onChange={(e) => updateField(i, { value: e.target.value })} placeholder="value" className="flex-1" />
+              <button type="button" onClick={() => removeField(i)} className="text-text-muted hover:text-danger">
+                <Trash2 className="size-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+        <button type="button" onClick={addField} className="text-brand-primary mt-2 flex items-center gap-1 text-xs font-medium hover:underline">
+          <PlusIcon className="size-3" />
+          Add field
+        </button>
+      </div>
+      <p className="text-text-muted text-xs">
+        Always includes automation, run, and contact info automatically — extra fields are merged in alongside them. Merge tags work in values.
+      </p>
+    </>
   );
 }

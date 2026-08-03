@@ -24,6 +24,7 @@ export interface ContactInput {
   notes?: string;
   tags?: string[];
   sourceLeadId?: string;
+  assignedToId?: string | null;
 }
 
 export interface ContactUpdateInput extends Partial<ContactInput> {

@@ -35,7 +35,7 @@ export async function GET() {
   if (!canView) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const contacts = await prisma.contact.findMany({
-    include: { createdBy: { select: { id: true, name: true } } },
+    include: { createdBy: { select: { id: true, name: true } }, assignedTo: { select: { id: true, name: true } } },
     orderBy: { createdAt: "desc" },
   });
 

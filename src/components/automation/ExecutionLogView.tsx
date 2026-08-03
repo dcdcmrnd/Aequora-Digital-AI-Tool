@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { CheckCircle2, Clock, User, XCircle } from "lucide-react";
 
-import { NODE_META } from "@/components/automation/CanvasNode";
+import { NODE_DEFINITIONS } from "@/lib/automation/nodeRegistry";
 import { Badge } from "@/components/ui/Badge";
 import { useAutomationRuns } from "@/hooks/useAutomations";
 import { cn, formatRelativeTime } from "@/lib/utils";
@@ -47,7 +47,7 @@ function RunTrace({ run }: { run: AutomationRun }) {
       ) : (
         <ol className="space-y-0">
           {steps.map((step, i) => {
-            const meta = NODE_META[step.nodeType];
+            const meta = NODE_DEFINITIONS[step.nodeType];
             const Icon = meta?.icon;
             const isLast = i === steps.length - 1;
             return (

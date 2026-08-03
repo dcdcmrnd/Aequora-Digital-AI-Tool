@@ -322,6 +322,8 @@ export interface Contact {
   notes: string | null;
   tags: string[];
   sourceLeadId: string | null;
+  assignedToId: string | null;
+  assignedTo?: { id: string; name: string } | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -357,28 +359,22 @@ export interface Opportunity {
   updatedAt: string;
 }
 
-export type AutomationTriggerType = "contact_created" | "tag_added" | "opportunity_stage_changed";
-export type AutomationNodeType = "trigger" | "send_email" | "add_tag" | "remove_tag" | "move_pipeline_stage" | "condition" | "wait";
-export type AutomationConditionType = "email_opened" | "has_tag" | "opportunity_at_stage" | "days_since_entered";
+export type {
+  AutomationNodeType,
+  AutomationNode,
+  AutomationEdge,
+  AutomationFlow,
+  ConditionCombinator,
+  FieldComparisonOperator,
+  ContactTextField,
+  ConditionRule,
+  AssigneeMode,
+  WaitUnit,
+} from "@/lib/automation/types";
+export type { TriggerType as AutomationTriggerType, ConditionType as AutomationConditionType } from "@/lib/automation/types";
+export { CONTACT_TEXT_FIELDS, CONTACT_FIELD_LABELS } from "@/lib/automation/types";
 
-export interface AutomationNode {
-  id: string;
-  type: AutomationNodeType;
-  position: { x: number; y: number };
-  data: Record<string, unknown>;
-}
-
-export interface AutomationEdge {
-  id: string;
-  source: string;
-  target: string;
-  sourceHandle?: string | null;
-}
-
-export interface AutomationFlow {
-  nodes: AutomationNode[];
-  edges: AutomationEdge[];
-}
+import type { AutomationNodeType, AutomationFlow } from "@/lib/automation/types";
 
 export interface AutomationRunStep {
   id: string;

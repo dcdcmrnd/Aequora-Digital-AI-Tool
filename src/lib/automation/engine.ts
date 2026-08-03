@@ -1,15 +1,30 @@
 import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/gmail";
+import { createNotification } from "@/lib/activity";
 import { applyMergeTags, contactMergeValues } from "./mergeTags";
-import type { AutomationEdge, AutomationFlow, AutomationNode, TriggerType, WaitUnit } from "./types";
+import type {
+  AutomationEdge,
+  AutomationFlow,
+  AutomationNode,
+  ConditionCombinator,
+  ConditionRule,
+  ContactTextField,
+  TriggerType,
+  WaitUnit,
+} from "./types";
+import { CONTACT_TEXT_FIELDS } from "./types";
+
+const WEBHOOK_TIMEOUT_MS = 10_000;
+const MAX_ENROLLMENT_DEPTH = 10;
 
 interface TriggerEvent {
   triggerType: TriggerType;
-  contactId: string;
+  /** Absent for triggers with no associated contact (e.g. task_completed, note_added). */
+  contactId?: string;
   /** Required for triggerType "tag_added" — the tag that was just added. */
   tag?: string;
-  /** Required for triggerType "opportunity_stage_changed" — the stage it moved into. */
+  /** Required for triggerType "opportunity_stage_changed"/"opportunity_won"/"opportunity_lost" — the stage/status it moved into. */
   stageId?: string;
 }
 
@@ -45,6 +60,14 @@ function triggerMatches(triggerNode: AutomationNode, event: TriggerEvent): boole
   return true;
 }
 
+const TRIGGER_DETAIL_LABELS: Partial<Record<TriggerType, string>> = {
+  opportunity_created: "Opportunity created",
+  opportunity_won: "Opportunity marked won",
+  opportunity_lost: "Opportunity marked lost",
+  task_completed: "Task completed",
+  note_added: "Note added",
+};
+
 function durationMs(amount: number, unit: WaitUnit): number {
   const unitMs = { minutes: 60_000, hours: 60 * 60_000, days: 24 * 60 * 60_000 };
   return amount * (unitMs[unit] ?? unitMs.hours);
@@ -53,7 +76,7 @@ function durationMs(amount: number, unit: WaitUnit): number {
 function triggerDetail(event: TriggerEvent): string {
   if (event.triggerType === "tag_added") return `Tag added: ${event.tag ?? ""}`;
   if (event.triggerType === "opportunity_stage_changed") return "Opportunity moved stage";
-  return "Contact created";
+  return TRIGGER_DETAIL_LABELS[event.triggerType] ?? "Contact created";
 }
 
 /** Records one step of a run's path through the flow, for the execution log UI. */
@@ -65,6 +88,73 @@ async function logStep(
   detail?: string,
 ): Promise<void> {
   await prisma.automationRunStep.create({ data: { runId, nodeId, nodeType, status, detail } });
+}
+
+/** The contact's most-recent open opportunity — the implicit single-opportunity-per-contact model used throughout this engine. */
+async function findOpenOpportunityForContact(contactId: string) {
+  return prisma.opportunity.findFirst({ where: { contactId, status: "open" }, orderBy: { createdAt: "desc" } });
+}
+
+/**
+ * Best-effort round robin: rotates through `userIds` based on how many times this node has
+ * already succeeded. Not perfectly race-free under true concurrency, but self-corrects on the
+ * next run and needs no extra table/column — acceptable for a small internal team.
+ */
+async function pickRoundRobin(nodeId: string, userIds: string[]): Promise<string | undefined> {
+  if (userIds.length === 0) return undefined;
+  const count = await prisma.automationRunStep.count({ where: { nodeId, status: "success" } });
+  return userIds[count % userIds.length];
+}
+
+function resolveAssignee(
+  mode: string | undefined,
+  singleUserId: string | undefined,
+  roundRobinUserIds: string[] | undefined,
+  nodeId: string,
+): Promise<string | undefined> {
+  if (mode === "round_robin") return pickRoundRobin(nodeId, roundRobinUserIds ?? []);
+  if (mode === "single") return Promise.resolve(singleUserId || undefined);
+  return Promise.resolve(undefined);
+}
+
+/** Evaluates a single condition predicate against a run's contact. Shared by both the legacy single-predicate path and the compound rules path. */
+async function evaluateConditionRule(rule: ConditionRule, run: { id: string; contactId: string | null; createdAt: Date }): Promise<{ result: boolean; detail: string }> {
+  if (rule.conditionType === "has_tag") {
+    const contact = run.contactId ? await prisma.contact.findUnique({ where: { id: run.contactId } }) : null;
+    const tags = contact ? (JSON.parse(contact.tags) as string[]) : [];
+    const result = !!rule.tag && tags.some((t) => sameTag(t, rule.tag));
+    return { result, detail: `Contact has tag "${rule.tag ?? ""}"` };
+  }
+  if (rule.conditionType === "opportunity_at_stage") {
+    const opportunity = run.contactId ? await findOpenOpportunityForContact(run.contactId) : null;
+    const result = !!rule.stageId && opportunity?.stageId === rule.stageId;
+    return { result, detail: "Opportunity at configured stage" };
+  }
+  if (rule.conditionType === "days_since_entered") {
+    const days = rule.days ?? 0;
+    const elapsedMs = Date.now() - run.createdAt.getTime();
+    const result = days > 0 && elapsedMs >= days * 24 * 60 * 60 * 1000;
+    return { result, detail: `${days} day${days === 1 ? "" : "s"} since entering the workflow` };
+  }
+  if (rule.conditionType === "field_comparison") {
+    const contact = run.contactId ? await prisma.contact.findUnique({ where: { id: run.contactId } }) : null;
+    const field = rule.field as ContactTextField | undefined;
+    const raw = contact && field && CONTACT_TEXT_FIELDS.includes(field) ? ((contact as unknown as Record<string, string | null>)[field] ?? "") : "";
+    const actual = raw.trim();
+    const expected = (rule.value ?? "").trim();
+    let result: boolean;
+    switch (rule.operator) {
+      case "not_equals": result = actual.toLowerCase() !== expected.toLowerCase(); break;
+      case "contains": result = actual.toLowerCase().includes(expected.toLowerCase()); break;
+      case "is_empty": result = actual === ""; break;
+      case "is_not_empty": result = actual !== ""; break;
+      default: result = actual.toLowerCase() === expected.toLowerCase();
+    }
+    return { result, detail: `Contact ${field ?? "field"} ${rule.operator ?? "equals"} "${expected}"` };
+  }
+  // "email_opened" (also the fallback for older runs saved before conditionType existed)
+  const lastTracked = await prisma.automationEmailTracking.findFirst({ where: { runId: run.id }, orderBy: { createdAt: "desc" } });
+  return { result: !!lastTracked?.openedAt, detail: "Email was opened" };
 }
 
 /** Finds active automations whose trigger matches the fired event and starts a run for each. */
@@ -83,7 +173,7 @@ export async function runAutomationsForTrigger(event: TriggerEvent): Promise<voi
       const run = await prisma.automationRun.create({
         data: {
           automationId: automation.id,
-          contactId: event.contactId,
+          contactId: event.contactId ?? null,
           status: "running",
           currentNodeId: firstNodeId,
         },
@@ -103,7 +193,9 @@ export async function runAutomationsForTrigger(event: TriggerEvent): Promise<voi
  * list). Returns false if the contact is already running or waiting in
  * this automation, or if the trigger has no action attached yet.
  */
-export async function enrollContactInAutomation(automationId: string, contactId: string): Promise<boolean> {
+export async function enrollContactInAutomation(automationId: string, contactId: string, depth = 0): Promise<boolean> {
+  if (depth > MAX_ENROLLMENT_DEPTH) return false;
+
   const automation = await prisma.automation.findUnique({ where: { id: automationId } });
   if (!automation) return false;
 
@@ -124,7 +216,7 @@ export async function enrollContactInAutomation(automationId: string, contactId:
   });
 
   await logStep(run.id, triggerNode.id, triggerNode.type, "success", "Manually added to workflow");
-  await runLoop(run.id, flow, firstNodeId);
+  await runLoop(run.id, flow, firstNodeId, depth);
   return true;
 }
 
@@ -152,9 +244,14 @@ export async function resumeRun(runId: string): Promise<void> {
   await runLoop(run.id, flow, next);
 }
 
-async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string): Promise<void> {
+async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string, enrollmentDepth = 0): Promise<void> {
   const run = await prisma.automationRun.findUnique({ where: { id: runId } });
   if (!run) return;
+
+  // Fallback creator/author for any record an automation creates on a human's behalf
+  // (Task.creatorId / Note.authorId are required columns; there's no "system user").
+  const automation = await prisma.automation.findUnique({ where: { id: run.automationId }, select: { createdById: true, name: true } });
+  const systemUserId = automation?.createdById;
 
   let currentNodeId: string | undefined = startNodeId;
 
@@ -250,10 +347,7 @@ async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string)
         try {
           const data = node.data as { stageId?: string };
           if (run.contactId && data.stageId) {
-            const opportunity = await prisma.opportunity.findFirst({
-              where: { contactId: run.contactId, status: "open" },
-              orderBy: { createdAt: "desc" },
-            });
+            const opportunity = await findOpenOpportunityForContact(run.contactId);
             if (opportunity) {
               await prisma.opportunity.update({ where: { id: opportunity.id }, data: { stageId: data.stageId } });
               await logStep(run.id, node.id, node.type, "success", "Opportunity moved to new stage");
@@ -273,37 +367,27 @@ async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string)
 
       if (node.type === "condition") {
         try {
-          const data = node.data as { conditionType?: string; tag?: string; stageId?: string; days?: number };
-          let result = false;
-          let detail: string;
+          const data = node.data as {
+            conditionType?: string; tag?: string; stageId?: string; days?: number;
+            rules?: ConditionRule[]; combinator?: ConditionCombinator;
+          };
+          // Legacy flows (saved before compound rules existed) have flat fields and no
+          // `rules` array — wrap them into a single implicit rule so evaluation and the
+          // execution-log wording stay identical to before for every existing automation.
+          const rules: ConditionRule[] = data.rules?.length
+            ? data.rules
+            : [{ id: "legacy", conditionType: (data.conditionType as ConditionRule["conditionType"]) ?? "email_opened", tag: data.tag, stageId: data.stageId, days: data.days }];
 
-          if (data.conditionType === "has_tag") {
-            const contact = run.contactId ? await prisma.contact.findUnique({ where: { id: run.contactId } }) : null;
-            const tags = contact ? (JSON.parse(contact.tags) as string[]) : [];
-            result = !!data.tag && tags.some((t) => sameTag(t, data.tag));
-            detail = `Contact has tag "${data.tag ?? ""}"`;
-          } else if (data.conditionType === "opportunity_at_stage") {
-            const opportunity = run.contactId
-              ? await prisma.opportunity.findFirst({ where: { contactId: run.contactId, status: "open" }, orderBy: { createdAt: "desc" } })
-              : null;
-            result = !!data.stageId && opportunity?.stageId === data.stageId;
-            detail = "Opportunity at configured stage";
-          } else if (data.conditionType === "days_since_entered") {
-            const days = data.days ?? 0;
-            const elapsedMs = Date.now() - run.createdAt.getTime();
-            result = days > 0 && elapsedMs >= days * 24 * 60 * 60 * 1000;
-            detail = `${days} day${days === 1 ? "" : "s"} since entering the workflow`;
-          } else {
-            // "email_opened" (also the fallback for older runs saved before conditionType existed)
-            const lastTracked = await prisma.automationEmailTracking.findFirst({
-              where: { runId: run.id },
-              orderBy: { createdAt: "desc" },
-            });
-            result = !!lastTracked?.openedAt;
-            detail = "Email was opened";
-          }
+          const evaluated = await Promise.all(rules.map((rule) => evaluateConditionRule(rule, run)));
+          const result = rules.length > 1 && data.combinator === "OR"
+            ? evaluated.some((e) => e.result)
+            : evaluated.every((e) => e.result);
 
-          await logStep(run.id, node.id, node.type, "success", `${detail} — ${result ? "Yes" : "No"}`);
+          const detail = rules.length === 1
+            ? `${evaluated[0].detail} — ${evaluated[0].result ? "Yes" : "No"}`
+            : `${evaluated.map((e) => `${e.detail} (${e.result ? "Yes" : "No"})`).join(data.combinator === "OR" ? " OR " : " AND ")} — ${result ? "Yes" : "No"}`;
+
+          await logStep(run.id, node.id, node.type, "success", detail);
           currentNodeId = nextNodeId(flow, node.id, result ? "yes" : "no");
         } catch (err) {
           await logStep(run.id, node.id, node.type, "error", err instanceof Error ? err.message : "Unknown error");
@@ -334,6 +418,259 @@ async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string)
           await logStep(run.id, node.id, node.type, "waiting", `Waiting ${data.amount ?? 1} ${data.unit ?? "hours"}`);
         }
         return; // pause here until resumed
+      }
+
+      if (node.type === "create_task") {
+        try {
+          const data = node.data as {
+            projectId?: string; title?: string; description?: string; priority?: string;
+            dueDateOffsetDays?: number; assigneeMode?: string; assigneeId?: string; roundRobinUserIds?: string[];
+          };
+          if (!data.projectId) throw new Error("No project configured for this step");
+          if (!systemUserId) throw new Error("Could not resolve a creator for this task");
+
+          const contact = run.contactId ? await prisma.contact.findUnique({ where: { id: run.contactId } }) : null;
+          const mergeValues = contact ? contactMergeValues(contact) : {};
+          const title = applyMergeTags(data.title || "Untitled task", mergeValues);
+          const description = data.description ? applyMergeTags(data.description, mergeValues) : undefined;
+          const assigneeId = await resolveAssignee(data.assigneeMode, data.assigneeId, data.roundRobinUserIds, node.id);
+          const dueDate = data.dueDateOffsetDays ? new Date(Date.now() + data.dueDateOffsetDays * 24 * 60 * 60 * 1000) : undefined;
+
+          const task = await prisma.task.create({
+            data: {
+              title, description, projectId: data.projectId,
+              priority: data.priority || "medium",
+              creatorId: systemUserId,
+              assigneeId: assigneeId || undefined,
+              dueDate,
+            },
+          });
+          await logStep(run.id, node.id, node.type, "success", `Created task "${task.title}"`);
+        } catch (err) {
+          await logStep(run.id, node.id, node.type, "error", err instanceof Error ? err.message : "Unknown error");
+          throw err;
+        }
+        currentNodeId = nextNodeId(flow, node.id);
+        continue;
+      }
+
+      if (node.type === "create_note") {
+        try {
+          const data = node.data as { title?: string; content?: string; projectId?: string; categoryId?: string };
+          if (!systemUserId) throw new Error("Could not resolve an author for this note");
+          if (!data.title) throw new Error("No title configured for this step");
+
+          const contact = run.contactId ? await prisma.contact.findUnique({ where: { id: run.contactId } }) : null;
+          const mergeValues = contact ? contactMergeValues(contact) : {};
+          const title = applyMergeTags(data.title, mergeValues);
+          const content = data.content ? applyMergeTags(data.content, mergeValues) : "";
+
+          const note = await prisma.note.create({
+            data: { title, content, authorId: systemUserId, projectId: data.projectId || undefined, categoryId: data.categoryId || undefined },
+          });
+          await logStep(run.id, node.id, node.type, "success", `Created note "${note.title}"`);
+        } catch (err) {
+          await logStep(run.id, node.id, node.type, "error", err instanceof Error ? err.message : "Unknown error");
+          throw err;
+        }
+        currentNodeId = nextNodeId(flow, node.id);
+        continue;
+      }
+
+      if (node.type === "create_opportunity") {
+        try {
+          if (!run.contactId) {
+            await logStep(run.id, node.id, node.type, "success", "No contact for this run");
+          } else {
+            const data = node.data as { name?: string; value?: number; stageId?: string };
+            if (!data.stageId) throw new Error("No stage configured for this step");
+            if (!systemUserId) throw new Error("Could not resolve a creator for this opportunity");
+
+            const stage = await prisma.pipelineStage.findUnique({ where: { id: data.stageId } });
+            if (!stage) throw new Error("Configured stage no longer exists");
+
+            const contact = await prisma.contact.findUnique({ where: { id: run.contactId } });
+            const mergeValues = contact ? contactMergeValues(contact) : {};
+            const name = applyMergeTags(data.name || contact?.name || "New opportunity", mergeValues);
+
+            const opportunity = await prisma.opportunity.create({
+              data: {
+                name, value: data.value ?? undefined, contactId: run.contactId,
+                pipelineId: stage.pipelineId, stageId: stage.id, createdById: systemUserId,
+              },
+            });
+            await logStep(run.id, node.id, node.type, "success", `Created opportunity "${opportunity.name}"`);
+          }
+        } catch (err) {
+          await logStep(run.id, node.id, node.type, "error", err instanceof Error ? err.message : "Unknown error");
+          throw err;
+        }
+        currentNodeId = nextNodeId(flow, node.id);
+        continue;
+      }
+
+      if (node.type === "update_contact_field") {
+        try {
+          if (!run.contactId) {
+            await logStep(run.id, node.id, node.type, "success", "No contact for this run");
+          } else {
+            const data = node.data as { field?: ContactTextField; value?: string };
+            if (!data.field || !CONTACT_TEXT_FIELDS.includes(data.field)) throw new Error("No field configured for this step");
+
+            const contact = await prisma.contact.findUnique({ where: { id: run.contactId } });
+            const mergeValues = contact ? contactMergeValues(contact) : {};
+            const value = applyMergeTags(data.value ?? "", mergeValues);
+
+            await prisma.contact.update({ where: { id: run.contactId }, data: { [data.field]: value } });
+            await logStep(run.id, node.id, node.type, "success", `Set ${data.field} to "${value}"`);
+          }
+        } catch (err) {
+          await logStep(run.id, node.id, node.type, "error", err instanceof Error ? err.message : "Unknown error");
+          throw err;
+        }
+        currentNodeId = nextNodeId(flow, node.id);
+        continue;
+      }
+
+      if (node.type === "update_opportunity") {
+        try {
+          if (!run.contactId) {
+            await logStep(run.id, node.id, node.type, "success", "No contact for this run");
+          } else {
+            const opportunity = await findOpenOpportunityForContact(run.contactId);
+            if (!opportunity) {
+              await logStep(run.id, node.id, node.type, "success", "No open opportunity found for this contact");
+            } else {
+              const data = node.data as { status?: string; value?: number };
+              // Intentionally does not re-fire opportunity_won/lost/stage_changed triggers —
+              // same (pre-existing) behavior as move_pipeline_stage, to avoid two automations
+              // that react to each other's changes looping indefinitely.
+              await prisma.opportunity.update({
+                where: { id: opportunity.id },
+                data: { ...(data.status !== undefined && { status: data.status }), ...(data.value !== undefined && { value: data.value }) },
+              });
+              await logStep(run.id, node.id, node.type, "success", "Opportunity updated");
+            }
+          }
+        } catch (err) {
+          await logStep(run.id, node.id, node.type, "error", err instanceof Error ? err.message : "Unknown error");
+          throw err;
+        }
+        currentNodeId = nextNodeId(flow, node.id);
+        continue;
+      }
+
+      if (node.type === "assign_contact_to_user") {
+        try {
+          if (!run.contactId) {
+            await logStep(run.id, node.id, node.type, "success", "No contact for this run");
+          } else {
+            const data = node.data as { mode?: string; assigneeId?: string; roundRobinUserIds?: string[] };
+            const assigneeId = await resolveAssignee(data.mode, data.assigneeId, data.roundRobinUserIds, node.id);
+            if (!assigneeId) {
+              await logStep(run.id, node.id, node.type, "success", "No assignee configured");
+            } else {
+              await prisma.contact.update({ where: { id: run.contactId }, data: { assignedToId: assigneeId } });
+              await logStep(run.id, node.id, node.type, "success", "Contact assigned");
+            }
+          }
+        } catch (err) {
+          await logStep(run.id, node.id, node.type, "error", err instanceof Error ? err.message : "Unknown error");
+          throw err;
+        }
+        currentNodeId = nextNodeId(flow, node.id);
+        continue;
+      }
+
+      if (node.type === "send_notification") {
+        try {
+          const data = node.data as { recipientMode?: string; recipientId?: string; roundRobinUserIds?: string[]; title?: string; body?: string };
+          const recipientId = await resolveAssignee(data.recipientMode, data.recipientId, data.roundRobinUserIds, node.id);
+          if (!recipientId) throw new Error("No recipient configured for this step");
+
+          const contact = run.contactId ? await prisma.contact.findUnique({ where: { id: run.contactId } }) : null;
+          const mergeValues = contact ? contactMergeValues(contact) : {};
+          const title = applyMergeTags(data.title || "Automation notification", mergeValues);
+          const body = applyMergeTags(data.body || "", mergeValues);
+
+          await createNotification({
+            userId: recipientId, type: "automation", title, body,
+            entityType: "automation", entityId: run.automationId,
+          });
+          await logStep(run.id, node.id, node.type, "success", `Notified ${recipientId}`);
+        } catch (err) {
+          await logStep(run.id, node.id, node.type, "error", err instanceof Error ? err.message : "Unknown error");
+          throw err;
+        }
+        currentNodeId = nextNodeId(flow, node.id);
+        continue;
+      }
+
+      if (node.type === "webhook") {
+        try {
+          const data = node.data as { url?: string; extraFields?: { key: string; value: string }[] };
+          if (!data.url) throw new Error("No URL configured for this step");
+
+          const contact = run.contactId ? await prisma.contact.findUnique({ where: { id: run.contactId } }) : null;
+          const mergeValues = contact ? contactMergeValues(contact) : {};
+          const extra: Record<string, string> = {};
+          for (const field of data.extraFields ?? []) {
+            if (field.key) extra[field.key] = applyMergeTags(field.value ?? "", mergeValues);
+          }
+
+          const payload = {
+            automationId: run.automationId,
+            automationName: automation?.name ?? "",
+            runId: run.id,
+            triggeredAt: new Date().toISOString(),
+            contact: contact ? { id: contact.id, name: contact.name, email: contact.email } : null,
+            extra,
+          };
+
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), WEBHOOK_TIMEOUT_MS);
+          try {
+            const res = await fetch(data.url, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+              signal: controller.signal,
+            });
+            if (!res.ok) throw new Error(`Webhook responded with ${res.status}`);
+          } finally {
+            clearTimeout(timeout);
+          }
+          await logStep(run.id, node.id, node.type, "success", `Posted to ${data.url}`);
+        } catch (err) {
+          await logStep(run.id, node.id, node.type, "error", err instanceof Error ? err.message : "Unknown error");
+          throw err;
+        }
+        currentNodeId = nextNodeId(flow, node.id);
+        continue;
+      }
+
+      if (node.type === "enroll_in_automation") {
+        try {
+          const data = node.data as { automationId?: string };
+          if (!data.automationId) throw new Error("No automation configured for this step");
+          if (data.automationId === run.automationId) throw new Error("Cannot enroll a workflow into itself");
+          if (!run.contactId) {
+            await logStep(run.id, node.id, node.type, "success", "No contact for this run");
+          } else {
+            await enrollContactInAutomation(data.automationId, run.contactId, enrollmentDepth + 1);
+            await logStep(run.id, node.id, node.type, "success", "Enrolled in another automation");
+          }
+        } catch (err) {
+          await logStep(run.id, node.id, node.type, "error", err instanceof Error ? err.message : "Unknown error");
+          throw err;
+        }
+        currentNodeId = nextNodeId(flow, node.id);
+        continue;
+      }
+
+      if (node.type === "end_workflow") {
+        await logStep(run.id, node.id, node.type, "success", "Workflow ended");
+        break;
       }
 
       await logStep(run.id, node.id, node.type, "error", "Unknown node type");

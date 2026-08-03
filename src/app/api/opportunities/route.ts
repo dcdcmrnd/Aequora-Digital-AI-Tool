@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { logActivity } from "@/lib/activity";
 import { authOptions } from "@/lib/auth";
+import { runAutomationsForTrigger } from "@/lib/automation/engine";
 import { checkPermission } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 
@@ -56,6 +57,8 @@ export async function POST(req: NextRequest) {
     entityId: opportunity.id,
     entityName: opportunity.name,
   });
+
+  await runAutomationsForTrigger({ triggerType: "opportunity_created", contactId: opportunity.contactId });
 
   return NextResponse.json({ opportunity }, { status: 201 });
 }

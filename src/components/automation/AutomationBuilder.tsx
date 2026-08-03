@@ -97,7 +97,7 @@ export function AutomationBuilder({ automation }: AutomationBuilderProps) {
             <TabsTrigger value="logs">Execution Log</TabsTrigger>
           </TabsList>
           <TabsContent value="builder">
-            <AutomationCanvas flow={flow} onChange={setFlow} stages={stages} />
+            <AutomationCanvas flow={flow} onChange={setFlow} stages={stages} automationId={automation.id} />
           </TabsContent>
           <TabsContent value="logs">
             <ExecutionLogView automationId={automation.id} enabled={tab === "logs"} />

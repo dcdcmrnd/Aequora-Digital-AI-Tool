@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { checkPermission, hasProjectAccess } from "@/lib/permissions";
 import { logActivity } from "@/lib/activity";
+import { runAutomationsForTrigger } from "@/lib/automation/engine";
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -80,6 +81,8 @@ export async function POST(req: NextRequest) {
     entityId: note.id,
     entityName: note.title,
   });
+
+  await runAutomationsForTrigger({ triggerType: "note_added" });
 
   return NextResponse.json({ note }, { status: 201 });
 }

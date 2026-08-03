@@ -25,6 +25,7 @@ const updateSchema = z.object({
   address: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
   tags: z.array(z.string()).optional(),
+  assignedToId: z.string().nullable().optional(),
 });
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
@@ -36,7 +37,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   const contact = await prisma.contact.findUnique({
     where: { id: params.id },
-    include: { createdBy: { select: { id: true, name: true } } },
+    include: { createdBy: { select: { id: true, name: true } }, assignedTo: { select: { id: true, name: true } } },
   });
   if (!contact) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -77,11 +78,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (parsed.data.address !== undefined) data.address = parsed.data.address;
   if (parsed.data.notes !== undefined) data.notes = parsed.data.notes;
   if (parsed.data.tags !== undefined) data.tags = JSON.stringify(parsed.data.tags);
+  if (parsed.data.assignedToId !== undefined) data.assignedTo = parsed.data.assignedToId ? { connect: { id: parsed.data.assignedToId } } : { disconnect: true };
 
   const updated = await prisma.contact.update({
     where: { id: params.id },
     data,
-    include: { createdBy: { select: { id: true, name: true } } },
+    include: { createdBy: { select: { id: true, name: true } }, assignedTo: { select: { id: true, name: true } } },
   });
 
   await logActivity({

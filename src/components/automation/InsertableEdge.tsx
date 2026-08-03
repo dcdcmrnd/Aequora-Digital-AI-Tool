@@ -3,10 +3,6 @@
 import { BaseEdge, EdgeLabelRenderer, getSmoothStepPath, type EdgeProps } from "@xyflow/react";
 import { Plus } from "lucide-react";
 
-import { ADD_STEP_OPTIONS } from "@/components/automation/PlaceholderNode";
-import { Dropdown } from "@/components/ui/Dropdown";
-import type { AutomationNodeType } from "@/types";
-
 export function InsertableEdge({
   id,
   sourceX,
@@ -25,33 +21,24 @@ export function InsertableEdge({
     targetY,
     targetPosition,
   });
-  const onInsert = (data as { onInsert?: (type: AutomationNodeType) => void } | undefined)?.onInsert;
+  const onOpenPicker = (data as { onOpenPicker?: () => void } | undefined)?.onOpenPicker;
 
   return (
     <>
       <BaseEdge id={id} path={edgePath} />
-      {onInsert && (
+      {onOpenPicker && (
         <EdgeLabelRenderer>
           <div
             className="nodrag nopan absolute"
             style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`, pointerEvents: "all" }}
           >
-            <Dropdown
-              align="left"
-              trigger={
-                <button
-                  type="button"
-                  className="flex size-5 items-center justify-center rounded-full border border-border bg-white text-text-muted shadow-sm transition-colors hover:border-brand-primary hover:text-brand-primary"
-                >
-                  <Plus className="size-3" />
-                </button>
-              }
-              items={ADD_STEP_OPTIONS.map((opt) => ({
-                label: opt.label,
-                icon: <opt.icon className="size-3.5" />,
-                onClick: () => onInsert(opt.type),
-              }))}
-            />
+            <button
+              type="button"
+              onClick={onOpenPicker}
+              className="flex size-5 items-center justify-center rounded-full border border-border bg-white text-text-muted shadow-sm transition-colors hover:border-brand-primary hover:text-brand-primary"
+            >
+              <Plus className="size-3" />
+            </button>
           </div>
         </EdgeLabelRenderer>
       )}

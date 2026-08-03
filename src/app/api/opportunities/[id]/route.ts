@@ -78,6 +78,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     });
   }
 
+  if (parsed.data.status !== undefined && parsed.data.status !== existing.status && (parsed.data.status === "won" || parsed.data.status === "lost")) {
+    await runAutomationsForTrigger({
+      triggerType: parsed.data.status === "won" ? "opportunity_won" : "opportunity_lost",
+      contactId: updated.contactId,
+    });
+  }
+
   return NextResponse.json({ opportunity: updated });
 }
 

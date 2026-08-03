@@ -9,6 +9,7 @@ const ENTITY_ROUTES: Record<string, (id: string) => string> = {
   task: (id) => `/projects`, // navigate to projects; task panels open via project page
   project: (id) => `/projects/${id}`,
   note: (id) => `/notes/${id}`,
+  automation: (id) => `/automation/${id}`,
 };
 
 export function NotificationBell() {

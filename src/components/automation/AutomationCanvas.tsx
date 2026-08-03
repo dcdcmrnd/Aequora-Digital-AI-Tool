@@ -18,10 +18,12 @@ import { Redo2, Undo2 } from "lucide-react";
 import { CanvasNode } from "@/components/automation/CanvasNode";
 import { InsertableEdge } from "@/components/automation/InsertableEdge";
 import { NodeConfigPanel } from "@/components/automation/NodeConfigPanel";
+import { NodePickerPanel } from "@/components/automation/NodePickerPanel";
 import { PlaceholderNode } from "@/components/automation/PlaceholderNode";
+import { NODE_DEFINITIONS } from "@/lib/automation/nodeRegistry";
 import type { AutomationFlow, AutomationNode, AutomationNodeType, PipelineStage } from "@/types";
 
-const nodeTypes = {
+const nodeTypes: Record<AutomationNodeType | "placeholder", typeof CanvasNode | typeof PlaceholderNode> = {
   trigger: CanvasNode,
   send_email: CanvasNode,
   add_tag: CanvasNode,
@@ -29,6 +31,16 @@ const nodeTypes = {
   move_pipeline_stage: CanvasNode,
   condition: CanvasNode,
   wait: CanvasNode,
+  create_task: CanvasNode,
+  create_note: CanvasNode,
+  create_opportunity: CanvasNode,
+  update_contact_field: CanvasNode,
+  update_opportunity: CanvasNode,
+  assign_contact_to_user: CanvasNode,
+  send_notification: CanvasNode,
+  webhook: CanvasNode,
+  enroll_in_automation: CanvasNode,
+  end_workflow: CanvasNode,
   placeholder: PlaceholderNode,
 };
 
@@ -74,21 +86,20 @@ function layout(nodes: AutomationNode[], edges: AutomationFlow["edges"]): Automa
   }));
 }
 
-function defaultDataFor(type: AutomationNodeType): Record<string, unknown> {
-  if (type === "wait") return { mode: "duration", amount: 1, unit: "hours" };
-  return {};
-}
-
 function withPlaceholders(
   nodes: AutomationNode[],
   edges: AutomationFlow["edges"],
   onPick: (sourceId: string, branch: string | undefined, type: AutomationNodeType) => void,
   onInsert: (edge: AutomationFlow["edges"][number], type: AutomationNodeType) => void,
+  openPicker: (pick: (type: AutomationNodeType) => void) => void,
 ): { nodes: RFNode[]; edges: RFEdge[] } {
   const phNodes: RFNode[] = [];
   const phEdges: RFEdge[] = [];
 
   for (const node of nodes) {
+    // A node with no outgoing-edge slot (e.g. end_workflow) never gets a placeholder appended.
+    if (!NODE_DEFINITIONS[node.type]?.hasSourceHandle) continue;
+
     const outgoing = edges.filter((e) => e.source === node.id);
     const branches: (string | undefined)[] = node.type === "condition" ? ["yes", "no"] : [undefined];
 
@@ -101,7 +112,7 @@ function withPlaceholders(
         id: phId,
         type: "placeholder",
         position: { x: node.position.x + xOffset, y: node.position.y + ROW_HEIGHT },
-        data: { onPick: (type: AutomationNodeType) => onPick(node.id, branch, type) },
+        data: { onOpenPicker: () => openPicker((type) => onPick(node.id, branch, type)) },
         draggable: false,
       });
       phEdges.push({ id: `edge-${phId}`, source: node.id, target: phId, sourceHandle: branch ?? null, type: "smoothstep" });
@@ -114,7 +125,7 @@ function withPlaceholders(
       ...phNodes,
     ],
     edges: [
-      ...edges.map((e) => ({ ...e, type: "insertable", data: { onInsert: (type: AutomationNodeType) => onInsert(e, type) } })),
+      ...edges.map((e) => ({ ...e, type: "insertable", data: { onOpenPicker: () => openPicker((type) => onInsert(e, type)) } })),
       ...phEdges,
     ],
   };
@@ -124,10 +135,13 @@ interface AutomationCanvasProps {
   flow: AutomationFlow;
   onChange: (flow: AutomationFlow) => void;
   stages: PipelineStage[];
+  automationId?: string;
 }
 
-function CanvasInner({ flow, onChange, stages }: AutomationCanvasProps) {
+function CanvasInner({ flow, onChange, stages, automationId }: AutomationCanvasProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [pickerPick, setPickerPick] = useState<((type: AutomationNodeType) => void) | null>(null);
+  const openPicker = useCallback((pick: (type: AutomationNodeType) => void) => setPickerPick(() => pick), []);
 
   // Real (persisted) nodes/edges live here, separate from React Flow's
   // render state below -- this is the source of truth we report upward via
@@ -199,9 +213,10 @@ function CanvasInner({ flow, onChange, stages }: AutomationCanvasProps) {
 
   const handlePick = useCallback((sourceId: string, branch: string | undefined, type: AutomationNodeType) => {
     const newId = crypto.randomUUID();
-    const newNode: AutomationNode = { id: newId, type, position: { x: 0, y: 0 }, data: defaultDataFor(type) };
+    const newNode: AutomationNode = { id: newId, type, position: { x: 0, y: 0 }, data: NODE_DEFINITIONS[type].defaultData() };
     const nextEdges = [...realEdges, { id: crypto.randomUUID(), source: sourceId, target: newId, sourceHandle: branch ?? null }];
     commit(layout([...realNodes, newNode], nextEdges), nextEdges);
+    setSelectedId(newId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [realNodes, realEdges, commit]);
 
@@ -211,9 +226,10 @@ function CanvasInner({ flow, onChange, stages }: AutomationCanvasProps) {
     const newId = crypto.randomUUID();
     const toTarget = { id: crypto.randomUUID(), source: newId, target: edge.target, sourceHandle: type === "condition" ? "yes" : null };
     const fromSource = { id: crypto.randomUUID(), source: edge.source, target: newId, sourceHandle: edge.sourceHandle ?? null };
-    const newNode: AutomationNode = { id: newId, type, position: { x: 0, y: 0 }, data: defaultDataFor(type) };
+    const newNode: AutomationNode = { id: newId, type, position: { x: 0, y: 0 }, data: NODE_DEFINITIONS[type].defaultData() };
     const nextEdges = [...realEdges.filter((e) => e.id !== edge.id), fromSource, toTarget];
     commit(layout([...realNodes, newNode], nextEdges), nextEdges);
+    setSelectedId(newId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [realNodes, realEdges, commit]);
 
@@ -254,7 +270,7 @@ function CanvasInner({ flow, onChange, stages }: AutomationCanvasProps) {
   const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState<RFEdge>([]);
 
   useEffect(() => {
-    const { nodes, edges } = withPlaceholders(realNodes, realEdges, handlePick, handleInsertOnEdge);
+    const { nodes, edges } = withPlaceholders(realNodes, realEdges, handlePick, handleInsertOnEdge, openPicker);
     setRfNodes(nodes.map((n) => ({ ...n, selected: n.id === selectedId })));
     setRfEdges(edges);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -346,12 +362,23 @@ function CanvasInner({ flow, onChange, stages }: AutomationCanvasProps) {
         <NodeConfigPanel
           node={selectedNode}
           stages={stages}
+          automationId={automationId}
           onClose={() => setSelectedId(null)}
           onSave={handleSaveNode}
           onDelete={handleDeleteNode}
           canDelete={selectedNode.type !== "trigger"}
           onDuplicate={handleDuplicateAndClose}
-          canDuplicate={selectedNode.type !== "trigger" && selectedNode.type !== "condition"}
+          canDuplicate={NODE_DEFINITIONS[selectedNode.type].canDuplicate}
+        />
+      )}
+
+      {pickerPick && (
+        <NodePickerPanel
+          onPick={(type) => {
+            pickerPick(type);
+            setPickerPick(null);
+          }}
+          onClose={() => setPickerPick(null)}
         />
       )}
     </div>

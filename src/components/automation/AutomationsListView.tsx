@@ -16,6 +16,11 @@ const TRIGGER_LABELS: Record<AutomationTriggerType, string> = {
   contact_created: "Contact Created",
   tag_added: "Tag Added to Contact",
   opportunity_stage_changed: "Opportunity Moved to Stage",
+  opportunity_created: "Opportunity Created",
+  opportunity_won: "Opportunity Won",
+  opportunity_lost: "Opportunity Lost",
+  task_completed: "Task Completed",
+  note_added: "Note Added",
 };
 
 const STATUS_STYLES: Record<string, string> = {

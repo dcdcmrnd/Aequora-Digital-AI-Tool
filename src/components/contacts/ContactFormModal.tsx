@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { MessageSquare, Plus, X } from "lucide-react";
 
 import { ContactConversationModal } from "@/components/contacts/ContactConversationModal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/Select";
 import { TagInput } from "@/components/ui/TagInput";
 import { Textarea } from "@/components/ui/Textarea";
 import { type ContactInput, useContactTags, useContacts } from "@/hooks/useContacts";
@@ -65,10 +66,20 @@ export function ContactFormModal({ open, onClose, contact, prefill, onSaved }: C
   const { createContact, updateContact } = useContacts();
   const { tags: tagSuggestions } = useContactTags();
   const [form, setForm] = useState<FormState>(() => toFormState(contact ?? prefill));
+  const [assignedToId, setAssignedToId] = useState(contact?.assignedToId ?? "");
+  const [users, setUsers] = useState<{ id: string; name: string }[]>([]);
   const isEditing = !!contact;
   const isSaving = createContact.isPending || updateContact.isPending;
   const canAccessInbox = usePermission("company.email");
   const [conversationOpen, setConversationOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isEditing) return;
+    fetch("/api/users")
+      .then((res) => res.json())
+      .then((d) => setUsers((d.users ?? []).map((u: { id: string; name: string }) => ({ id: u.id, name: u.name }))))
+      .catch(() => {});
+  }, [isEditing]);
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -118,6 +129,7 @@ export function ContactFormModal({ open, onClose, contact, prefill, onSaved }: C
       notes: form.notes.trim() || undefined,
       tags: form.tags,
       sourceLeadId: !isEditing ? prefill?.sourceLeadId : undefined,
+      assignedToId: isEditing ? assignedToId || null : undefined,
     };
 
     const onSuccess = {
@@ -212,6 +224,24 @@ export function ContactFormModal({ open, onClose, contact, prefill, onSaved }: C
             <Input value={form.twitterUrl} onChange={(e) => set("twitterUrl", e.target.value)} />
           </Field>
         </div>
+
+        {isEditing && (
+          <Field label="Assigned To">
+            <Select value={assignedToId || "__unassigned"} onValueChange={(v) => setAssignedToId(v === "__unassigned" ? "" : v)}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Unassigned" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__unassigned">Unassigned</SelectItem>
+                {users.map((u) => (
+                  <SelectItem key={u.id} value={u.id}>
+                    {u.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+        )}
 
         <Field label="Tags">
           <TagInput
