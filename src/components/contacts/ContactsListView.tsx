@@ -5,17 +5,22 @@ import { ChevronLeft, ChevronRight, Plus, Upload } from "lucide-react";
 
 import { BulkActionsBar } from "@/components/contacts/BulkActionsBar";
 import { ContactFormModal } from "@/components/contacts/ContactFormModal";
+import { ContactsFilterBar } from "@/components/contacts/ContactsFilterBar";
 import { ContactsTable } from "@/components/contacts/ContactsTable";
 import { ImportContactsModal } from "@/components/contacts/ImportContactsModal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useContacts } from "@/hooks/useContacts";
+import { useOpportunities } from "@/hooks/useOpportunities";
 import { usePermission } from "@/hooks/usePermission";
+import { usePipeline } from "@/hooks/usePipeline";
 
 const PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
 
 export function ContactsListView() {
   const { contacts, isLoading } = useContacts();
+  const { opportunities } = useOpportunities();
+  const { pipeline } = usePipeline();
   const canManage = usePermission("contacts.manage");
   const [search, setSearch] = useState("");
   const [adding, setAdding] = useState(false);
@@ -24,25 +29,77 @@ export function ContactsListView() {
   const [pageSize, setPageSize] = useState<number>(PAGE_SIZE_OPTIONS[0]);
   const [page, setPage] = useState(1);
 
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
+  const [selectedStageId, setSelectedStageId] = useState<string | null>(null);
+  const [selectedCreatedById, setSelectedCreatedById] = useState<string | null>(null);
+
+  const availableTags = useMemo(
+    () => Array.from(new Set((contacts ?? []).flatMap((c) => c.tags))).sort(),
+    [contacts],
+  );
+  const availableCompanies = useMemo(
+    () => Array.from(new Set((contacts ?? []).map((c) => c.company).filter((c): c is string => !!c))).sort(),
+    [contacts],
+  );
+  const creators = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const c of contacts ?? []) {
+      if (c.createdBy) map.set(c.createdBy.id, c.createdBy.name);
+    }
+    return Array.from(map.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [contacts]);
+  const stageOptions = useMemo(
+    () => (pipeline?.stages ? [...pipeline.stages].sort((a, b) => a.order - b.order) : []),
+    [pipeline],
+  );
+  const openStagesByContact = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    for (const opp of opportunities ?? []) {
+      if (opp.status !== "open") continue;
+      if (!map.has(opp.contactId)) map.set(opp.contactId, new Set());
+      map.get(opp.contactId)!.add(opp.stageId);
+    }
+    return map;
+  }, [opportunities]);
+
+  function toggleTag(tag: string) {
+    setSelectedTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
+  }
+
+  function clearFilters() {
+    setSelectedTags([]);
+    setSelectedCompany(null);
+    setSelectedStageId(null);
+    setSelectedCreatedById(null);
+  }
+
   const filtered = useMemo(() => {
     if (!contacts) return [];
     const q = search.trim().toLowerCase();
-    if (!q) return contacts;
-    return contacts.filter(
-      (c) =>
-        c.name.toLowerCase().includes(q) ||
-        c.company?.toLowerCase().includes(q) ||
-        c.email?.toLowerCase().includes(q) ||
-        c.tags.some((t) => t.toLowerCase().includes(q)),
-    );
-  }, [contacts, search]);
+    return contacts
+      .filter(
+        (c) =>
+          !q ||
+          c.name.toLowerCase().includes(q) ||
+          c.company?.toLowerCase().includes(q) ||
+          c.email?.toLowerCase().includes(q) ||
+          c.tags.some((t) => t.toLowerCase().includes(q)),
+      )
+      .filter((c) => selectedTags.length === 0 || selectedTags.some((t) => c.tags.includes(t)))
+      .filter((c) => !selectedCompany || c.company === selectedCompany)
+      .filter((c) => !selectedStageId || openStagesByContact.get(c.id)?.has(selectedStageId))
+      .filter((c) => !selectedCreatedById || c.createdById === selectedCreatedById);
+  }, [contacts, search, selectedTags, selectedCompany, selectedStageId, selectedCreatedById, openStagesByContact]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
 
-  // Reset to page 1 whenever the visible set changes shape (new search, page size change).
+  // Reset to page 1 whenever the visible set changes shape (new search, filters, page size).
   useEffect(() => {
     setPage(1);
-  }, [search, pageSize]);
+  }, [search, pageSize, selectedTags, selectedCompany, selectedStageId, selectedCreatedById]);
 
   const paginated = useMemo(
     () => filtered.slice((page - 1) * pageSize, page * pageSize),
@@ -92,6 +149,22 @@ export function ContactsListView() {
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         className="max-w-sm"
+      />
+
+      <ContactsFilterBar
+        availableTags={availableTags}
+        selectedTags={selectedTags}
+        onToggleTag={toggleTag}
+        availableCompanies={availableCompanies}
+        selectedCompany={selectedCompany}
+        onCompanyChange={setSelectedCompany}
+        stages={stageOptions}
+        selectedStageId={selectedStageId}
+        onStageChange={setSelectedStageId}
+        creators={creators}
+        selectedCreatedById={selectedCreatedById}
+        onCreatedByChange={setSelectedCreatedById}
+        onClearAll={clearFilters}
       />
 
       {canManage && selectedIds.size > 0 && (
@@ -145,7 +218,9 @@ export function ContactsListView() {
         </>
       ) : (
         <p className="text-text-muted text-sm">
-          {search ? `No contacts match "${search}".` : "No contacts yet. Add one, or save a lead as a contact."}
+          {search || selectedTags.length > 0 || selectedCompany || selectedStageId || selectedCreatedById
+            ? "No contacts match your search and filters."
+            : "No contacts yet. Add one, or save a lead as a contact."}
         </p>
       )}
 
