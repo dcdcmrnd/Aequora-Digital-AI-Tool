@@ -66,6 +66,7 @@ const TRIGGER_DETAIL_LABELS: Partial<Record<TriggerType, string>> = {
   opportunity_lost: "Opportunity marked lost",
   task_completed: "Task completed",
   note_added: "Note added",
+  email_opened: "Email opened",
 };
 
 function durationMs(amount: number, unit: WaitUnit): number {
@@ -153,7 +154,7 @@ async function evaluateConditionRule(rule: ConditionRule, run: { id: string; con
     return { result, detail: `Contact ${field ?? "field"} ${rule.operator ?? "equals"} "${expected}"` };
   }
   // "email_opened" (also the fallback for older runs saved before conditionType existed)
-  const lastTracked = await prisma.automationEmailTracking.findFirst({ where: { runId: run.id }, orderBy: { createdAt: "desc" } });
+  const lastTracked = await prisma.emailTracking.findFirst({ where: { runId: run.id }, orderBy: { createdAt: "desc" } });
   return { result: !!lastTracked?.openedAt, detail: "Email was opened" };
 }
 
@@ -277,8 +278,12 @@ async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string,
           const to = allRecipients.join(", ");
 
           const trackingToken = crypto.randomBytes(16).toString("hex");
-          await prisma.automationEmailTracking.create({ data: { token: trackingToken, runId: run.id } });
-          await sendEmail({ to, subject, body, cc, fromEmail: data.fromEmail, trackingToken }, null);
+          await prisma.emailTracking.create({ data: { token: trackingToken, runId: run.id, contactId: contact.id } });
+          const sendResult = await sendEmail({ to, subject, body, cc, fromEmail: data.fromEmail, trackingToken }, null);
+          await prisma.emailTracking.update({
+            where: { token: trackingToken },
+            data: { gmailMessageId: sendResult.id ?? undefined, gmailThreadId: sendResult.threadId ?? undefined },
+          });
 
           await logStep(run.id, node.id, node.type, "success", `Sent to ${to}`);
         } catch (err) {
@@ -400,7 +405,7 @@ async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string,
         const data = node.data as { mode?: string; amount?: number; unit?: WaitUnit; condition?: string };
 
         if (data.mode === "condition") {
-          const lastTracked = await prisma.automationEmailTracking.findFirst({
+          const lastTracked = await prisma.emailTracking.findFirst({
             where: { runId: run.id },
             orderBy: { createdAt: "desc" },
           });

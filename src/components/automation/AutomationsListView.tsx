@@ -21,6 +21,7 @@ const TRIGGER_LABELS: Record<AutomationTriggerType, string> = {
   opportunity_lost: "Opportunity Lost",
   task_completed: "Task Completed",
   note_added: "Note Added",
+  email_opened: "Email Opened",
 };
 
 const STATUS_STYLES: Record<string, string> = {

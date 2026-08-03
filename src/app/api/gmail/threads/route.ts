@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getGmailClient, getConnectedEmail, getHeader } from "@/lib/gmail";
 import { checkPermission } from "@/lib/permissions";
+import { prisma } from "@/lib/prisma";
 
 function extractContact(from: string, to: string, isOutgoing: boolean) {
   const raw = isOutgoing ? to : from;
@@ -68,7 +69,7 @@ export async function GET(req: NextRequest) {
         const isUnread = messages.some((m) => m.labelIds?.includes("UNREAD"));
 
         return {
-          id: t.id,
+          id: t.id!,
           subject: getHeader(headers, "Subject"),
           snippet: last?.snippet ?? "",
           date: getHeader(headers, "Date"),
@@ -80,6 +81,21 @@ export async function GET(req: NextRequest) {
         };
       })
     );
+
+    // Recipient open-tracking only applies to mail we sent — attach it for the Sent tab only.
+    if (labelId === "SENT" && threads.length > 0) {
+      const tracked = await prisma.emailTracking.findMany({
+        where: { gmailThreadId: { in: threads.map((t) => t.id) } },
+        select: { gmailThreadId: true, openedAt: true },
+      });
+      const openedByThreadId = new Map<string, boolean>();
+      for (const row of tracked) {
+        if (row.gmailThreadId) openedByThreadId.set(row.gmailThreadId, openedByThreadId.get(row.gmailThreadId) || !!row.openedAt);
+      }
+      for (const t of threads as (typeof threads[number] & { opened?: boolean | null })[]) {
+        t.opened = openedByThreadId.has(t.id) ? openedByThreadId.get(t.id)! : null;
+      }
+    }
 
     return NextResponse.json({
       threads,

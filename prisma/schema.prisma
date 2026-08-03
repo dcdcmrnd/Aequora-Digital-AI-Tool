@@ -283,6 +283,7 @@ model ChatMessage {
   senderId  String
   sender    User      @relation(fields: [senderId], references: [id])
   content   String
+  editedAt  DateTime?
   createdAt DateTime  @default(now())
 }
 
@@ -441,6 +442,7 @@ model Contact {
 
   opportunities Opportunity[]
   automationRuns AutomationRun[]
+  emailTracking EmailTracking[]
 }
 
 // --- Pipeline / Opportunities ---
@@ -507,7 +509,7 @@ model AutomationRun {
   detail        String?
   createdAt     DateTime                  @default(now())
   updatedAt     DateTime                  @updatedAt
-  emailTracking AutomationEmailTracking[]
+  emailTracking EmailTracking[]
   steps         AutomationRunStep[]
 }
 
@@ -522,11 +524,17 @@ model AutomationRunStep {
   createdAt DateTime     @default(now())
 }
 
-model AutomationEmailTracking {
-  id        String        @id @default(cuid())
-  token     String        @unique
-  runId     String
-  run       AutomationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
-  openedAt  DateTime?
-  createdAt DateTime      @default(now())
+model EmailTracking {
+  id             String         @id @default(cuid())
+  token          String         @unique
+  contactId      String?
+  contact        Contact?       @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  runId          String?
+  run            AutomationRun? @relation(fields: [runId], references: [id], onDelete: Cascade)
+  gmailMessageId String?
+  gmailThreadId  String?
+  openedAt       DateTime?
+  createdAt      DateTime       @default(now())
+
+  @@index([gmailThreadId])
 }

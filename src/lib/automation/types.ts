@@ -25,7 +25,8 @@ export type TriggerType =
   | "opportunity_won"
   | "opportunity_lost"
   | "task_completed"
-  | "note_added";
+  | "note_added"
+  | "email_opened";
 
 export type ConditionType = "email_opened" | "has_tag" | "opportunity_at_stage" | "days_since_entered" | "field_comparison";
 

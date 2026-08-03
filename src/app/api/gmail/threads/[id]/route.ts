@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { getGmailClient, getConnectedEmail, getHeader, extractBody } from "@/lib/gmail";
+import { archiveThread, extractBody, getConnectedEmail, getGmailClient, getHeader, trashThread } from "@/lib/gmail";
 import { checkPermission } from "@/lib/permissions";
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
@@ -86,5 +86,42 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     return NextResponse.json({ error: "Failed to fetch thread" }, { status: 500 });
+  }
+}
+
+export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  const session = await getServerSession(authOptions);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { action, scope, email } = await req.json();
+  if (scope !== "own" && scope !== "agency") {
+    return NextResponse.json({ error: "Invalid scope" }, { status: 400 });
+  }
+  if (action !== "archive" && action !== "trash") {
+    return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+  }
+
+  if (scope === "agency") {
+    const canAccessInbox = session.user.role === "admin" || (await checkPermission(session.user.id, "company.email"));
+    if (!canAccessInbox) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const ownerId = scope === "own" ? session.user.id : null;
+
+  try {
+    if (action === "archive") {
+      await archiveThread(ownerId, email, params.id);
+    } else {
+      await trashThread(ownerId, email, params.id);
+    }
+    return NextResponse.json({ success: true });
+  } catch (err: any) {
+    if (err.message?.includes("Gmail not connected")) {
+      return NextResponse.json({ error: "not_connected" }, { status: 503 });
+    }
+    if (err.message?.includes("not accessible")) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    return NextResponse.json({ error: `Failed to ${action} thread` }, { status: 500 });
   }
 }

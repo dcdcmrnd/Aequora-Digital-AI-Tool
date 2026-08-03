@@ -67,6 +67,18 @@ export async function getGmailClient(ownerId: string | null, email?: string) {
   return google.gmail({ version: "v1", auth: client });
 }
 
+/** Removes the thread from Inbox (stays searchable in All Mail) — matches Gmail's own "Archive" button. */
+export async function archiveThread(ownerId: string | null, email: string, threadId: string): Promise<void> {
+  const gmail = await getGmailClient(ownerId, email);
+  await gmail.users.threads.modify({ userId: "me", id: threadId, requestBody: { removeLabelIds: ["INBOX"] } });
+}
+
+/** Moves the thread to Trash (reversible for 30 days) — matches Gmail's own "Delete" button. */
+export async function trashThread(ownerId: string | null, email: string, threadId: string): Promise<void> {
+  const gmail = await getGmailClient(ownerId, email);
+  await gmail.users.threads.trash({ userId: "me", id: threadId });
+}
+
 /** Strips CR/LF so header values can't inject extra headers (e.g. a stray Bcc). */
 function sanitizeHeaderValue(value: string): string {
   return value.replace(/[\r\n]+/g, " ").trim();

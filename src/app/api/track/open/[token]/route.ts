@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { resumeRun } from "@/lib/automation/engine";
+import { resumeRun, runAutomationsForTrigger } from "@/lib/automation/engine";
 import { prisma } from "@/lib/prisma";
 
 // 1x1 transparent PNG
@@ -11,10 +11,10 @@ const PIXEL = Buffer.from(
 
 export async function GET(req: NextRequest, { params }: { params: { token: string } }) {
   try {
-    const tracking = await prisma.automationEmailTracking.findUnique({ where: { token: params.token } });
+    const tracking = await prisma.emailTracking.findUnique({ where: { token: params.token } });
 
     if (tracking && !tracking.openedAt) {
-      await prisma.automationEmailTracking.update({
+      await prisma.emailTracking.update({
         where: { id: tracking.id },
         data: { openedAt: new Date() },
       });
@@ -24,6 +24,10 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
       });
       if (waitingRun) {
         await resumeRun(waitingRun.id);
+      }
+
+      if (tracking.contactId) {
+        await runAutomationsForTrigger({ triggerType: "email_opened", contactId: tracking.contactId });
       }
     }
   } catch {

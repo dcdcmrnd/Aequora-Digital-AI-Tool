@@ -33,6 +33,7 @@ const TRIGGER_OPTIONS: { value: AutomationTriggerType; label: string }[] = [
   { value: "opportunity_lost", label: "Opportunity Lost" },
   { value: "task_completed", label: "Task Completed" },
   { value: "note_added", label: "Note Added" },
+  { value: "email_opened", label: "Email Opened" },
 ];
 
 const CONTACTLESS_TRIGGERS: AutomationTriggerType[] = ["task_completed", "note_added"];

@@ -17,6 +17,8 @@ interface ThreadSummary {
   messageCount: number;
   contactName: string;
   contactEmail: string;
+  /** Set only for Sent-tab threads: whether the recipient has opened it. null = not tracked (e.g. sent before open-tracking shipped). */
+  opened?: boolean | null;
 }
 
 interface ThreadMessage {
@@ -153,6 +155,25 @@ export function InboxView({ scope, isConnected, accounts, isAdmin, currentUserId
 
   const goBackToList = () => {
     setMobileShowDetail(false);
+  };
+
+  const handleThreadAction = async (action: "archive" | "trash") => {
+    if (!selected) return;
+    const threadId = selected.id;
+    try {
+      const res = await fetch(`/api/gmail/threads/${threadId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, scope, email: activeAccount }),
+      });
+      if (!res.ok) throw new Error();
+      setThreads((prev) => prev.filter((t) => t.id !== threadId));
+      setSelected(null);
+      setMobileShowDetail(false);
+      toast.success(action === "archive" ? "Archived" : "Moved to trash");
+    } catch {
+      toast.error(`Couldn't ${action === "archive" ? "archive" : "delete"} this conversation.`);
+    }
   };
 
   if (!isConnected) {
@@ -322,14 +343,26 @@ export function InboxView({ scope, isConnected, accounts, isAdmin, currentUserId
                               {thread.contactName}
                             </span>
                             <div className="flex items-center gap-2 flex-shrink-0">
-                              <span className={cn(
-                                "text-[10px] px-2 py-0.5 rounded-full font-medium",
-                                thread.isUnread
-                                  ? "bg-amber-100 text-amber-700"
-                                  : "bg-emerald-100 text-emerald-700"
-                              )}>
-                                {thread.isUnread ? "Unread" : "Read"}
-                              </span>
+                              {activeLabel === "INBOX" && (
+                                <span className={cn(
+                                  "text-[10px] px-2 py-0.5 rounded-full font-medium",
+                                  thread.isUnread
+                                    ? "bg-amber-100 text-amber-700"
+                                    : "bg-emerald-100 text-emerald-700"
+                                )}>
+                                  {thread.isUnread ? "Unread" : "Read"}
+                                </span>
+                              )}
+                              {activeLabel === "SENT" && thread.opened != null && (
+                                <span className={cn(
+                                  "text-[10px] px-2 py-0.5 rounded-full font-medium",
+                                  thread.opened
+                                    ? "bg-emerald-100 text-emerald-700"
+                                    : "bg-surface-secondary text-text-muted"
+                                )}>
+                                  {thread.opened ? "Opened" : "Sent"}
+                                </span>
+                              )}
                               <span className="text-[10px] text-text-muted">
                                 {formatDate(thread.date)}
                               </span>
@@ -386,21 +419,41 @@ export function InboxView({ scope, isConnected, accounts, isAdmin, currentUserId
                 <div>
                   <h2 className="text-sm font-semibold text-text-primary">{selected.subject || "(no subject)"}</h2>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <span className={cn(
-                      "text-[10px] px-2 py-0.5 rounded-full font-medium",
-                      selected.status === "unread"
-                        ? "bg-amber-100 text-amber-700"
-                        : "bg-emerald-100 text-emerald-700"
-                    )}>
-                      {selected.status === "unread" ? "Unread" : "Read"}
-                    </span>
+                    {activeLabel === "INBOX" && (
+                      <span className={cn(
+                        "text-[10px] px-2 py-0.5 rounded-full font-medium",
+                        selected.status === "unread"
+                          ? "bg-amber-100 text-amber-700"
+                          : "bg-emerald-100 text-emerald-700"
+                      )}>
+                        {selected.status === "unread" ? "Unread" : "Read"}
+                      </span>
+                    )}
                     <p className="text-xs text-text-muted">{selected.messages.length} message{selected.messages.length !== 1 ? "s" : ""}</p>
                   </div>
                 </div>
-                <Button size="sm" variant="secondary" onClick={() => setReplyOpen(true)}>
-                  <ReplyIcon />
-                  Reply
-                </Button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleThreadAction("archive")}
+                    title="Archive"
+                    className="text-text-muted hover:text-text-primary p-1.5 rounded-btn hover:bg-surface-secondary transition-colors"
+                  >
+                    <ArchiveIcon />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleThreadAction("trash")}
+                    title="Delete"
+                    className="text-text-muted hover:text-danger p-1.5 rounded-btn hover:bg-surface-secondary transition-colors"
+                  >
+                    <TrashIconOutline />
+                  </button>
+                  <Button size="sm" variant="secondary" onClick={() => setReplyOpen(true)}>
+                    <ReplyIcon />
+                    Reply
+                  </Button>
+                </div>
               </div>
 
               {/* Message bubbles */}
@@ -545,6 +598,22 @@ function ReplyIcon() {
   return (
     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
+    </svg>
+  );
+}
+
+function ArchiveIcon() {
+  return (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M4.5 6.75v10.5a2.25 2.25 0 002.25 2.25h10.5a2.25 2.25 0 002.25-2.25V6.75M9.75 11.25h4.5M2.25 6.75l1.5-3h16.5l1.5 3" />
+    </svg>
+  );
+}
+
+function TrashIconOutline() {
+  return (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
     </svg>
   );
 }

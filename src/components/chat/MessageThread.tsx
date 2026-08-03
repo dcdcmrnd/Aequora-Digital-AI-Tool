@@ -10,6 +10,7 @@ interface ChatMessage {
   content: string;
   senderId: string;
   createdAt: string;
+  editedAt?: string | null;
   sender: { id: string; name: string; avatarUrl: string | null };
 }
 
@@ -90,6 +91,8 @@ export function MessageThread({ room, currentUserId, currentUserName, isAdmin, o
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const onMessagesReadRef = useRef(onMessagesRead);
@@ -198,6 +201,45 @@ export function MessageThread({ room, currentUserId, currentUserName, isAdmin, o
 
     if (text) {
       await sendMessage(text);
+    }
+  };
+
+  const startEdit = (msg: ChatMessage) => {
+    setEditingId(msg.id);
+    setEditText(msg.content);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditText("");
+  };
+
+  const saveEdit = async (messageId: string) => {
+    const content = editText.trim();
+    if (!content) return;
+    try {
+      const res = await fetch(`/api/chat/rooms/${room.id}/messages/${messageId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setMessages((prev) => prev.map((m) => (m.id === messageId ? data.message : m)));
+      cancelEdit();
+    } catch {
+      console.error("Failed to edit message");
+    }
+  };
+
+  const deleteMessage = async (messageId: string) => {
+    if (!confirm("Delete this message?")) return;
+    try {
+      const res = await fetch(`/api/chat/rooms/${room.id}/messages/${messageId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+      setMessages((prev) => prev.filter((m) => m.id !== messageId));
+    } catch {
+      console.error("Failed to delete message");
     }
   };
 
@@ -372,9 +414,11 @@ export function MessageThread({ room, currentUserId, currentUserName, isAdmin, o
               const prev = messages[i - 1];
               const showAvatar = !isMine && (!prev || prev.senderId !== msg.senderId);
               const parsed = parseContent(msg.content);
+              const isEditing = editingId === msg.id;
+              const canEdit = isMine && !parsed.isAudio && !parsed.isImage;
 
               return (
-                <div key={msg.id} className={cn("flex items-end gap-2", isMine && "flex-row-reverse")}>
+                <div key={msg.id} className={cn("group flex items-end gap-2", isMine && "flex-row-reverse")}>
                   {!isMine ? (
                     showAvatar ? (
                       <Avatar name={msg.sender.name} avatarUrl={msg.sender.avatarUrl} size="sm" />
@@ -383,40 +427,92 @@ export function MessageThread({ room, currentUserId, currentUserName, isAdmin, o
                     )
                   ) : null}
 
+                  {isMine && !isEditing && (
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                      {canEdit && (
+                        <button
+                          type="button"
+                          onClick={() => startEdit(msg)}
+                          className="text-text-muted hover:text-text-primary p-1"
+                          aria-label="Edit message"
+                        >
+                          <PencilIcon />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => deleteMessage(msg.id)}
+                        className="text-text-muted hover:text-danger p-1"
+                        aria-label="Delete message"
+                      >
+                        <TrashIcon />
+                      </button>
+                    </div>
+                  )}
+
                   <div className={cn("max-w-[70%] flex flex-col", isMine && "items-end")}>
                     {showAvatar && !isMine && (
                       <span className="text-[11px] text-text-muted mb-1 ml-1">{msg.sender.name}</span>
                     )}
-                    <div
-                      className={cn(
-                        "rounded-2xl text-sm leading-relaxed overflow-hidden",
-                        isMine
-                          ? "bg-brand-primary text-white rounded-br-sm"
-                          : "bg-surface-secondary text-text-primary rounded-bl-sm",
-                        parsed.isAudio || parsed.isImage ? "min-w-[200px]" : "px-3 py-2"
-                      )}
-                    >
-                      {parsed.isAudio ? (
-                        <AudioPlayer audio={parsed.audio} isMine={isMine} />
-                      ) : parsed.isImage ? (
-                        <div className="max-w-[24rem] rounded-2xl overflow-hidden bg-black/5">
-                          <img
-                            src={parsed.image.url}
-                            alt={parsed.image.alt ?? "Shared image"}
-                            className="w-full h-auto object-cover"
-                          />
-                          {parsed.image.caption ? (
-                            <div className="px-3 py-2 bg-surface-secondary text-text-primary text-sm">
-                              {parsed.image.caption}
-                            </div>
-                          ) : null}
+                    {isEditing ? (
+                      <div className="flex flex-col gap-1.5 w-64">
+                        <textarea
+                          autoFocus
+                          value={editText}
+                          onChange={(e) => setEditText(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              saveEdit(msg.id);
+                            } else if (e.key === "Escape") {
+                              cancelEdit();
+                            }
+                          }}
+                          rows={2}
+                          className="w-full rounded-xl border border-border px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand-primary resize-none"
+                        />
+                        <div className="flex justify-end gap-2">
+                          <button type="button" onClick={cancelEdit} className="text-xs text-text-muted hover:text-text-primary">
+                            Cancel
+                          </button>
+                          <button type="button" onClick={() => saveEdit(msg.id)} className="text-xs text-brand-primary font-medium hover:underline">
+                            Save
+                          </button>
                         </div>
-                      ) : (
-                        <span className="whitespace-pre-wrap break-words">{parsed.text}</span>
-                      )}
-                    </div>
+                      </div>
+                    ) : (
+                      <div
+                        className={cn(
+                          "rounded-2xl text-sm leading-relaxed overflow-hidden",
+                          isMine
+                            ? "bg-brand-primary text-white rounded-br-sm"
+                            : "bg-surface-secondary text-text-primary rounded-bl-sm",
+                          parsed.isAudio || parsed.isImage ? "min-w-[200px]" : "px-3 py-2"
+                        )}
+                      >
+                        {parsed.isAudio ? (
+                          <AudioPlayer audio={parsed.audio} isMine={isMine} />
+                        ) : parsed.isImage ? (
+                          <div className="max-w-[24rem] rounded-2xl overflow-hidden bg-black/5">
+                            <img
+                              src={parsed.image.url}
+                              alt={parsed.image.alt ?? "Shared image"}
+                              className="w-full h-auto object-cover"
+                            />
+                            {parsed.image.caption ? (
+                              <div className="px-3 py-2 bg-surface-secondary text-text-primary text-sm">
+                                {parsed.image.caption}
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <span className="whitespace-pre-wrap break-words">{parsed.text}</span>
+                        )}
+                      </div>
+                    )}
                     <span className="text-[10px] text-text-muted mt-1 mx-1">
                       {formatTime(msg.createdAt)}
+                      {msg.editedAt && " · edited"}
                     </span>
                   </div>
                 </div>
@@ -636,6 +732,23 @@ function AudioPlayer({ audio, isMine }: { audio: AudioMessage; isMine: boolean }
 }
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
+
+function PencilIcon() {
+  return (
+    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+    </svg>
+  );
+}
 
 function MicIcon() {
   return (

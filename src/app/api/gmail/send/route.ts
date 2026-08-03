@@ -1,8 +1,10 @@
+import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { sendEmail } from "@/lib/gmail";
 import { checkPermission } from "@/lib/permissions";
+import { prisma } from "@/lib/prisma";
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -26,7 +28,21 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const result = await sendEmail({ to, subject, body, threadId, inReplyTo, references, fromEmail }, ownerId);
+    const firstRecipient = (to as string).split(",")[0]?.trim();
+    const contact = firstRecipient
+      ? await prisma.contact.findFirst({ where: { email: { equals: firstRecipient, mode: "insensitive" } } })
+      : null;
+
+    const trackingToken = crypto.randomBytes(16).toString("hex");
+    await prisma.emailTracking.create({ data: { token: trackingToken, contactId: contact?.id } });
+
+    const result = await sendEmail({ to, subject, body, threadId, inReplyTo, references, fromEmail, trackingToken }, ownerId);
+
+    await prisma.emailTracking.update({
+      where: { token: trackingToken },
+      data: { gmailMessageId: result.id ?? undefined, gmailThreadId: result.threadId ?? undefined },
+    });
+
     return NextResponse.json(result);
   } catch (err: any) {
     if (err.message?.includes("Gmail not connected")) {
