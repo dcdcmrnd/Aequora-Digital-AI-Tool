@@ -356,6 +356,28 @@ async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string,
             if (opportunity) {
               await prisma.opportunity.update({ where: { id: opportunity.id }, data: { stageId: data.stageId } });
               await logStep(run.id, node.id, node.type, "success", "Opportunity moved to new stage");
+            } else if (systemUserId) {
+              // No opportunity yet for this contact — create one in the
+              // target stage instead of silently no-op'ing, since "move to
+              // stage" is how most workflows expect a contact to actually
+              // land in the pipeline for the first time.
+              const stage = await prisma.pipelineStage.findUnique({ where: { id: data.stageId } });
+              if (stage) {
+                const contact = await prisma.contact.findUnique({ where: { id: run.contactId } });
+                const opportunityName = contact?.name ? `${contact.name}` : "New opportunity";
+                await prisma.opportunity.create({
+                  data: {
+                    name: opportunityName,
+                    contactId: run.contactId,
+                    pipelineId: stage.pipelineId,
+                    stageId: stage.id,
+                    createdById: systemUserId,
+                  },
+                });
+                await logStep(run.id, node.id, node.type, "success", "Created opportunity in this stage (none existed yet)");
+              } else {
+                await logStep(run.id, node.id, node.type, "error", "Configured stage no longer exists");
+              }
             } else {
               await logStep(run.id, node.id, node.type, "success", "No open opportunity found for this contact");
             }

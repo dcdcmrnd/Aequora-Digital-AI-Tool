@@ -82,6 +82,9 @@ export async function POST(req: NextRequest) {
   });
 
   await runAutomationsForTrigger({ triggerType: "contact_created", contactId: contact.id });
+  for (const tag of parsed.data.tags ?? []) {
+    await runAutomationsForTrigger({ triggerType: "tag_added", contactId: contact.id, tag });
+  }
 
   return NextResponse.json(
     { contact: { ...contact, tags: JSON.parse(contact.tags), additionalEmails: JSON.parse(contact.additionalEmails) } },
