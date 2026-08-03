@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
 
   const result = await listLeads({
     category: searchParams.get("category") ?? undefined,
-    city: searchParams.get("city") ?? undefined,
+    location: searchParams.get("location") ?? undefined,
     search: searchParams.get("search") ?? undefined,
     minRating: minRating ? Number(minRating) : undefined,
     minReviews: minReviews ? Number(minReviews) : undefined,

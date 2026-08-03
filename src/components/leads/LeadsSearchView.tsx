@@ -71,6 +71,7 @@ export function LeadsSearchView() {
     filters
       ? {
           category: toTitleCase(filters.keyword),
+          location: filters.location,
           minRating: filters.minRating,
           minReviews: filters.minReviews,
           hasWebsite: filters.hasWebsite === "any" ? undefined : filters.hasWebsite === "has",

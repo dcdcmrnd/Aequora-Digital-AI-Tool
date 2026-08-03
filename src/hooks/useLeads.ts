@@ -7,7 +7,7 @@ import type { Lead } from "@/types";
 
 export interface UseLeadsParams {
   category?: string;
-  city?: string;
+  location?: string;
   minRating?: number;
   minReviews?: number;
   /** true = has a website, false = no website, undefined = both */

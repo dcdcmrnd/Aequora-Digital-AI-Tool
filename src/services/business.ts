@@ -13,7 +13,8 @@ export type LeadSortColumn = "opportunityScore" | "reviewCount" | "rating" | "cr
 
 export interface ListLeadsParams {
   category?: string;
-  city?: string;
+  /** Free-text location as typed in the search form (e.g. "Austin, TX") — matched against city/state/country. */
+  location?: string;
   minRating?: number;
   minReviews?: number;
   /** true = has a website, false = no website, undefined = both */
@@ -35,7 +36,7 @@ export interface ListLeadsResult {
 export async function listLeads(params: ListLeadsParams = {}): Promise<ListLeadsResult> {
   const {
     category,
-    city,
+    location,
     minRating,
     minReviews,
     hasWebsite,
@@ -48,7 +49,21 @@ export async function listLeads(params: ListLeadsParams = {}): Promise<ListLeads
 
   const where: Prisma.LeadWhereInput = {};
   if (category) where.category = { contains: category, mode: "insensitive" };
-  if (city) where.city = { contains: city, mode: "insensitive" };
+  if (location) {
+    // Free text like "Austin, TX" — every comma-separated token must match
+    // somewhere in city/state/country, so a two-part location narrows
+    // correctly instead of a single token (e.g. a stray "TX") over-matching.
+    const tokens = location.split(",").map((t) => t.trim()).filter(Boolean);
+    if (tokens.length > 0) {
+      where.AND = tokens.map((token) => ({
+        OR: [
+          { city: { contains: token, mode: "insensitive" as const } },
+          { state: { contains: token, mode: "insensitive" as const } },
+          { country: { contains: token, mode: "insensitive" as const } },
+        ],
+      }));
+    }
+  }
   if (minRating !== undefined) where.rating = { gte: minRating };
   if (minReviews !== undefined) where.reviewCount = { gte: minReviews };
   if (hasWebsite === true) where.website = { not: null };
