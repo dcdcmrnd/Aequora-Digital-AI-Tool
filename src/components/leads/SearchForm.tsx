@@ -34,6 +34,23 @@ const US_STATES = [
   "Virginia", "Washington", "West Virginia", "Wisconsin", "Wyoming",
 ] as const;
 
+// "United States" first — the default, nationwide option — followed by every
+// state so users can still narrow down without needing to know exact spelling.
+const LOCATION_SUGGESTIONS = ["United States", ...US_STATES];
+
+const BUSINESS_CATEGORIES = [
+  "Restaurants", "Coffee Shops", "Bakeries", "Bars", "Caterers",
+  "Dentists", "Chiropractors", "Physical Therapists", "Veterinarians", "Optometrists",
+  "Lawyers", "Accountants", "Financial Advisors", "Insurance Agencies", "Mortgage Brokers",
+  "Real Estate Agents", "Property Management Companies", "Interior Designers", "Architects",
+  "Plumbers", "Electricians", "HVAC Contractors", "Roofing Contractors", "General Contractors",
+  "Landscaping Services", "Painters", "Locksmiths", "Pest Control Services", "Cleaning Services",
+  "Auto Repair Shops", "Car Dealerships", "Moving Companies",
+  "Hair Salons", "Nail Salons", "Spas", "Gyms & Fitness Centers", "Pet Groomers",
+  "Photographers", "Marketing Agencies", "Web Design Agencies", "IT Services", "Consultants",
+  "Daycare Centers", "Tutoring Services", "Florists",
+] as const;
+
 const searchFormSchema = z.object({
   keyword: z.string().min(1, "Enter a category or keyword"),
   location: z.string().min(1, "Enter a city or location"),
@@ -54,7 +71,7 @@ interface SearchFormProps {
 
 const DEFAULT_VALUES: SearchFormValues = {
   keyword: "",
-  location: "",
+  location: "United States",
   radiusMeters: 8000,
   minRating: undefined,
   minReviews: undefined,
@@ -79,8 +96,13 @@ export function SearchForm({ defaultValues, onSubmit, isSearching }: SearchFormP
               <FormItem className="lg:col-span-2">
                 <FormLabel>Business Category</FormLabel>
                 <FormControl>
-                  <Input placeholder="e.g. plumbers, dentists, coffee shops" {...field} />
+                  <Input placeholder="e.g. plumbers, dentists, coffee shops" list="business-categories" {...field} />
                 </FormControl>
+                <datalist id="business-categories">
+                  {BUSINESS_CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat} />
+                  ))}
+                </datalist>
                 <FormMessage />
               </FormItem>
             )}
@@ -92,11 +114,11 @@ export function SearchForm({ defaultValues, onSubmit, isSearching }: SearchFormP
               <FormItem className="lg:col-span-2">
                 <FormLabel>Location</FormLabel>
                 <FormControl>
-                  <Input placeholder="e.g. Austin, TX" list="us-states" {...field} />
+                  <Input placeholder="United States, or narrow to a city/state" list="us-states" {...field} />
                 </FormControl>
                 <datalist id="us-states">
-                  {US_STATES.map((state) => (
-                    <option key={state} value={state} />
+                  {LOCATION_SUGGESTIONS.map((loc) => (
+                    <option key={loc} value={loc} />
                   ))}
                 </datalist>
                 <FormMessage />
