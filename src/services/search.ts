@@ -31,6 +31,19 @@ export interface ExecuteSearchResult {
 export async function executeSearch(params: ExecuteSearchParams): Promise<ExecuteSearchResult> {
   const radiusMeters = params.radiusMeters ?? 5_000;
 
+  // Created up front (before we know resultsCount) so its id can tag every
+  // lead this search upserts — that tag is what lets the results table show
+  // exactly what this search found later, instead of re-deriving it via
+  // fuzzy category/location text matching against the whole shared table.
+  const searchRow = await prisma.leadSearch.create({
+    data: {
+      userId: params.userId,
+      keyword: params.keyword,
+      location: params.location,
+      radius: radiusMeters,
+    },
+  });
+
   const mapped = await searchBusinesses({
     keyword: params.keyword,
     location: params.location,
@@ -38,7 +51,7 @@ export async function executeSearch(params: ExecuteSearchParams): Promise<Execut
     maxResults: SEARCH_MAX_RESULTS,
   });
 
-  const leads = await upsertLeads(mapped);
+  const leads = await upsertLeads(mapped, searchRow.id);
 
   const results = await mapWithConcurrency(
     leads,
@@ -54,14 +67,9 @@ export async function executeSearch(params: ExecuteSearchParams): Promise<Execut
     },
   );
 
-  const searchRow = await prisma.leadSearch.create({
-    data: {
-      userId: params.userId,
-      keyword: params.keyword,
-      location: params.location,
-      radius: radiusMeters,
-      resultsCount: results.length,
-    },
+  await prisma.leadSearch.update({
+    where: { id: searchRow.id },
+    data: { resultsCount: results.length },
   });
 
   await logActivity({

@@ -24,6 +24,7 @@ export async function GET(req: NextRequest) {
   const pageSize = searchParams.get("pageSize");
 
   const result = await listLeads({
+    searchId: searchParams.get("searchId") ?? undefined,
     category: searchParams.get("category") ?? undefined,
     location: searchParams.get("location") ?? undefined,
     search: searchParams.get("search") ?? undefined,

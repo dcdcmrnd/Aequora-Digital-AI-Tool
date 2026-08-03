@@ -39,7 +39,7 @@ function parseFiltersFromParams(params: URLSearchParams): SearchFormValues | nul
   };
 }
 
-function buildSearchParams(filters: SearchFormValues, page: number): URLSearchParams {
+function buildSearchParams(filters: SearchFormValues, page: number, searchId: string | null): URLSearchParams {
   const params = new URLSearchParams();
   params.set("keyword", filters.keyword);
   params.set("location", filters.location);
@@ -49,6 +49,7 @@ function buildSearchParams(filters: SearchFormValues, page: number): URLSearchPa
   params.set("hasWebsite", filters.hasWebsite);
   params.set("sortBy", filters.sortBy);
   params.set("page", String(page));
+  if (searchId) params.set("searchId", searchId);
   return params;
 }
 
@@ -64,12 +65,17 @@ export function LeadsSearchView() {
   // survive navigating away to a lead's detail page and back.
   const [filters, setFilters] = useState<SearchFormValues | null>(() => parseFiltersFromParams(searchParams));
   const [page, setPage] = useState(() => Number(searchParams.get("page") ?? 1));
+  // Ties the results table to exactly what the most recent search found
+  // (via Lead.lastSearchId) instead of re-deriving "what matched" through
+  // fuzzy category/location text matching against the whole shared table.
+  const [searchId, setSearchId] = useState<string | null>(() => searchParams.get("searchId"));
 
   const savedLeadIds = useMemo(() => new Set((savedLeads ?? []).map((saved) => saved.leadId)), [savedLeads]);
 
   const leads = useLeads(
     filters
       ? {
+          searchId: searchId ?? undefined,
           category: toTitleCase(filters.keyword),
           location: filters.location,
           minRating: filters.minRating,
@@ -83,20 +89,29 @@ export function LeadsSearchView() {
       : { page, pageSize: PAGE_SIZE },
   );
 
-  function updateUrl(nextFilters: SearchFormValues, nextPage: number) {
-    router.replace(`/leads?${buildSearchParams(nextFilters, nextPage)}`, { scroll: false });
+  function updateUrl(nextFilters: SearchFormValues, nextPage: number, nextSearchId: string | null) {
+    router.replace(`/leads?${buildSearchParams(nextFilters, nextPage, nextSearchId)}`, { scroll: false });
   }
 
   function handleSubmit(values: SearchFormValues) {
     setFilters(values);
     setPage(1);
-    updateUrl(values, 1);
-    search.mutate({ keyword: values.keyword, location: values.location, radiusMeters: values.radiusMeters });
+    setSearchId(null);
+    updateUrl(values, 1, null);
+    search.mutate(
+      { keyword: values.keyword, location: values.location, radiusMeters: values.radiusMeters },
+      {
+        onSuccess: (result) => {
+          setSearchId(result.searchId);
+          updateUrl(values, 1, result.searchId);
+        },
+      },
+    );
   }
 
   function handlePageChange(nextPage: number) {
     setPage(nextPage);
-    if (filters) updateUrl(filters, nextPage);
+    if (filters) updateUrl(filters, nextPage, searchId);
   }
 
   function handleSave(lead: Lead) {

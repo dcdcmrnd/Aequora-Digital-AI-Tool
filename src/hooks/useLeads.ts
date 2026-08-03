@@ -6,6 +6,7 @@ import { apiFetch } from "@/lib/api-client";
 import type { Lead } from "@/types";
 
 export interface UseLeadsParams {
+  searchId?: string;
   category?: string;
   location?: string;
   minRating?: number;
