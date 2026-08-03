@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { RoomList } from "./RoomList";
 import { MessageThread } from "./MessageThread";
 import { NewChatModal } from "./NewChatModal";
@@ -25,8 +26,9 @@ interface Props {
 }
 
 export function ChatPageClient({ initialRooms, teamMembers, currentUserId, currentUserName, isAdmin }: Props) {
+  const searchParams = useSearchParams();
   const [rooms, setRooms] = useState<ChatRoom[]>(initialRooms);
-  const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
+  const [activeRoomId, setActiveRoomId] = useState<string | null>(() => searchParams.get("room"));
   const [showNewChat, setShowNewChat] = useState(false);
   const [editingRoom, setEditingRoom] = useState<ChatRoom | null>(null);
   const [mobileShowThread, setMobileShowThread] = useState(false);

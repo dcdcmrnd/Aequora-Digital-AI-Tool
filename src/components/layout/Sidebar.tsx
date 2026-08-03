@@ -7,6 +7,7 @@ import { usePermission } from "@/hooks/usePermission";
 import { Avatar } from "@/components/ui/Avatar";
 import { cn } from "@/lib/utils";
 import { ChatUnreadBadge } from "@/components/chat/ChatUnreadBadge";
+import { SidebarCommunication } from "@/components/layout/SidebarCommunication";
 
 interface NavItem {
   href: string;
@@ -88,26 +89,27 @@ export function Sidebar({ companyName = "Aequora Digital", companyLogoUrl, onClo
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto scrollbar-thin px-3 py-4 space-y-0.5">
-        {/* Workspace */}
-        <p className="px-3 pt-1 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-[#475569]">Workspace</p>
         <NavLink href="/" label="Dashboard" icon={<HomeIcon />} />
-        {canViewProjects && <NavLink href="/projects" label="Projects" icon={<FolderIcon />} />}
-        {canViewTasks && <NavLink href="/tasks" label="My Tasks" icon={<CheckSquareIcon />} />}
-        {canViewNotes && <NavLink href="/notes" label="Notes" icon={<FileTextIcon />} />}
-
-        {/* Clients */}
-        <p className="px-3 pt-4 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-[#475569]">Clients</p>
+        <NavLink href="/calendar" label="Calendar" icon={<CalendarIcon />} />
+        {(isAdmin || canAccessCompanyEmail) && <NavLink href="/inbox" label="Inbox" icon={<InboxIcon />} />}
+        {(isAdmin || canAccessCompanyEmail) && (
+          <NavLink href="/conversations" label="Conversation" icon={<ConversationIcon />} />
+        )}
         {canViewLeads && <NavLink href="/leads" label="Leads" icon={<TargetIcon />} />}
         {canViewContacts && <NavLink href="/contacts" label="Contacts" icon={<ContactIcon />} />}
         {canViewPipeline && <NavLink href="/pipeline" label="Pipeline" icon={<PipelineIcon />} />}
         {canViewAutomation && <NavLink href="/automation" label="Automation" icon={<ZapIcon />} />}
-        {(isAdmin || canAccessCompanyEmail) && <NavLink href="/inbox" label="Inbox" icon={<InboxIcon />} />}
 
-        {/* Team */}
-        <p className="px-3 pt-4 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-[#475569]">Team</p>
+        {/* Workspace */}
+        <p className="px-3 pt-4 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-[#475569]">Workspace</p>
+        {canViewProjects && <NavLink href="/projects" label="Projects" icon={<FolderIcon />} />}
+        {canViewTasks && <NavLink href="/tasks" label="My Tasks" icon={<CheckSquareIcon />} />}
+        {canViewNotes && <NavLink href="/notes" label="Notes" icon={<FileTextIcon />} />}
+
+        {/* Communication */}
+        <p className="px-3 pt-4 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-[#475569]">Communication</p>
         <NavLink href="/chat" label="Chat" icon={<ChatIcon />} badge={<ChatUnreadBadge />} />
-        {canViewTeam && <NavLink href="/team" label="Team" icon={<UsersIcon />} />}
-        <NavLink href="/calendar" label="Calendar" icon={<CalendarIcon />} />
+        {session?.user?.id && <SidebarCommunication currentUserId={session.user.id} />}
       </nav>
 
       {/* User + Settings */}
@@ -121,6 +123,7 @@ export function Sidebar({ companyName = "Aequora Digital", companyLogoUrl, onClo
           <LinkedInIcon />
           LinkedIn
         </a>
+        {canViewTeam && <NavLink href="/team" label="Team" icon={<UsersIcon />} />}
         {isAdmin && (
           <NavLink
             href="/settings"
@@ -267,6 +270,14 @@ function LinkedInIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3">
       <path d="M4.98 3.5C4.98 4.88 3.86 6 2.5 6S0 4.88 0 3.5 1.12 1 2.5 1 4.98 2.12 4.98 3.5zM0 8.5h5V24H0V8.5zm7.5 0h4.75v2.15h.07c.66-1.24 2.27-2.55 4.68-2.55 5 0 5.93 3.29 5.93 7.56V24h-5V14.4c0-2.29-.04-5.24-3.2-5.24-3.2 0-3.69 2.5-3.69 5.08V24h-5V8.5z" />
+    </svg>
+  );
+}
+
+function ConversationIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 0 1-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8Z" />
     </svg>
   );
 }
