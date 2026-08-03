@@ -89,10 +89,16 @@ export async function listLeads(params: ListLeadsParams = {}): Promise<ListLeads
           take: 20,
         })
       : [];
+    const mostRecent = await prisma.lead.findMany({
+      orderBy: { createdAt: "desc" },
+      select: { name: true, category: true, city: true, state: true, country: true, createdAt: true },
+      take: 20,
+    });
     console.log("[DEBUG_LEADS] params:", JSON.stringify({ category, location }));
     console.log("[DEBUG_LEADS] where:", JSON.stringify(where));
     console.log("[DEBUG_LEADS] total with full filter:", total);
     console.log("[DEBUG_LEADS] category-only matches:", JSON.stringify(categoryOnly, null, 2));
+    console.log("[DEBUG_LEADS] most recently created leads (any category):", JSON.stringify(mostRecent, null, 2));
   }
 
   return { leads, total, page, pageSize };
