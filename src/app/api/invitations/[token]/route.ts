@@ -102,6 +102,20 @@ export async function POST(
       data: { acceptedAt: new Date() },
     });
 
+    // New team members also become a Contact (tagged accordingly) so
+    // they show up alongside client contacts with the same custom fields.
+    const nameParts = name.trim().split(/\s+/).filter(Boolean);
+    await tx.contact.create({
+      data: {
+        name,
+        firstName: nameParts[0] || undefined,
+        lastName: nameParts.slice(1).join(" ") || undefined,
+        email: inv.email,
+        tags: JSON.stringify(["team member"]),
+        createdById: newUser.id,
+      },
+    });
+
     return newUser;
   });
 

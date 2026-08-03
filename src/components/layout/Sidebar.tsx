@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { usePermission } from "@/hooks/usePermission";
-import { Avatar } from "@/components/ui/Avatar";
 import { cn } from "@/lib/utils";
 import { ChatUnreadBadge } from "@/components/chat/ChatUnreadBadge";
 import { SidebarCommunication } from "@/components/layout/SidebarCommunication";
@@ -52,7 +51,6 @@ export function Sidebar({ companyName = "Aequora Digital", companyLogoUrl, onClo
   const canViewContacts = usePermission("contacts.view");
   const canViewPipeline = usePermission("pipeline.view");
   const canViewAutomation = usePermission("automation.view");
-  const canViewTeam = usePermission("team.view");
   const canAccessCompanyEmail = usePermission("company.email");
   const isAdmin = session?.user?.role === "admin";
 
@@ -112,44 +110,14 @@ export function Sidebar({ companyName = "Aequora Digital", companyLogoUrl, onClo
         {session?.user?.id && <SidebarCommunication currentUserId={session.user.id} />}
       </nav>
 
-      {/* User + Settings */}
+      {/* Settings */}
       <div className="px-3 py-4 border-t border-white/10 space-y-1">
-        <a
-          href="https://www.linkedin.com/company/aequora-digital-services/posts/?feedView=all"
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-2 px-3 py-2 rounded-btn text-sm text-[#94A3B8] hover:text-white hover:bg-white/5 transition-colors"
-        >
-          <LinkedInIcon />
-          LinkedIn
-        </a>
-        {canViewTeam && <NavLink href="/team" label="Team" icon={<UsersIcon />} />}
         {isAdmin && (
           <NavLink
             href="/settings"
             label="Settings"
             icon={<SettingsIcon />}
           />
-        )}
-        {session?.user && (
-          <Link
-            href="/profile"
-            className="flex items-center gap-3 px-3 py-2 mt-1 rounded-btn hover:bg-white/5 transition-colors"
-          >
-            <Avatar
-              name={session.user.name ?? "?"}
-              avatarUrl={session.user.avatarUrl}
-              size="sm"
-            />
-            <div className="flex-1 min-w-0">
-              <p className="text-white text-sm font-medium truncate">
-                {session.user.name}
-              </p>
-              <p className="text-[#64748B] text-xs truncate capitalize">
-                {session.user.role}
-              </p>
-            </div>
-          </Link>
         )}
       </div>
     </aside>
@@ -205,18 +173,6 @@ function FileTextIcon() {
   );
 }
 
-function UsersIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-    </svg>
-  );
-}
-
-
 function TargetIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -262,14 +218,6 @@ function CalendarIcon() {
       <line x1="16" y1="2" x2="16" y2="6" />
       <line x1="8" y1="2" x2="8" y2="6" />
       <line x1="3" y1="10" x2="21" y2="10" />
-    </svg>
-  );
-}
-
-function LinkedInIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3">
-      <path d="M4.98 3.5C4.98 4.88 3.86 6 2.5 6S0 4.88 0 3.5 1.12 1 2.5 1 4.98 2.12 4.98 3.5zM0 8.5h5V24H0V8.5zm7.5 0h4.75v2.15h.07c.66-1.24 2.27-2.55 4.68-2.55 5 0 5.93 3.29 5.93 7.56V24h-5V14.4c0-2.29-.04-5.24-3.2-5.24-3.2 0-3.69 2.5-3.69 5.08V24h-5V8.5z" />
     </svg>
   );
 }

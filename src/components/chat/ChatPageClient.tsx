@@ -28,7 +28,7 @@ interface Props {
 export function ChatPageClient({ initialRooms, teamMembers, currentUserId, currentUserName, isAdmin }: Props) {
   const searchParams = useSearchParams();
   const [rooms, setRooms] = useState<ChatRoom[]>(initialRooms);
-  const [activeRoomId, setActiveRoomId] = useState<string | null>(() => searchParams.get("room"));
+  const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const [showNewChat, setShowNewChat] = useState(false);
   const [editingRoom, setEditingRoom] = useState<ChatRoom | null>(null);
   const [mobileShowThread, setMobileShowThread] = useState(false);
@@ -43,6 +43,17 @@ export function ChatPageClient({ initialRooms, teamMembers, currentUserId, curre
     }, 5000);
     return () => clearInterval(id);
   }, []);
+
+  // A ?room= link (e.g. from the sidebar) only triggers a query-string
+  // navigation, not a remount — react to it explicitly so clicking a
+  // different room while already on /chat actually switches conversations.
+  useEffect(() => {
+    const roomId = searchParams.get("room");
+    if (!roomId) return;
+    setActiveRoomId(roomId);
+    setRooms((prev) => prev.map((r) => (r.id === roomId ? { ...r, unreadCount: 0 } : r)));
+    setMobileShowThread(true);
+  }, [searchParams]);
 
   const activeRoom = rooms.find((r) => r.id === activeRoomId) ?? null;
 

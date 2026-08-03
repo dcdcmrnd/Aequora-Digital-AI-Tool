@@ -4,6 +4,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 interface Props {
+  teamPanel: React.ReactNode;
   companyPanel: React.ReactNode;
   documentsPanel: React.ReactNode;
   categoriesPanel: React.ReactNode;
@@ -11,6 +12,7 @@ interface Props {
 }
 
 const TABS = [
+  { id: "team", label: "Team" },
   { id: "company", label: "Company Branding" },
   { id: "documents", label: "Documents" },
   { id: "categories", label: "Note Categories" },
@@ -19,8 +21,8 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]["id"];
 
-export function SettingsTabs({ companyPanel, documentsPanel, categoriesPanel, emailPanel }: Props) {
-  const [active, setActive] = useState<TabId>("company");
+export function SettingsTabs({ teamPanel, companyPanel, documentsPanel, categoriesPanel, emailPanel }: Props) {
+  const [active, setActive] = useState<TabId>("team");
 
   return (
     <div>
@@ -41,6 +43,7 @@ export function SettingsTabs({ companyPanel, documentsPanel, categoriesPanel, em
         ))}
       </div>
 
+      {active === "team" && teamPanel}
       {active === "company" && companyPanel}
       {active === "documents" && documentsPanel}
       {active === "categories" && categoriesPanel}

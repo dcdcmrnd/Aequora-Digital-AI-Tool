@@ -1,17 +1,16 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Users } from "lucide-react";
 
+import { useChatHeads } from "@/lib/chatHeadsStore";
 import { cn } from "@/lib/utils";
 
 interface RoomSummary {
   id: string;
   name: string | null;
   isGroup: boolean;
-  members: { id: string; name: string }[];
+  members: { id: string; name: string; avatarUrl: string | null }[];
   unreadCount: number;
 }
 
@@ -28,8 +27,8 @@ interface SidebarCommunicationProps {
 }
 
 export function SidebarCommunication({ currentUserId }: SidebarCommunicationProps) {
-  const pathname = usePathname();
   const [rooms, setRooms] = useState<RoomSummary[]>([]);
+  const { openHead, activeHeadId } = useChatHeads();
 
   useEffect(() => {
     let cancelled = false;
@@ -56,13 +55,14 @@ export function SidebarCommunication({ currentUserId }: SidebarCommunicationProp
   return (
     <div className="space-y-0.5">
       {rooms.slice(0, MAX_ROOMS).map((room) => {
-        const isActive = pathname === "/chat"; // room-level highlight isn't worth a query-param match here
+        const isActive = activeHeadId === room.id;
         return (
-          <Link
+          <button
             key={room.id}
-            href={`/chat?room=${room.id}`}
+            type="button"
+            onClick={() => openHead(room)}
             className={cn(
-              "flex items-center gap-3 rounded-btn px-3 py-1.5 text-sm transition-colors",
+              "flex w-full items-center gap-3 rounded-btn px-3 py-1.5 text-sm transition-colors",
               isActive ? "text-white" : "text-[#94A3B8] hover:bg-white/5 hover:text-white",
             )}
           >
@@ -71,13 +71,13 @@ export function SidebarCommunication({ currentUserId }: SidebarCommunicationProp
             ) : (
               <span className="size-1.5 shrink-0 rounded-full bg-[#475569]" />
             )}
-            <span className="min-w-0 flex-1 truncate">{roomLabel(room, currentUserId)}</span>
+            <span className="min-w-0 flex-1 truncate text-left">{roomLabel(room, currentUserId)}</span>
             {room.unreadCount > 0 && (
               <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-danger text-[9px] font-bold text-white">
                 {room.unreadCount > 9 ? "9+" : room.unreadCount}
               </span>
             )}
-          </Link>
+          </button>
         );
       })}
     </div>
