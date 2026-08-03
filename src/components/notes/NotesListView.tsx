@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { PaginationBar } from "@/components/ui/PaginationBar";
+import { usePagination } from "@/hooks/usePagination";
 import { formatDate, cn } from "@/lib/utils";
 import type { Note } from "@/types";
 import toast from "react-hot-toast";
@@ -25,6 +27,7 @@ export function NotesListView({ notes: initialNotes, categories, projects, canCr
     if (activeCategoryId) return n.categoryId === activeCategoryId;
     return true;
   });
+  const { page, setPage, pageCount, paginated, total } = usePagination(filtered, 20, `${activeCategoryId}-${showPinned}`);
 
   const handleCreate = async (title: string, categoryId: string, projectId: string) => {
     try {
@@ -119,8 +122,9 @@ export function NotesListView({ notes: initialNotes, categories, projects, canCr
               </p>
             </div>
           ) : (
+            <div className="space-y-3">
             <div className="space-y-2">
-              {filtered.map((note) => (
+              {paginated.map((note) => (
                 <div
                   key={note.id}
                   onClick={() => router.push(`/notes/${note.id}`)}
@@ -168,6 +172,8 @@ export function NotesListView({ notes: initialNotes, categories, projects, canCr
                   </div>
                 </div>
               ))}
+            </div>
+            <PaginationBar page={page} pageCount={pageCount} total={total} itemLabel="note" onPageChange={setPage} />
             </div>
           )}
         </div>

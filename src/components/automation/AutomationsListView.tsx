@@ -5,7 +5,9 @@ import { Loader2, Plus, Trash2, Users, Zap } from "lucide-react";
 
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { PaginationBar } from "@/components/ui/PaginationBar";
 import { useAutomations } from "@/hooks/useAutomations";
+import { usePagination } from "@/hooks/usePagination";
 import { usePermission } from "@/hooks/usePermission";
 import { cn } from "@/lib/utils";
 import type { Automation, AutomationTriggerType } from "@/types";
@@ -34,6 +36,7 @@ function summarizeAutomation(automation: Automation): string {
 export function AutomationsListView() {
   const { automations, isLoading, updateAutomation, deleteAutomation } = useAutomations();
   const canManage = usePermission("automation.manage");
+  const { page, setPage, pageCount, paginated, total } = usePagination(automations ?? []);
 
   function handleDelete(automation: Automation) {
     if (!confirm(`Delete automation "${automation.name}"?`)) return;
@@ -60,8 +63,9 @@ export function AutomationsListView() {
       {isLoading ? (
         <p className="text-text-muted text-sm">Loading...</p>
       ) : automations && automations.length > 0 ? (
+        <>
         <div className="flex flex-col gap-3">
-          {automations.map((automation) => {
+          {paginated.map((automation) => {
             const lastRun = automation.runs?.[0];
             return (
               <div
@@ -123,6 +127,8 @@ export function AutomationsListView() {
             );
           })}
         </div>
+        <PaginationBar page={page} pageCount={pageCount} total={total} itemLabel="automation" onPageChange={setPage} />
+        </>
       ) : (
         <p className="text-text-muted text-sm">
           No automations yet. {canManage && "Create one to get started."}

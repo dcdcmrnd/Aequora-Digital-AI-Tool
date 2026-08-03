@@ -5,6 +5,8 @@ import { MessageSquare } from "lucide-react";
 
 import { ContactConversationModal } from "@/components/contacts/ContactConversationModal";
 import { Input } from "@/components/ui/Input";
+import { PaginationBar } from "@/components/ui/PaginationBar";
+import { usePagination } from "@/hooks/usePagination";
 import { useContacts } from "@/hooks/useContacts";
 import type { Contact } from "@/types";
 
@@ -25,6 +27,8 @@ export function ConversationsListView() {
     );
   }, [contacts, search]);
 
+  const { page, setPage, pageCount, paginated, total } = usePagination(filtered, 20, search);
+
   return (
     <div className="space-y-6">
       <div>
@@ -42,26 +46,30 @@ export function ConversationsListView() {
       {isLoading ? (
         <p className="text-text-muted text-sm">Loading...</p>
       ) : filtered.length > 0 ? (
-        <div className="rounded-card border-border overflow-hidden border bg-white">
-          {filtered.map((contact) => (
-            <button
-              key={contact.id}
-              onClick={() => setActive(contact)}
-              className="hover:bg-surface-secondary flex w-full items-center gap-3 border-b border-border px-4 py-3 text-left transition-colors last:border-b-0"
-            >
-              <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
-                <MessageSquare className="size-4" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-text-primary text-sm font-medium">{contact.name}</p>
-                <p className="text-text-muted truncate text-xs">
-                  {contact.email}
-                  {contact.company && ` · ${contact.company}`}
-                </p>
-              </div>
-            </button>
-          ))}
-        </div>
+        <>
+          <div className="rounded-card border-border overflow-hidden border bg-white">
+            {paginated.map((contact) => (
+              <button
+                key={contact.id}
+                onClick={() => setActive(contact)}
+                className="hover:bg-surface-secondary flex w-full items-center gap-3 border-b border-border px-4 py-3 text-left transition-colors last:border-b-0"
+              >
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
+                  <MessageSquare className="size-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-text-primary text-sm font-medium">{contact.name}</p>
+                  <p className="text-text-muted truncate text-xs">
+                    {contact.email}
+                    {contact.company && ` · ${contact.company}`}
+                  </p>
+                </div>
+              </button>
+            ))}
+          </div>
+
+          <PaginationBar page={page} pageCount={pageCount} total={total} itemLabel="contact" onPageChange={setPage} />
+        </>
       ) : (
         <p className="text-text-muted text-sm">
           {search ? `No contacts match "${search}".` : "No contacts with an email address yet."}
