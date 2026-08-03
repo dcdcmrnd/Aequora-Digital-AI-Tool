@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
       body: applyMergeTags(body, SAMPLE_MERGE_VALUES),
       cc: cc ? applyMergeTags(cc, SAMPLE_MERGE_VALUES) : undefined,
       fromEmail,
-    });
+    }, null);
     return NextResponse.json({ success: true });
   } catch (err) {
     if (err instanceof Error && err.message.includes("Gmail not connected")) {

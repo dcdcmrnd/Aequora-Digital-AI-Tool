@@ -4,6 +4,8 @@ import { useState } from "react";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge, StatusBadge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { PaginationBar } from "@/components/ui/PaginationBar";
+import { usePagination } from "@/hooks/usePagination";
 import { InviteUserModal } from "./InviteUserModal";
 import { PendingInvitesList } from "./PendingInvitesList";
 import { EditUserModal } from "./EditUserModal";
@@ -21,6 +23,7 @@ export function TeamView({ users: initialUsers, isAdmin, currentUserId }: Props)
   const [inviteOpen, setInviteOpen] = useState(false);
   const [editUser, setEditUser] = useState<UserProfile | null>(null);
   const [inviteRefresh, setInviteRefresh] = useState(0);
+  const { page, setPage, pageCount, paginated, total } = usePagination(users, 20, tab);
 
   const refreshUsers = async () => {
     const res = await fetch("/api/users");
@@ -74,8 +77,9 @@ export function TeamView({ users: initialUsers, isAdmin, currentUserId }: Props)
 
       {/* Members grid */}
       {tab === "members" && (
+        <div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {users.map((user) => (
+          {paginated.map((user) => (
             <div
               key={user.id}
               className={`bg-white border border-border rounded-card p-4 ${
@@ -105,6 +109,8 @@ export function TeamView({ users: initialUsers, isAdmin, currentUserId }: Props)
               </div>
             </div>
           ))}
+        </div>
+        <PaginationBar page={page} pageCount={pageCount} total={total} itemLabel="member" onPageChange={setPage} />
         </div>
       )}
 

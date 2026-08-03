@@ -1,14 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.redirect(new URL("/login", req.url));
+  }
+
   const { searchParams } = new URL(req.url);
   const code = searchParams.get("code");
+  const scope = searchParams.get("state") === "agency" ? "agency" : "personal";
+  const errorRedirectBase = scope === "agency" ? "/settings" : "/profile";
 
   if (!code) {
-    return NextResponse.redirect(new URL("/settings?error=no_code", req.url));
+    return NextResponse.redirect(new URL(`${errorRedirectBase}?error=no_code`, req.url));
   }
+
+  if (scope === "agency" && session.user.role !== "admin") {
+    return NextResponse.redirect(new URL("/settings?error=forbidden", req.url));
+  }
+
+  const ownerId = scope === "agency" ? null : session.user.id;
 
   const client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
@@ -23,8 +38,13 @@ export async function GET(req: NextRequest) {
     const { data } = await google.oauth2({ version: "v2", auth: client }).userinfo.get();
     if (!data.email) throw new Error("No email on Google account");
 
-    // Multiple agency accounts can be connected side by side; reconnecting the
-    // same account just refreshes its token instead of adding a duplicate.
+    const existing = await prisma.gmailToken.findUnique({ where: { email: data.email }, select: { ownerId: true } });
+    if (existing && existing.ownerId !== ownerId) {
+      return NextResponse.redirect(new URL(`${errorRedirectBase}?error=owner_mismatch`, req.url));
+    }
+
+    // Multiple accounts (per owner) can be connected side by side; reconnecting
+    // the same account just refreshes its token instead of adding a duplicate.
     await prisma.gmailToken.upsert({
       where: { email: data.email },
       update: {
@@ -33,17 +53,19 @@ export async function GET(req: NextRequest) {
         // prompt=consent forced; keep the existing one if this grant omitted it.
         refreshToken: tokens.refresh_token ?? undefined,
         expiryDate: BigInt(tokens.expiry_date ?? 0),
+        ownerId,
       },
       create: {
         email: data.email,
         accessToken: tokens.access_token!,
         refreshToken: tokens.refresh_token ?? "",
         expiryDate: BigInt(tokens.expiry_date ?? 0),
+        ownerId,
       },
     });
 
-    return NextResponse.redirect(new URL("/settings?connected=1", req.url));
+    return NextResponse.redirect(new URL(`${errorRedirectBase}?connected=${scope}`, req.url));
   } catch {
-    return NextResponse.redirect(new URL("/settings?error=auth_failed", req.url));
+    return NextResponse.redirect(new URL(`${errorRedirectBase}?error=auth_failed`, req.url));
   }
 }

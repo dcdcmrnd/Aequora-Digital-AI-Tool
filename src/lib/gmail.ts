@@ -9,11 +9,12 @@ function createOAuthClient() {
   );
 }
 
-export function getAuthUrl() {
+export function getAuthUrl(scope: "agency" | "personal" = "agency") {
   const client = createOAuthClient();
   return client.generateAuthUrl({
     access_type: "offline",
     prompt: "consent",
+    state: scope,
     scope: [
       "https://www.googleapis.com/auth/gmail.modify",
       "https://www.googleapis.com/auth/userinfo.email",
@@ -21,24 +22,25 @@ export function getAuthUrl() {
   });
 }
 
-/** All connected agency accounts, oldest-connected first. */
-export async function getConnectedEmails(): Promise<string[]> {
-  const tokens = await prisma.gmailToken.findMany({ select: { email: true }, orderBy: { updatedAt: "asc" } });
+/** Connected accounts for the given owner (null = shared agency account), oldest-connected first. */
+export async function getConnectedEmails(ownerId: string | null): Promise<string[]> {
+  const tokens = await prisma.gmailToken.findMany({ where: { ownerId }, select: { email: true }, orderBy: { updatedAt: "asc" } });
   return tokens.map((t) => t.email);
 }
 
-/** The default account — the first one connected — used when a caller doesn't specify which. */
-export async function getConnectedEmail(): Promise<string | null> {
-  const token = await prisma.gmailToken.findFirst({ orderBy: { updatedAt: "asc" } });
+/** The default account for the given owner — the first one connected — used when a caller doesn't specify which. */
+export async function getConnectedEmail(ownerId: string | null): Promise<string | null> {
+  const token = await prisma.gmailToken.findFirst({ where: { ownerId }, orderBy: { updatedAt: "asc" } });
   return token?.email ?? null;
 }
 
-export async function getGmailClient(email?: string) {
+export async function getGmailClient(ownerId: string | null, email?: string) {
   const token = email
     ? await prisma.gmailToken.findUnique({ where: { email } })
-    : await prisma.gmailToken.findFirst({ orderBy: { updatedAt: "asc" } });
+    : await prisma.gmailToken.findFirst({ where: { ownerId }, orderBy: { updatedAt: "asc" } });
 
   if (!token) throw new Error("Gmail not connected. Visit /api/gmail/auth to connect.");
+  if (email && token.ownerId !== ownerId) throw new Error("Gmail account not accessible.");
 
   const client = createOAuthClient();
   client.setCredentials({
@@ -110,11 +112,11 @@ export async function sendEmail(fields: {
   references?: string;
   /** When set, appends a 1x1 open-tracking pixel pointed at /api/track/open/{token}. */
   trackingToken?: string;
-  /** Which connected agency account to send from. Defaults to the first connected account. */
+  /** Which connected account to send from. Defaults to the first connected account for the given owner. */
   fromEmail?: string;
-}): Promise<{ id: string | null | undefined; threadId: string | null | undefined }> {
-  const gmail = await getGmailClient(fields.fromEmail);
-  const senderEmail = fields.fromEmail ?? (await getConnectedEmail());
+}, ownerId: string | null): Promise<{ id: string | null | undefined; threadId: string | null | undefined }> {
+  const gmail = await getGmailClient(ownerId, fields.fromEmail);
+  const senderEmail = fields.fromEmail ?? (await getConnectedEmail(ownerId));
 
   const baseUrl = process.env.NEXTAUTH_URL || "https://app.aequoradigital.com";
   const body = fields.trackingToken

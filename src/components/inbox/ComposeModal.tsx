@@ -24,6 +24,7 @@ interface Props {
   references?: string;
   mode?: "compose" | "reply";
   fromEmail?: string;
+  scope: "own" | "agency";
 }
 
 export function ComposeModal({
@@ -37,6 +38,7 @@ export function ComposeModal({
   references,
   mode = "compose",
   fromEmail,
+  scope,
 }: Props) {
   const [to, setTo] = useState(defaultTo);
   const [subject, setSubject] = useState(defaultSubject);
@@ -86,6 +88,7 @@ export function ComposeModal({
           inReplyTo,
           references,
           fromEmail,
+          scope,
         }),
       });
 

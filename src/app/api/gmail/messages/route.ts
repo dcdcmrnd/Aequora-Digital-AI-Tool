@@ -8,15 +8,23 @@ export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const canAccessInbox = session.user.role === "admin" || (await checkPermission(session.user.id, "company.email"));
-  if (!canAccessInbox) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-
   const { searchParams } = new URL(req.url);
+  const scopeParam = searchParams.get("scope");
+  if (scopeParam !== "own" && scopeParam !== "agency") {
+    return NextResponse.json({ error: "Invalid scope" }, { status: 400 });
+  }
+
+  if (scopeParam === "agency") {
+    const canAccessInbox = session.user.role === "admin" || (await checkPermission(session.user.id, "company.email"));
+    if (!canAccessInbox) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const ownerId = scopeParam === "own" ? session.user.id : null;
   const pageToken = searchParams.get("pageToken") ?? undefined;
   const labelId = searchParams.get("label") ?? "INBOX";
 
   try {
-    const gmail = await getGmailClient();
+    const gmail = await getGmailClient(ownerId);
 
     const listRes = await gmail.users.messages.list({
       userId: "me",
@@ -57,6 +65,9 @@ export async function GET(req: NextRequest) {
   } catch (err: any) {
     if (err.message?.includes("Gmail not connected")) {
       return NextResponse.json({ error: "not_connected" }, { status: 503 });
+    }
+    if (err.message?.includes("not accessible")) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     return NextResponse.json({ error: "Failed to fetch messages" }, { status: 500 });
   }

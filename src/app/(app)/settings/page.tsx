@@ -50,7 +50,7 @@ export default async function SettingsPage() {
       include: { uploadedBy: { select: { name: true } } },
       orderBy: { createdAt: "desc" },
     }),
-    getConnectedEmails(),
+    getConnectedEmails(null),
     prisma.user.findMany({
       select: {
         id: true,

@@ -8,14 +8,23 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const canAccessInbox = session.user.role === "admin" || (await checkPermission(session.user.id, "company.email"));
-  if (!canAccessInbox) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const searchParams = new URL(req.url).searchParams;
+  const scopeParam = searchParams.get("scope");
+  if (scopeParam !== "own" && scopeParam !== "agency") {
+    return NextResponse.json({ error: "Invalid scope" }, { status: 400 });
+  }
 
-  const account = new URL(req.url).searchParams.get("email") ?? undefined;
+  if (scopeParam === "agency") {
+    const canAccessInbox = session.user.role === "admin" || (await checkPermission(session.user.id, "company.email"));
+    if (!canAccessInbox) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const ownerId = scopeParam === "own" ? session.user.id : null;
+  const account = searchParams.get("email") ?? undefined;
 
   try {
-    const gmail = await getGmailClient(account);
-    const connectedEmail = (account ?? (await getConnectedEmail()))?.toLowerCase() ?? "";
+    const gmail = await getGmailClient(ownerId, account);
+    const connectedEmail = (account ?? (await getConnectedEmail(ownerId)))?.toLowerCase() ?? "";
 
     const thread = await gmail.users.threads.get({
       userId: "me",
@@ -72,6 +81,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   } catch (err: any) {
     if (err.message?.includes("Gmail not connected")) {
       return NextResponse.json({ error: "not_connected" }, { status: 503 });
+    }
+    if (err.message?.includes("not accessible")) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     return NextResponse.json({ error: "Failed to fetch thread" }, { status: 500 });
   }

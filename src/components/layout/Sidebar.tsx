@@ -89,7 +89,6 @@ export function Sidebar({ companyName = "Aequora Digital", companyLogoUrl, onClo
       <nav className="flex-1 overflow-y-auto scrollbar-thin px-3 py-4 space-y-0.5">
         <NavLink href="/" label="Dashboard" icon={<HomeIcon />} />
         <NavLink href="/calendar" label="Calendar" icon={<CalendarIcon />} />
-        {(isAdmin || canAccessCompanyEmail) && <NavLink href="/inbox" label="Inbox" icon={<InboxIcon />} />}
         {(isAdmin || canAccessCompanyEmail) && (
           <NavLink href="/conversations" label="Conversation" icon={<ConversationIcon />} />
         )}
@@ -108,6 +107,7 @@ export function Sidebar({ companyName = "Aequora Digital", companyLogoUrl, onClo
         <p className="px-3 pt-4 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-[#475569]">Communication</p>
         <NavLink href="/chat" label="Chat" icon={<ChatIcon />} badge={<ChatUnreadBadge />} />
         {session?.user?.id && <SidebarCommunication currentUserId={session.user.id} />}
+        <NavLink href="/inbox" label="Inbox" icon={<InboxIcon />} />
       </nav>
 
       {/* Settings */}

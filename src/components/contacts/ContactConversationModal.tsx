@@ -62,7 +62,7 @@ export function ContactConversationModal({ open, onClose, contactEmail, contactN
     setLoadingList(true);
 
     const q = `from:${contactEmail} OR to:${contactEmail}`;
-    fetch(`/api/gmail/threads?${new URLSearchParams({ q })}`)
+    fetch(`/api/gmail/threads?${new URLSearchParams({ q, scope: "agency" })}`)
       .then((res) => res.json().then((data) => ({ res, data })))
       .then(({ res, data }) => {
         if (!res.ok || !Array.isArray(data.threads)) {
@@ -79,7 +79,7 @@ export function ContactConversationModal({ open, onClose, contactEmail, contactN
   async function openThread(thread: ThreadSummary) {
     setLoadingThread(true);
     try {
-      const res = await fetch(`/api/gmail/threads/${thread.id}`);
+      const res = await fetch(`/api/gmail/threads/${thread.id}?${new URLSearchParams({ scope: "agency" })}`);
       const data = await res.json();
       if (!res.ok || !Array.isArray(data.messages)) {
         toast.error("Couldn't load this conversation.");
@@ -194,6 +194,7 @@ export function ContactConversationModal({ open, onClose, contactEmail, contactN
           open={replyOpen}
           onClose={() => setReplyOpen(false)}
           mode="reply"
+          scope="agency"
           defaultTo={lastMessage.isOutgoing ? lastMessage.to : lastMessage.from}
           defaultSubject={selected.subject.startsWith("Re:") ? selected.subject : `Re: ${selected.subject}`}
           threadId={selected.id}

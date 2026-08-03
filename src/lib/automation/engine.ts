@@ -181,7 +181,7 @@ async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string)
 
           const trackingToken = crypto.randomBytes(16).toString("hex");
           await prisma.automationEmailTracking.create({ data: { token: trackingToken, runId: run.id } });
-          await sendEmail({ to, subject, body, cc, fromEmail: data.fromEmail, trackingToken });
+          await sendEmail({ to, subject, body, cc, fromEmail: data.fromEmail, trackingToken }, null);
 
           await logStep(run.id, node.id, node.type, "success", `Sent to ${to}`);
         } catch (err) {

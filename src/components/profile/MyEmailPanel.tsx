@@ -7,33 +7,49 @@ import toast from "react-hot-toast";
 
 import { Button } from "@/components/ui/Button";
 
-interface AgencyEmailPanelProps {
-  emails: string[];
-}
-
-export function AgencyEmailPanel({ emails }: AgencyEmailPanelProps) {
+export function MyEmailPanel() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [emails, setEmails] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
   const [disconnecting, setDisconnecting] = useState<string | null>(null);
 
+  const refresh = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/gmail/accounts?scope=own");
+      const data = await res.json();
+      setEmails(data.emails ?? []);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    if (searchParams.get("connected") === "agency") {
+    refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (searchParams.get("connected") === "personal") {
       toast.success("Gmail connected");
-      router.replace("/settings");
+      router.replace("/profile");
+      refresh();
     } else if (searchParams.get("error")) {
       toast.error("Failed to connect Gmail. Please try again.");
-      router.replace("/settings");
+      router.replace("/profile");
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, router]);
 
   async function handleDisconnect(email: string) {
-    if (!confirm(`Disconnect ${email}? Automations or inbox activity using this address will stop working until you reconnect.`)) return;
+    if (!confirm(`Disconnect ${email}? Your inbox will stop showing this account's mail until you reconnect.`)) return;
     setDisconnecting(email);
     try {
       const res = await fetch(`/api/gmail/disconnect?email=${encodeURIComponent(email)}`, { method: "DELETE" });
       if (!res.ok) throw new Error();
       toast.success("Gmail disconnected");
-      router.refresh();
+      await refresh();
     } catch {
       toast.error("Failed to disconnect Gmail");
     } finally {
@@ -48,15 +64,14 @@ export function AgencyEmailPanel({ emails }: AgencyEmailPanelProps) {
           <Mail className="size-5" />
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="text-sm font-semibold text-text-primary">Agency Email</h3>
+          <h3 className="text-sm font-semibold text-text-primary">My Email</h3>
           <p className="text-sm text-text-secondary mt-0.5">
-            Connect the Gmail accounts your agency sends from. Used by Conversations, Contact
-            messaging, and Automation email actions. For your own personal inbox, connect it
-            under Profile → My Email instead.
+            Connect your own Gmail account — separate from the shared agency inbox, only visible
+            to you. Used by your Inbox.
           </p>
 
           <div className="mt-4 space-y-2">
-            {emails.length === 0 && (
+            {!loading && emails.length === 0 && (
               <div className="flex items-center justify-between gap-3 rounded-input border border-border bg-surface-secondary px-3 py-2">
                 <span className="text-sm text-text-muted">Not connected</span>
               </div>
@@ -78,7 +93,7 @@ export function AgencyEmailPanel({ emails }: AgencyEmailPanelProps) {
               </div>
             ))}
 
-            <a href="/api/gmail/auth?scope=agency" className="block">
+            <a href="/api/gmail/auth?scope=personal" className="block">
               <Button variant="secondary" size="sm" className="w-full">
                 <Plus className="size-4" />
                 {emails.length === 0 ? "Connect Gmail" : "Connect Another Account"}

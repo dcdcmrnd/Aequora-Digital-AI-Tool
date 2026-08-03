@@ -59,13 +59,14 @@ function getInitials(name: string) {
 }
 
 interface Props {
+  scope: "own" | "agency";
   isConnected: boolean;
   accounts: string[];
   isAdmin: boolean;
   currentUserId: string;
 }
 
-export function InboxView({ isConnected, accounts, isAdmin, currentUserId }: Props) {
+export function InboxView({ scope, isConnected, accounts, isAdmin, currentUserId }: Props) {
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
   const [selected, setSelected] = useState<ThreadDetail | null>(null);
   const [loadingList, setLoadingList] = useState(false);
@@ -86,16 +87,17 @@ export function InboxView({ isConnected, accounts, isAdmin, currentUserId }: Pro
     if (!account) return;
     setLoadingList(true);
     try {
-      const params = new URLSearchParams({ label, email: account });
+      const params = new URLSearchParams({ label, email: account, scope });
       if (pageToken) params.set("pageToken", pageToken);
       const res = await fetch(`/api/gmail/threads?${params}`);
       const data = await res.json();
 
       if (!res.ok || !Array.isArray(data.threads)) {
+        const settingsHint = scope === "own" ? "Profile → My Email" : "Settings → Agency Email";
         const message =
           data.error === "not_connected"
-            ? "Gmail isn't connected. Connect it in Settings → Agency Email."
-            : "Couldn't load your inbox. The Gmail connection may need to be refreshed in Settings → Agency Email.";
+            ? `Gmail isn't connected. Connect it in ${settingsHint}.`
+            : `Couldn't load your inbox. The Gmail connection may need to be refreshed in ${settingsHint}.`;
         setLoadError(message);
         if (data.error !== "not_connected") toast.error(message);
         return;
@@ -109,7 +111,7 @@ export function InboxView({ isConnected, accounts, isAdmin, currentUserId }: Pro
     } finally {
       setLoadingList(false);
     }
-  }, []);
+  }, [scope]);
 
   useEffect(() => {
     if (!isConnected || !activeAccount) return;
@@ -131,7 +133,7 @@ export function InboxView({ isConnected, accounts, isAdmin, currentUserId }: Pro
       prev.map((t) => (t.id === thread.id ? { ...t, isUnread: false } : t))
     );
     try {
-      const res = await fetch(`/api/gmail/threads/${thread.id}?${new URLSearchParams({ email: activeAccount })}`);
+      const res = await fetch(`/api/gmail/threads/${thread.id}?${new URLSearchParams({ email: activeAccount, scope })}`);
       const data = await res.json();
       if (!res.ok || !Array.isArray(data.messages)) {
         toast.error("Couldn't load this conversation.");
@@ -159,12 +161,21 @@ export function InboxView({ isConnected, accounts, isAdmin, currentUserId }: Pro
         <div className="w-16 h-16 rounded-full bg-surface-secondary flex items-center justify-center mb-4">
           <MailIcon className="w-8 h-8 text-text-muted" />
         </div>
-        <h2 className="text-lg font-semibold text-text-primary mb-2">Inbox not connected</h2>
+        <h2 className="text-lg font-semibold text-text-primary mb-2">
+          {scope === "own" ? "No email connected" : "Conversations not connected"}
+        </h2>
         <p className="text-sm text-text-secondary mb-6 max-w-sm">
-          Connect your agency Google account to view and send emails from the workspace.
+          {scope === "own"
+            ? "Connect your own Gmail account to view and send your email from the workspace."
+            : "Connect the agency Google account to view and send emails from the workspace."}
         </p>
-        {isAdmin ? (
-          <Button onClick={() => (window.location.href = "/api/gmail/auth")}>
+        {scope === "own" ? (
+          <Button onClick={() => (window.location.href = "/api/gmail/auth?scope=personal")}>
+            <LinkIcon />
+            Connect Gmail
+          </Button>
+        ) : isAdmin ? (
+          <Button onClick={() => (window.location.href = "/api/gmail/auth?scope=agency")}>
             <LinkIcon />
             Connect Gmail
           </Button>
@@ -201,7 +212,9 @@ export function InboxView({ isConnected, accounts, isAdmin, currentUserId }: Pro
           </button>
         ) : (
           <div>
-            <h1 className="text-base md:text-lg font-semibold text-text-primary leading-tight">Inbox</h1>
+            <h1 className="text-base md:text-lg font-semibold text-text-primary leading-tight">
+              {scope === "own" ? "Inbox" : "Conversations"}
+            </h1>
             {accounts.length > 1 ? (
               <select
                 value={activeAccount}
@@ -484,6 +497,7 @@ export function InboxView({ isConnected, accounts, isAdmin, currentUserId }: Pro
         onClose={() => setComposeOpen(false)}
         mode="compose"
         fromEmail={activeAccount}
+        scope={scope}
       />
 
       {/* Reply modal */}
@@ -493,6 +507,7 @@ export function InboxView({ isConnected, accounts, isAdmin, currentUserId }: Pro
           onClose={() => setReplyOpen(false)}
           mode="reply"
           fromEmail={activeAccount}
+          scope={scope}
           defaultTo={lastMessage.isOutgoing ? lastMessage.to : lastMessage.from}
           defaultSubject={selected.subject.startsWith("Re:") ? selected.subject : `Re: ${selected.subject}`}
           threadId={selected.id}

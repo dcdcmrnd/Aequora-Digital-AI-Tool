@@ -46,6 +46,7 @@ model User {
   opportunitiesCreated Opportunity[] @relation("OpportunityCreator")
   automationsCreated   Automation[]  @relation("AutomationCreator")
   passwordResetTokens  PasswordResetToken[]
+  gmailTokens          GmailToken[]         @relation("GmailTokenOwner")
 }
 
 model Invitation {
@@ -323,6 +324,10 @@ model GmailToken {
   refreshToken String
   expiryDate   BigInt
   updatedAt    DateTime @updatedAt
+  ownerId      String?
+  owner        User?    @relation("GmailTokenOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId])
 }
 
 // --- Leads / Prospecting ---

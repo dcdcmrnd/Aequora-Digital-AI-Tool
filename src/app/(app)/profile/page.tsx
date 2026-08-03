@@ -2,14 +2,15 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { ProfileForm } from "@/components/profile/ProfileForm";
+import { MyEmailPanel } from "@/components/profile/MyEmailPanel";
 
 export default async function ProfilePage() {
   const session = await getServerSession(authOptions);
   if (!session) redirect("/login");
 
   return (
-    <div className="max-w-xl">
-      <div className="mb-6">
+    <div className="max-w-xl space-y-6">
+      <div>
         <h1 className="text-xl font-semibold text-text-primary">My Profile</h1>
         <p className="text-sm text-text-secondary mt-0.5">Update your name, avatar, and password</p>
       </div>
@@ -19,6 +20,7 @@ export default async function ProfilePage() {
         email={session.user.email ?? ""}
         role={session.user.role}
       />
+      <MyEmailPanel />
     </div>
   );
 }
