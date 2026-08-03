@@ -26,6 +26,7 @@ function summarizeCondition(data: Record<string, unknown>): string {
   if (conditionType === "email_opened") return "Was the email opened?";
   if (conditionType === "has_tag") return data.tag ? `Contact has tag: "${data.tag}"?` : "Click to configure";
   if (conditionType === "opportunity_at_stage") return data.stageName ? `Opportunity at stage "${data.stageName}"?` : "Click to configure";
+  if (conditionType === "days_since_entered") return data.days ? `${data.days} day(s) passed?` : "Click to configure";
   return "Click to configure";
 }
 

@@ -33,10 +33,14 @@ function nextNodeId(flow: AutomationFlow, fromNodeId: string, sourceHandle?: str
   return edge?.target;
 }
 
+function sameTag(a?: string, b?: string): boolean {
+  return (a ?? "").trim().toLowerCase() === (b ?? "").trim().toLowerCase();
+}
+
 function triggerMatches(triggerNode: AutomationNode, event: TriggerEvent): boolean {
   const data = triggerNode.data as { triggerType?: TriggerType; tag?: string; stageId?: string };
   if (data.triggerType !== event.triggerType) return false;
-  if (event.triggerType === "tag_added" && data.tag !== event.tag) return false;
+  if (event.triggerType === "tag_added" && !sameTag(data.tag, event.tag)) return false;
   if (event.triggerType === "opportunity_stage_changed" && data.stageId !== event.stageId) return false;
   return true;
 }
@@ -91,6 +95,37 @@ export async function runAutomationsForTrigger(event: TriggerEvent): Promise<voi
   } catch {
     // Never let automation firing break the triggering request.
   }
+}
+
+/**
+ * Manually enrolls a contact into an automation's flow, skipping trigger
+ * matching entirely (e.g. a bulk "Add to Workflow" action from the Contacts
+ * list). Returns false if the contact is already running or waiting in
+ * this automation, or if the trigger has no action attached yet.
+ */
+export async function enrollContactInAutomation(automationId: string, contactId: string): Promise<boolean> {
+  const automation = await prisma.automation.findUnique({ where: { id: automationId } });
+  if (!automation) return false;
+
+  const existing = await prisma.automationRun.findFirst({
+    where: { automationId, contactId, status: { in: ["running", "waiting"] } },
+  });
+  if (existing) return false;
+
+  const flow = parseFlow(automation.flow);
+  const triggerNode = flow.nodes.find((n) => n.type === "trigger");
+  if (!triggerNode) return false;
+
+  const firstNodeId = nextNodeId(flow, triggerNode.id);
+  if (!firstNodeId) return false;
+
+  const run = await prisma.automationRun.create({
+    data: { automationId, contactId, status: "running", currentNodeId: firstNodeId },
+  });
+
+  await logStep(run.id, triggerNode.id, triggerNode.type, "success", "Manually added to workflow");
+  await runLoop(run.id, flow, firstNodeId);
+  return true;
 }
 
 /** Resumes a run paused at a "wait" node — called by the cron sweep or the open-tracking pixel. */
@@ -158,13 +193,14 @@ async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string)
           if (run.contactId) {
             const contact = await prisma.contact.findUnique({ where: { id: run.contactId } });
             const data = node.data as { tag?: string };
-            if (contact && data.tag) {
+            const tagToAdd = data.tag?.trim().toLowerCase();
+            if (contact && tagToAdd) {
               const tags = JSON.parse(contact.tags) as string[];
-              if (!tags.includes(data.tag)) {
-                tags.push(data.tag);
+              if (!tags.some((t) => sameTag(t, tagToAdd))) {
+                tags.push(tagToAdd);
                 await prisma.contact.update({ where: { id: contact.id }, data: { tags: JSON.stringify(tags) } });
               }
-              await logStep(run.id, node.id, node.type, "success", `Tag added: ${data.tag}`);
+              await logStep(run.id, node.id, node.type, "success", `Tag added: ${tagToAdd}`);
             } else {
               await logStep(run.id, node.id, node.type, "success", "No tag configured");
             }
@@ -206,14 +242,14 @@ async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string)
 
       if (node.type === "condition") {
         try {
-          const data = node.data as { conditionType?: string; tag?: string; stageId?: string };
+          const data = node.data as { conditionType?: string; tag?: string; stageId?: string; days?: number };
           let result = false;
           let detail: string;
 
           if (data.conditionType === "has_tag") {
             const contact = run.contactId ? await prisma.contact.findUnique({ where: { id: run.contactId } }) : null;
             const tags = contact ? (JSON.parse(contact.tags) as string[]) : [];
-            result = !!data.tag && tags.includes(data.tag);
+            result = !!data.tag && tags.some((t) => sameTag(t, data.tag));
             detail = `Contact has tag "${data.tag ?? ""}"`;
           } else if (data.conditionType === "opportunity_at_stage") {
             const opportunity = run.contactId
@@ -221,6 +257,11 @@ async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string)
               : null;
             result = !!data.stageId && opportunity?.stageId === data.stageId;
             detail = "Opportunity at configured stage";
+          } else if (data.conditionType === "days_since_entered") {
+            const days = data.days ?? 0;
+            const elapsedMs = Date.now() - run.createdAt.getTime();
+            result = days > 0 && elapsedMs >= days * 24 * 60 * 60 * 1000;
+            detail = `${days} day${days === 1 ? "" : "s"} since entering the workflow`;
           } else {
             // "email_opened" (also the fallback for older runs saved before conditionType existed)
             const lastTracked = await prisma.automationEmailTracking.findFirst({

@@ -2,7 +2,7 @@ export type AutomationNodeType = "trigger" | "send_email" | "add_tag" | "move_pi
 
 export type TriggerType = "contact_created" | "tag_added" | "opportunity_stage_changed";
 
-export type ConditionType = "email_opened" | "has_tag" | "opportunity_at_stage";
+export type ConditionType = "email_opened" | "has_tag" | "opportunity_at_stage" | "days_since_entered";
 
 export type WaitUnit = "minutes" | "hours" | "days";
 

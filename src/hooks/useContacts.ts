@@ -96,3 +96,11 @@ export function useContacts() {
 
   return { ...query, contacts: query.data?.contacts, createContact, updateContact, deleteContact, importContacts };
 }
+
+export function useContactTags() {
+  const query = useQuery({
+    queryKey: ["contact-tags"],
+    queryFn: () => apiFetch<{ tags: string[] }>("/api/contacts/tags"),
+  });
+  return { ...query, tags: query.data?.tags ?? [] };
+}

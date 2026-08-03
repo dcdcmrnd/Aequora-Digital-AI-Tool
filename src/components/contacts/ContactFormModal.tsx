@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { TagInput } from "@/components/ui/TagInput";
 import { Textarea } from "@/components/ui/Textarea";
-import { type ContactInput, useContacts } from "@/hooks/useContacts";
+import { type ContactInput, useContactTags, useContacts } from "@/hooks/useContacts";
 import { usePermission } from "@/hooks/usePermission";
 import type { Contact } from "@/types";
 
@@ -61,6 +61,7 @@ function toFormState(source?: Partial<Contact> | Partial<ContactInput>): FormSta
 
 export function ContactFormModal({ open, onClose, contact, prefill, onSaved }: ContactFormModalProps) {
   const { createContact, updateContact } = useContacts();
+  const { tags: tagSuggestions } = useContactTags();
   const [form, setForm] = useState<FormState>(() => toFormState(contact ?? prefill));
   const isEditing = !!contact;
   const isSaving = createContact.isPending || updateContact.isPending;
@@ -167,7 +168,12 @@ export function ContactFormModal({ open, onClose, contact, prefill, onSaved }: C
         </div>
 
         <Field label="Tags">
-          <TagInput tags={form.tags} onChange={(tags) => set("tags", tags)} placeholder="Type a tag and press Enter" />
+          <TagInput
+            tags={form.tags}
+            onChange={(tags) => set("tags", tags)}
+            placeholder="Type a tag and press Enter"
+            suggestions={tagSuggestions}
+          />
         </Field>
 
         <Field label="Notes">

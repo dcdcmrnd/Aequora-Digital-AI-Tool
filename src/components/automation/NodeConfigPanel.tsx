@@ -21,6 +21,7 @@ const CONDITION_OPTIONS: { value: AutomationConditionType; label: string }[] = [
   { value: "email_opened", label: "Email was opened" },
   { value: "has_tag", label: "Contact has tag" },
   { value: "opportunity_at_stage", label: "Contact's opportunity is at stage" },
+  { value: "days_since_entered", label: "Days have passed" },
 ];
 
 const NODE_TITLES: Record<AutomationNodeType, string> = {
@@ -308,6 +309,18 @@ export function NodeConfigPanel({ node, stages, onClose, onSave, onDelete, canDe
                     ))}
                   </SelectContent>
                 </Select>
+              </Field>
+            )}
+
+            {data.conditionType === "days_since_entered" && (
+              <Field label="Days since entering this workflow">
+                <Input
+                  type="number"
+                  min={1}
+                  value={(data.days as number) ?? ""}
+                  onChange={(e) => set("days", Number(e.target.value))}
+                  placeholder="e.g. 4"
+                />
               </Field>
             )}
 

@@ -15,13 +15,17 @@ import type { Contact } from "@/types";
 interface ContactsTableProps {
   contacts: Contact[];
   canManage: boolean;
+  selectedIds: Set<string>;
+  onToggle: (id: string) => void;
+  onToggleAll: () => void;
 }
 
-export function ContactsTable({ contacts, canManage }: ContactsTableProps) {
+export function ContactsTable({ contacts, canManage, selectedIds, onToggle, onToggleAll }: ContactsTableProps) {
   const { deleteContact } = useContacts();
   const [editing, setEditing] = useState<Contact | null>(null);
   const [conversationContact, setConversationContact] = useState<Contact | null>(null);
   const canAccessInbox = usePermission("company.email");
+  const allSelected = contacts.length > 0 && contacts.every((c) => selectedIds.has(c.id));
 
   function handleDelete(contact: Contact) {
     if (!confirm(`Delete contact "${contact.name}"?`)) return;
@@ -41,6 +45,17 @@ export function ContactsTable({ contacts, canManage }: ContactsTableProps) {
       <Table>
         <TableHeader>
           <TableRow>
+            {canManage && (
+              <TableHead className="w-8">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={onToggleAll}
+                  className="text-brand-primary focus:ring-brand-primary size-4 rounded border-border"
+                  aria-label="Select all contacts"
+                />
+              </TableHead>
+            )}
             <TableHead>Name</TableHead>
             <TableHead>Email</TableHead>
             <TableHead>Phone</TableHead>
@@ -54,6 +69,17 @@ export function ContactsTable({ contacts, canManage }: ContactsTableProps) {
             const socialLinks = socialLinksFor(contact);
             return (
               <TableRow key={contact.id}>
+                {canManage && (
+                  <TableCell>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(contact.id)}
+                      onChange={() => onToggle(contact.id)}
+                      className="text-brand-primary focus:ring-brand-primary size-4 rounded border-border"
+                      aria-label={`Select ${contact.name}`}
+                    />
+                  </TableCell>
+                )}
                 <TableCell>
                   <p className="text-text-primary font-medium">{contact.name}</p>
                   {contact.company && <p className="text-text-muted text-xs">{contact.company}</p>}

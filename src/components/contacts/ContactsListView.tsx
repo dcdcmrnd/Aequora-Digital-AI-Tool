@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Plus, Upload } from "lucide-react";
 
+import { BulkActionsBar } from "@/components/contacts/BulkActionsBar";
 import { ContactFormModal } from "@/components/contacts/ContactFormModal";
 import { ContactsTable } from "@/components/contacts/ContactsTable";
 import { ImportContactsModal } from "@/components/contacts/ImportContactsModal";
@@ -17,6 +18,7 @@ export function ContactsListView() {
   const [search, setSearch] = useState("");
   const [adding, setAdding] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const filtered = useMemo(() => {
     if (!contacts) return [];
@@ -31,8 +33,25 @@ export function ContactsListView() {
     );
   }, [contacts, search]);
 
+  function toggleOne(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    setSelectedIds((prev) => {
+      const allSelected = filtered.length > 0 && filtered.every((c) => prev.has(c.id));
+      if (allSelected) return new Set();
+      return new Set(filtered.map((c) => c.id));
+    });
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-text-primary text-2xl font-semibold tracking-tight">Contacts</h1>
@@ -59,10 +78,24 @@ export function ContactsListView() {
         className="max-w-sm"
       />
 
+      {canManage && selectedIds.size > 0 && (
+        <BulkActionsBar
+          selectedIds={Array.from(selectedIds)}
+          onClear={() => setSelectedIds(new Set())}
+          onDone={() => setSelectedIds(new Set())}
+        />
+      )}
+
       {isLoading ? (
         <p className="text-text-muted text-sm">Loading...</p>
       ) : filtered.length > 0 ? (
-        <ContactsTable contacts={filtered} canManage={canManage} />
+        <ContactsTable
+          contacts={filtered}
+          canManage={canManage}
+          selectedIds={selectedIds}
+          onToggle={toggleOne}
+          onToggleAll={toggleAll}
+        />
       ) : (
         <p className="text-text-muted text-sm">
           {search ? `No contacts match "${search}".` : "No contacts yet. Add one, or save a lead as a contact."}

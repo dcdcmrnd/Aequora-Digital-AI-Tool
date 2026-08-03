@@ -352,7 +352,7 @@ export interface Opportunity {
 
 export type AutomationTriggerType = "contact_created" | "tag_added" | "opportunity_stage_changed";
 export type AutomationNodeType = "trigger" | "send_email" | "add_tag" | "move_pipeline_stage" | "condition" | "wait";
-export type AutomationConditionType = "email_opened" | "has_tag" | "opportunity_at_stage";
+export type AutomationConditionType = "email_opened" | "has_tag" | "opportunity_at_stage" | "days_since_entered";
 
 export interface AutomationNode {
   id: string;

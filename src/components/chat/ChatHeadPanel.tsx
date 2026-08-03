@@ -97,7 +97,10 @@ export function ChatHeadPanel({ room, currentUserId, onClose }: Props) {
           messages.map((m) => {
             const isOwn = m.senderId === currentUserId;
             return (
-              <div key={m.id} className={cn("flex", isOwn ? "justify-end" : "justify-start")}>
+              <div key={m.id} className={cn("flex flex-col", isOwn ? "items-end" : "items-start")}>
+                {!isOwn && (
+                  <span className="text-text-muted mb-0.5 ml-1 text-[10px] font-medium">{m.sender.name}</span>
+                )}
                 <div
                   className={cn(
                     "max-w-[75%] rounded-2xl px-3 py-1.5 text-sm",
