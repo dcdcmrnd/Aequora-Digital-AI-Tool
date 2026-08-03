@@ -1,7 +1,7 @@
 "use client";
 
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { Clock, GitBranch, Mail, Tag, Zap, type LucideIcon } from "lucide-react";
+import { Clock, GitBranch, Mail, Tag, TagsIcon, Zap, type LucideIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import type { AutomationNodeType } from "@/types";
@@ -10,6 +10,7 @@ export const NODE_META: Record<AutomationNodeType, { icon: LucideIcon; label: st
   trigger: { icon: Zap, label: "Trigger", accent: "bg-brand-primary/10 text-brand-primary" },
   send_email: { icon: Mail, label: "Send Email", accent: "bg-brand-primary/10 text-brand-primary" },
   add_tag: { icon: Tag, label: "Add Tag", accent: "bg-emerald-50 text-emerald-600" },
+  remove_tag: { icon: TagsIcon, label: "Remove Tag", accent: "bg-red-50 text-danger" },
   move_pipeline_stage: { icon: GitBranch, label: "Move Stage", accent: "bg-blue-50 text-blue-600" },
   condition: { icon: GitBranch, label: "Condition", accent: "bg-blue-50 text-blue-600" },
   wait: { icon: Clock, label: "Wait", accent: "bg-purple-50 text-purple-600" },
@@ -42,6 +43,8 @@ function summarize(type: AutomationNodeType, data: Record<string, unknown>): str
       return (data.subject as string) || "Click to configure";
     case "add_tag":
       return data.tag ? `Tag: "${data.tag}"` : "Click to configure";
+    case "remove_tag":
+      return data.tag ? `Remove tag: "${data.tag}"` : "Click to configure";
     case "move_pipeline_stage":
       return data.stageName ? `Move to "${data.stageName}"` : "Click to configure";
     case "condition":

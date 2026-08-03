@@ -15,6 +15,7 @@ const updateSchema = z.object({
   lastName: z.string().nullable().optional(),
   company: z.string().nullable().optional(),
   email: z.string().nullable().optional(),
+  additionalEmails: z.array(z.string()).optional(),
   phone: z.string().nullable().optional(),
   website: z.string().nullable().optional(),
   facebookUrl: z.string().nullable().optional(),
@@ -39,7 +40,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   });
   if (!contact) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  return NextResponse.json({ contact: { ...contact, tags: JSON.parse(contact.tags) } });
+  return NextResponse.json({
+    contact: { ...contact, tags: JSON.parse(contact.tags), additionalEmails: JSON.parse(contact.additionalEmails) },
+  });
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
@@ -64,6 +67,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (parsed.data.lastName !== undefined) data.lastName = parsed.data.lastName;
   if (parsed.data.company !== undefined) data.company = parsed.data.company;
   if (parsed.data.email !== undefined) data.email = parsed.data.email;
+  if (parsed.data.additionalEmails !== undefined) data.additionalEmails = JSON.stringify(parsed.data.additionalEmails);
   if (parsed.data.phone !== undefined) data.phone = parsed.data.phone;
   if (parsed.data.website !== undefined) data.website = parsed.data.website;
   if (parsed.data.facebookUrl !== undefined) data.facebookUrl = parsed.data.facebookUrl;
@@ -96,7 +100,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
   }
 
-  return NextResponse.json({ contact: { ...updated, tags: JSON.parse(updated.tags) } });
+  return NextResponse.json({
+    contact: { ...updated, tags: JSON.parse(updated.tags), additionalEmails: JSON.parse(updated.additionalEmails) },
+  });
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {

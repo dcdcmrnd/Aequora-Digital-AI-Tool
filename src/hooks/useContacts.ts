@@ -13,6 +13,7 @@ export interface ContactInput {
   lastName?: string;
   company?: string;
   email?: string;
+  additionalEmails?: string[];
   phone?: string;
   website?: string;
   facebookUrl?: string;

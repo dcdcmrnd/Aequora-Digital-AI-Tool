@@ -2,7 +2,7 @@
 
 import type { NodeProps } from "@xyflow/react";
 import { Handle, Position } from "@xyflow/react";
-import { GitBranch, Mail, Plus, Tag, Clock } from "lucide-react";
+import { GitBranch, Mail, Plus, Tag, TagsIcon, Clock } from "lucide-react";
 
 import { Dropdown } from "@/components/ui/Dropdown";
 import type { AutomationNodeType } from "@/types";
@@ -10,6 +10,7 @@ import type { AutomationNodeType } from "@/types";
 export const ADD_STEP_OPTIONS: { type: AutomationNodeType; label: string; icon: typeof Mail }[] = [
   { type: "send_email", label: "Send Email", icon: Mail },
   { type: "add_tag", label: "Add Tag", icon: Tag },
+  { type: "remove_tag", label: "Remove Tag", icon: TagsIcon },
   { type: "move_pipeline_stage", label: "Move Pipeline Stage", icon: GitBranch },
   { type: "condition", label: "If / Else Condition", icon: GitBranch },
   { type: "wait", label: "Wait", icon: Clock },

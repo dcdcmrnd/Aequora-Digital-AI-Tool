@@ -1,4 +1,4 @@
-export type AutomationNodeType = "trigger" | "send_email" | "add_tag" | "move_pipeline_stage" | "condition" | "wait";
+export type AutomationNodeType = "trigger" | "send_email" | "add_tag" | "remove_tag" | "move_pipeline_stage" | "condition" | "wait";
 
 export type TriggerType = "contact_created" | "tag_added" | "opportunity_stage_changed";
 

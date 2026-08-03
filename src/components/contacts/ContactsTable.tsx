@@ -86,9 +86,17 @@ export function ContactsTable({ contacts, canManage, selectedIds, onToggle, onTo
                 </TableCell>
                 <TableCell>
                   {contact.email ? (
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-text-primary">{contact.email}</span>
-                      <CopyButton value={contact.email} label="Email" />
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-text-primary">{contact.email}</span>
+                        <CopyButton value={contact.email} label="Email" />
+                      </div>
+                      {contact.additionalEmails.map((email) => (
+                        <div key={email} className="flex items-center gap-1.5">
+                          <span className="text-text-muted text-xs">{email}</span>
+                          <CopyButton value={email} label="Email" />
+                        </div>
+                      ))}
                     </div>
                   ) : (
                     <span className="text-text-muted">—</span>

@@ -175,11 +175,15 @@ async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string)
           const body = applyMergeTags(data.body ?? "", mergeValues);
           const cc = data.cc ? applyMergeTags(data.cc, mergeValues) : undefined;
 
+          const additionalEmails = JSON.parse(contact.additionalEmails) as string[];
+          const allRecipients = Array.from(new Set([contact.email, ...additionalEmails].filter(Boolean))) as string[];
+          const to = allRecipients.join(", ");
+
           const trackingToken = crypto.randomBytes(16).toString("hex");
           await prisma.automationEmailTracking.create({ data: { token: trackingToken, runId: run.id } });
-          await sendEmail({ to: contact.email, subject, body, cc, fromEmail: data.fromEmail, trackingToken });
+          await sendEmail({ to, subject, body, cc, fromEmail: data.fromEmail, trackingToken });
 
-          await logStep(run.id, node.id, node.type, "success", `Sent to ${contact.email}`);
+          await logStep(run.id, node.id, node.type, "success", `Sent to ${to}`);
         } catch (err) {
           await logStep(run.id, node.id, node.type, "error", err instanceof Error ? err.message : "Unknown error");
           throw err;
@@ -201,6 +205,33 @@ async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string)
                 await prisma.contact.update({ where: { id: contact.id }, data: { tags: JSON.stringify(tags) } });
               }
               await logStep(run.id, node.id, node.type, "success", `Tag added: ${tagToAdd}`);
+            } else {
+              await logStep(run.id, node.id, node.type, "success", "No tag configured");
+            }
+          } else {
+            await logStep(run.id, node.id, node.type, "success", "No contact for this run");
+          }
+        } catch (err) {
+          await logStep(run.id, node.id, node.type, "error", err instanceof Error ? err.message : "Unknown error");
+          throw err;
+        }
+        currentNodeId = nextNodeId(flow, node.id);
+        continue;
+      }
+
+      if (node.type === "remove_tag") {
+        try {
+          if (run.contactId) {
+            const contact = await prisma.contact.findUnique({ where: { id: run.contactId } });
+            const data = node.data as { tag?: string };
+            const tagToRemove = data.tag?.trim().toLowerCase();
+            if (contact && tagToRemove) {
+              const tags = JSON.parse(contact.tags) as string[];
+              const nextTags = tags.filter((t) => !sameTag(t, tagToRemove));
+              if (nextTags.length !== tags.length) {
+                await prisma.contact.update({ where: { id: contact.id }, data: { tags: JSON.stringify(nextTags) } });
+              }
+              await logStep(run.id, node.id, node.type, "success", `Tag removed: ${tagToRemove}`);
             } else {
               await logStep(run.id, node.id, node.type, "success", "No tag configured");
             }

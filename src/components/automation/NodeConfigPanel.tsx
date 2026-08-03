@@ -28,6 +28,7 @@ const NODE_TITLES: Record<AutomationNodeType, string> = {
   trigger: "Trigger",
   send_email: "Send Email",
   add_tag: "Add Tag",
+  remove_tag: "Remove Tag",
   move_pipeline_stage: "Move Pipeline Stage",
   condition: "Condition",
   wait: "Wait",
@@ -50,6 +51,7 @@ export function NodeConfigPanel({ node, stages, onClose, onSave, onDelete, canDe
   const [accounts, setAccounts] = useState<string[]>([]);
   const [testEmail, setTestEmail] = useState("");
   const [testSending, setTestSending] = useState(false);
+  const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
 
   useEffect(() => {
     setData(node.data);
@@ -59,6 +61,13 @@ export function NodeConfigPanel({ node, stages, onClose, onSave, onDelete, canDe
     fetch("/api/gmail/accounts")
       .then((res) => res.json())
       .then((d) => setAccounts(d.emails ?? []))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/contacts/tags")
+      .then((res) => res.json())
+      .then((d) => setTagSuggestions(d.tags ?? []))
       .catch(() => {});
   }, []);
 
@@ -235,8 +244,32 @@ export function NodeConfigPanel({ node, stages, onClose, onSave, onDelete, canDe
 
         {node.type === "add_tag" && (
           <Field label="Tag to add">
-            <Input value={(data.tag as string) ?? ""} onChange={(e) => set("tag", e.target.value)} placeholder="e.g. customer" />
+            <Input
+              value={(data.tag as string) ?? ""}
+              onChange={(e) => set("tag", e.target.value)}
+              placeholder="e.g. customer"
+              list="automation-tag-suggestions"
+            />
           </Field>
+        )}
+
+        {node.type === "remove_tag" && (
+          <Field label="Tag to remove">
+            <Input
+              value={(data.tag as string) ?? ""}
+              onChange={(e) => set("tag", e.target.value)}
+              placeholder="e.g. lead"
+              list="automation-tag-suggestions"
+            />
+          </Field>
+        )}
+
+        {(node.type === "add_tag" || node.type === "remove_tag") && (
+          <datalist id="automation-tag-suggestions">
+            {tagSuggestions.map((tag) => (
+              <option key={tag} value={tag} />
+            ))}
+          </datalist>
         )}
 
         {node.type === "move_pipeline_stage" && (

@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Plus, Upload } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ChevronLeft, ChevronRight, Plus, Upload } from "lucide-react";
 
 import { BulkActionsBar } from "@/components/contacts/BulkActionsBar";
 import { ContactFormModal } from "@/components/contacts/ContactFormModal";
@@ -12,6 +12,8 @@ import { Input } from "@/components/ui/Input";
 import { useContacts } from "@/hooks/useContacts";
 import { usePermission } from "@/hooks/usePermission";
 
+const PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
+
 export function ContactsListView() {
   const { contacts, isLoading } = useContacts();
   const canManage = usePermission("contacts.manage");
@@ -19,6 +21,8 @@ export function ContactsListView() {
   const [adding, setAdding] = useState(false);
   const [importing, setImporting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [pageSize, setPageSize] = useState<number>(PAGE_SIZE_OPTIONS[0]);
+  const [page, setPage] = useState(1);
 
   const filtered = useMemo(() => {
     if (!contacts) return [];
@@ -33,6 +37,18 @@ export function ContactsListView() {
     );
   }, [contacts, search]);
 
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+
+  // Reset to page 1 whenever the visible set changes shape (new search, page size change).
+  useEffect(() => {
+    setPage(1);
+  }, [search, pageSize]);
+
+  const paginated = useMemo(
+    () => filtered.slice((page - 1) * pageSize, page * pageSize),
+    [filtered, page, pageSize],
+  );
+
   function toggleOne(id: string) {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -44,9 +60,9 @@ export function ContactsListView() {
 
   function toggleAll() {
     setSelectedIds((prev) => {
-      const allSelected = filtered.length > 0 && filtered.every((c) => prev.has(c.id));
+      const allSelected = paginated.length > 0 && paginated.every((c) => prev.has(c.id));
       if (allSelected) return new Set();
-      return new Set(filtered.map((c) => c.id));
+      return new Set(paginated.map((c) => c.id));
     });
   }
 
@@ -89,13 +105,42 @@ export function ContactsListView() {
       {isLoading ? (
         <p className="text-text-muted text-sm">Loading...</p>
       ) : filtered.length > 0 ? (
-        <ContactsTable
-          contacts={filtered}
-          canManage={canManage}
-          selectedIds={selectedIds}
-          onToggle={toggleOne}
-          onToggleAll={toggleAll}
-        />
+        <>
+          <ContactsTable
+            contacts={paginated}
+            canManage={canManage}
+            selectedIds={selectedIds}
+            onToggle={toggleOne}
+            onToggleAll={toggleAll}
+          />
+
+          <div className="flex items-center justify-between">
+            <div className="text-text-muted flex items-center gap-2 text-sm">
+              <span>
+                Page {page} of {pageCount} · {filtered.length} contact{filtered.length === 1 ? "" : "s"}
+              </span>
+              <select
+                value={pageSize}
+                onChange={(e) => setPageSize(Number(e.target.value))}
+                className="border-border rounded-btn border bg-white px-2 py-1 text-xs"
+              >
+                {PAGE_SIZE_OPTIONS.map((size) => (
+                  <option key={size} value={size}>
+                    {size} per page
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setPage((p) => p - 1)} disabled={page <= 1}>
+                <ChevronLeft className="size-3.5" /> Previous
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setPage((p) => p + 1)} disabled={page >= pageCount}>
+                Next <ChevronRight className="size-3.5" />
+              </Button>
+            </div>
+          </div>
+        </>
       ) : (
         <p className="text-text-muted text-sm">
           {search ? `No contacts match "${search}".` : "No contacts yet. Add one, or save a lead as a contact."}

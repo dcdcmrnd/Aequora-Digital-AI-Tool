@@ -14,6 +14,7 @@ const contactSchema = z.object({
   lastName: z.string().optional(),
   company: z.string().optional(),
   email: z.string().optional(),
+  additionalEmails: z.array(z.string()).optional(),
   phone: z.string().optional(),
   website: z.string().optional(),
   facebookUrl: z.string().optional(),
@@ -39,7 +40,11 @@ export async function GET() {
   });
 
   return NextResponse.json({
-    contacts: contacts.map((contact) => ({ ...contact, tags: JSON.parse(contact.tags) })),
+    contacts: contacts.map((contact) => ({
+      ...contact,
+      tags: JSON.parse(contact.tags),
+      additionalEmails: JSON.parse(contact.additionalEmails),
+    })),
   });
 }
 
@@ -56,10 +61,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid contact." }, { status: 400 });
   }
 
+  const { additionalEmails, ...rest } = parsed.data;
+
   const contact = await prisma.contact.create({
     data: {
-      ...parsed.data,
+      ...rest,
       tags: JSON.stringify(parsed.data.tags ?? []),
+      additionalEmails: JSON.stringify(additionalEmails ?? []),
       createdById: session.user.id,
     },
     include: { createdBy: { select: { id: true, name: true } } },
@@ -75,5 +83,8 @@ export async function POST(req: NextRequest) {
 
   await runAutomationsForTrigger({ triggerType: "contact_created", contactId: contact.id });
 
-  return NextResponse.json({ contact: { ...contact, tags: JSON.parse(contact.tags) } }, { status: 201 });
+  return NextResponse.json(
+    { contact: { ...contact, tags: JSON.parse(contact.tags), additionalEmails: JSON.parse(contact.additionalEmails) } },
+    { status: 201 },
+  );
 }

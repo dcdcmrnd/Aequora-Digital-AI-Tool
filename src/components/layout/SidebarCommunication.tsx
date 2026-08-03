@@ -50,11 +50,16 @@ export function SidebarCommunication({ currentUserId }: SidebarCommunicationProp
     };
   }, []);
 
-  if (rooms.length === 0) return null;
+  // A 1-on-1 room with no other member (e.g. leftover test data, or the
+  // other person's account was removed) has nothing to show — hide it
+  // rather than display a blank "Chat" entry.
+  const visibleRooms = rooms.filter((room) => room.isGroup || room.members.some((m) => m.id !== currentUserId));
+
+  if (visibleRooms.length === 0) return null;
 
   return (
     <div className="space-y-0.5">
-      {rooms.slice(0, MAX_ROOMS).map((room) => {
+      {visibleRooms.slice(0, MAX_ROOMS).map((room) => {
         const isActive = activeHeadId === room.id;
         return (
           <button

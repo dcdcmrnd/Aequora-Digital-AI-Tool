@@ -23,7 +23,12 @@ function getRoomAvatar(room: ChatRoom, currentUserId: string) {
 }
 
 export function RoomList({ rooms, activeRoomId, currentUserId, onSelect }: Props) {
-  if (rooms.length === 0) {
+  // A 1-on-1 room with no other member (leftover test data, or the other
+  // person's account was removed) has nothing to show — hide it rather
+  // than display a blank conversation.
+  const visibleRooms = rooms.filter((room) => room.isGroup || room.members.some((m) => m.id !== currentUserId));
+
+  if (visibleRooms.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center p-4 text-center">
         <p className="text-xs text-text-muted">No conversations yet.<br />Start one with the + button.</p>
@@ -33,7 +38,7 @@ export function RoomList({ rooms, activeRoomId, currentUserId, onSelect }: Props
 
   return (
     <div className="flex-1 overflow-y-auto scrollbar-thin">
-      {rooms.map((room) => {
+      {visibleRooms.map((room) => {
         const name = getRoomName(room, currentUserId);
         const avatarUser = getRoomAvatar(room, currentUserId);
         const isActive = room.id === activeRoomId;

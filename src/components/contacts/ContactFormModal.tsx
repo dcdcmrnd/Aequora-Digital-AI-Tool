@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, Plus, X } from "lucide-react";
 
 import { ContactConversationModal } from "@/components/contacts/ContactConversationModal";
 import { Button } from "@/components/ui/Button";
@@ -26,6 +26,7 @@ type FormState = {
   lastName: string;
   company: string;
   email: string;
+  additionalEmails: string[];
   phone: string;
   website: string;
   facebookUrl: string;
@@ -47,6 +48,7 @@ function toFormState(source?: Partial<Contact> | Partial<ContactInput>): FormSta
     lastName: source?.lastName ?? nameParts.slice(1).join(" "),
     company: source?.company ?? "",
     email: source?.email ?? "",
+    additionalEmails: source?.additionalEmails ?? [],
     phone: source?.phone ?? "",
     website: source?.website ?? "",
     facebookUrl: source?.facebookUrl ?? "",
@@ -72,6 +74,21 @@ export function ContactFormModal({ open, onClose, contact, prefill, onSaved }: C
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
+  function addEmailField() {
+    setForm((prev) => ({ ...prev, additionalEmails: [...prev.additionalEmails, ""] }));
+  }
+
+  function updateEmailField(index: number, value: string) {
+    setForm((prev) => ({
+      ...prev,
+      additionalEmails: prev.additionalEmails.map((e, i) => (i === index ? value : e)),
+    }));
+  }
+
+  function removeEmailField(index: number) {
+    setForm((prev) => ({ ...prev, additionalEmails: prev.additionalEmails.filter((_, i) => i !== index) }));
+  }
+
   function handleClose() {
     setForm(toFormState(contact ?? prefill));
     onClose();
@@ -90,6 +107,7 @@ export function ContactFormModal({ open, onClose, contact, prefill, onSaved }: C
       lastName: lastName || undefined,
       company: form.company.trim() || undefined,
       email: form.email.trim() || undefined,
+      additionalEmails: form.additionalEmails.map((e) => e.trim()).filter(Boolean),
       phone: form.phone.trim() || undefined,
       website: form.website.trim() || undefined,
       facebookUrl: form.facebookUrl.trim() || undefined,
@@ -142,7 +160,35 @@ export function ContactFormModal({ open, onClose, contact, prefill, onSaved }: C
             <Input value={form.company} onChange={(e) => set("company", e.target.value)} />
           </Field>
           <Field label="Email">
-            <Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} />
+            <div className="space-y-2">
+              <Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} />
+              {form.additionalEmails.map((email, i) => (
+                <div key={i} className="flex gap-1.5">
+                  <Input
+                    type="email"
+                    value={email}
+                    onChange={(e) => updateEmailField(i, e.target.value)}
+                    placeholder="Additional email"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeEmailField(i)}
+                    className="text-text-muted hover:text-danger shrink-0"
+                    aria-label="Remove email"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={addEmailField}
+                className="text-brand-primary flex items-center gap-1 text-xs hover:underline"
+              >
+                <Plus className="size-3" />
+                Add another email
+              </button>
+            </div>
           </Field>
           <Field label="Phone">
             <Input value={form.phone} onChange={(e) => set("phone", e.target.value)} />

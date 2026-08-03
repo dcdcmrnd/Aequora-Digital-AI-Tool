@@ -9,7 +9,7 @@ import { EMPTY_FLOW } from "@/lib/automation/types";
 
 const nodeSchema = z.object({
   id: z.string(),
-  type: z.enum(["trigger", "send_email", "add_tag", "move_pipeline_stage", "condition", "wait"]),
+  type: z.enum(["trigger", "send_email", "add_tag", "remove_tag", "move_pipeline_stage", "condition", "wait"]),
   position: z.object({ x: z.number(), y: z.number() }),
   data: z.record(z.unknown()),
 });

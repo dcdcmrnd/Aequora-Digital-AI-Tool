@@ -410,6 +410,7 @@ model Contact {
   lastName     String?
   company      String?
   email        String?
+  additionalEmails String @default("[]") // JSON array of extra email strings
   phone        String?
   website      String?
   facebookUrl  String?

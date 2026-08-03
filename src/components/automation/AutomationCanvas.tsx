@@ -25,6 +25,7 @@ const nodeTypes = {
   trigger: CanvasNode,
   send_email: CanvasNode,
   add_tag: CanvasNode,
+  remove_tag: CanvasNode,
   move_pipeline_stage: CanvasNode,
   condition: CanvasNode,
   wait: CanvasNode,
