@@ -105,9 +105,9 @@ export function Sidebar({ companyName = "Aequora Digital", companyLogoUrl, onClo
 
         {/* Communication */}
         <p className="px-3 pt-4 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-[#475569]">Communication</p>
+        <NavLink href="/inbox" label="Inbox" icon={<InboxIcon />} />
         <NavLink href="/chat" label="Chat" icon={<ChatIcon />} badge={<ChatUnreadBadge />} />
         {session?.user?.id && <SidebarCommunication currentUserId={session.user.id} />}
-        <NavLink href="/inbox" label="Inbox" icon={<InboxIcon />} />
       </nav>
 
       {/* Settings */}

@@ -102,6 +102,7 @@ export function ContactConversationModal({ open, onClose, contactEmail, contactN
         onClose={onClose}
         title={selected ? selected.subject || "(no subject)" : `Conversation with ${contactName}`}
         size="xl"
+        className="max-w-6xl"
       >
         <div className="flex h-[70vh] flex-col">
           {selected ? (

@@ -423,7 +423,7 @@ export function InboxView({ scope, isConnected, accounts, isAdmin, currentUserId
 
                     <div
                       className={cn("flex flex-col", msg.isOutgoing ? "items-end" : "items-start")}
-                      style={{ maxWidth: msg.html ? "min(95%, 900px)" : "min(75%, 520px)" }}
+                      style={{ maxWidth: msg.html ? "100%" : "min(75%, 520px)" }}
                     >
                       <div className="flex items-center gap-2 mb-1 px-1">
                         <span className="text-xs font-medium text-text-secondary">
