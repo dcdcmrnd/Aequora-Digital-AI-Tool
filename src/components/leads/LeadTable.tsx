@@ -26,16 +26,17 @@ interface LeadTableProps {
   pageSize: number;
   total: number;
   onPageChange: (page: number) => void;
+  searchedCategory?: string;
 }
 
-export function LeadTable({ data, savedLeadIds, onSave, page, pageSize, total, onPageChange }: LeadTableProps) {
+export function LeadTable({ data, savedLeadIds, onSave, page, pageSize, total, onPageChange, searchedCategory }: LeadTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
   const [contactPrefillLead, setContactPrefillLead] = useState<Lead | null>(null);
 
   const columns = useMemo(
-    () => createLeadColumns({ savedLeadIds, onSave, onSaveAsContact: setContactPrefillLead }),
-    [savedLeadIds, onSave],
+    () => createLeadColumns({ savedLeadIds, onSave, onSaveAsContact: setContactPrefillLead, searchedCategory }),
+    [savedLeadIds, onSave, searchedCategory],
   );
 
   const table = useReactTable({

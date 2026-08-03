@@ -146,6 +146,7 @@ export function LeadsSearchView() {
           pageSize={leads.data.pageSize}
           total={leads.data.total}
           onPageChange={handlePageChange}
+          searchedCategory={filters ? toTitleCase(filters.keyword) : undefined}
         />
       ) : (
         <p className="text-text-muted text-sm">Search for a business category and location to get started.</p>

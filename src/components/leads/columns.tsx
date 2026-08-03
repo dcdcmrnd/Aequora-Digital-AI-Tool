@@ -28,9 +28,12 @@ export interface LeadColumnsOptions {
   savedLeadIds: Set<string>;
   onSave: (lead: Lead) => void;
   onSaveAsContact: (lead: Lead) => void;
+  /** The category actually searched for (e.g. "Architects") — shown instead of
+      Google's own, often too-generic place type (e.g. "Services") when set. */
+  searchedCategory?: string;
 }
 
-export function createLeadColumns({ savedLeadIds, onSave, onSaveAsContact }: LeadColumnsOptions): ColumnDef<Lead>[] {
+export function createLeadColumns({ savedLeadIds, onSave, onSaveAsContact, searchedCategory }: LeadColumnsOptions): ColumnDef<Lead>[] {
   return [
     {
       accessorKey: "name",
@@ -44,7 +47,7 @@ export function createLeadColumns({ savedLeadIds, onSave, onSaveAsContact }: Lea
     {
       accessorKey: "category",
       header: "Category",
-      cell: ({ row }) => row.original.category ?? "—",
+      cell: ({ row }) => searchedCategory ?? row.original.category ?? "—",
     },
     {
       id: "location",
