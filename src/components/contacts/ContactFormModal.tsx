@@ -7,6 +7,7 @@ import { ContactConversationModal } from "@/components/contacts/ContactConversat
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
+import { TagInput } from "@/components/ui/TagInput";
 import { Textarea } from "@/components/ui/Textarea";
 import { type ContactInput, useContacts } from "@/hooks/useContacts";
 import { usePermission } from "@/hooks/usePermission";
@@ -33,7 +34,7 @@ type FormState = {
   twitterUrl: string;
   address: string;
   notes: string;
-  tags: string;
+  tags: string[];
 };
 
 function toFormState(source?: Partial<Contact> | Partial<ContactInput>): FormState {
@@ -54,7 +55,7 @@ function toFormState(source?: Partial<Contact> | Partial<ContactInput>): FormSta
     twitterUrl: source?.twitterUrl ?? "",
     address: source?.address ?? "",
     notes: source?.notes ?? "",
-    tags: (source?.tags ?? []).join(", "),
+    tags: source?.tags ?? [],
   };
 }
 
@@ -96,10 +97,7 @@ export function ContactFormModal({ open, onClose, contact, prefill, onSaved }: C
       twitterUrl: form.twitterUrl.trim() || undefined,
       address: form.address.trim() || undefined,
       notes: form.notes.trim() || undefined,
-      tags: form.tags
-        .split(",")
-        .map((t) => t.trim())
-        .filter(Boolean),
+      tags: form.tags,
       sourceLeadId: !isEditing ? prefill?.sourceLeadId : undefined,
     };
 
@@ -168,8 +166,8 @@ export function ContactFormModal({ open, onClose, contact, prefill, onSaved }: C
           </Field>
         </div>
 
-        <Field label="Tags" hint="Comma-separated">
-          <Input value={form.tags} onChange={(e) => set("tags", e.target.value)} placeholder="client, hot lead" />
+        <Field label="Tags">
+          <TagInput tags={form.tags} onChange={(tags) => set("tags", tags)} placeholder="Type a tag and press Enter" />
         </Field>
 
         <Field label="Notes">

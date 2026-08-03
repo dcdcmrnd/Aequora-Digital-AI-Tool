@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/Button";
 import { Avatar } from "@/components/ui/Avatar";
+import { Button } from "@/components/ui/Button";
+import { TagInput } from "@/components/ui/TagInput";
 import { cn, formatDate } from "@/lib/utils";
 import { TASK_STATUSES, STATUS_LABELS, PRIORITY_COLORS, type Task, type TaskStatus, type TaskPriority } from "@/types";
 import toast from "react-hot-toast";
@@ -51,7 +52,7 @@ export function TaskDetailPanel({
   const [newPriority, setNewPriority] = useState<TaskPriority>("medium");
   const [newAssigneeIds, setNewAssigneeIds] = useState<string[]>([currentUserId]);
   const [newDueDate, setNewDueDate] = useState("");
-  const [newTags, setNewTags] = useState("");
+  const [newTags, setNewTags] = useState<string[]>([]);
 
   useEffect(() => {
     if (!taskId) { setTask(null); return; }
@@ -99,7 +100,7 @@ export function TaskDetailPanel({
           assigneeId: newAssigneeIds[0] || undefined,
           assigneeIds: newAssigneeIds,
           dueDate: newDueDate || undefined,
-          tags: newTags ? newTags.split(",").map((t) => t.trim()).filter(Boolean) : [],
+          tags: newTags,
         }),
       });
       const data = await res.json();
@@ -248,13 +249,8 @@ export function TaskDetailPanel({
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-text-secondary mb-1">Tags (comma-separated)</label>
-              <input
-                value={newTags}
-                onChange={(e) => setNewTags(e.target.value)}
-                placeholder="e.g. design, client-facing"
-                className="w-full px-2 py-1.5 border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-brand-primary"
-              />
+              <label className="block text-xs font-medium text-text-secondary mb-1">Tags</label>
+              <TagInput tags={newTags} onChange={setNewTags} placeholder="e.g. design, client-facing" className="text-sm" />
             </div>
             <div className="flex gap-2 pt-1">
               <Button onClick={handleCreate} loading={saving} className="flex-1">
@@ -366,9 +362,10 @@ export function TaskDetailPanel({
             {/* Tags */}
             <FieldBlock label="Tags">
               {canEdit ? (
-                <TagEditor
+                <TagInput
                   tags={task.tags ?? []}
-                  onSave={(tags) => handleFieldSave("tags", tags)}
+                  onChange={(tags) => handleFieldSave("tags", tags)}
+                  className="text-sm"
                 />
               ) : task.tags && task.tags.length > 0 ? (
                 <div className="flex flex-wrap gap-1">
@@ -481,45 +478,6 @@ function EditableTextarea({ value, canEdit, placeholder, onSave }: { value: stri
   );
 }
 
-function TagEditor({ tags, onSave }: { tags: string[]; onSave: (tags: string[]) => void }) {
-  const [input, setInput] = useState("");
-
-  const addTag = () => {
-    const trimmed = input.trim();
-    if (!trimmed || tags.includes(trimmed)) { setInput(""); return; }
-    onSave([...tags, trimmed]);
-    setInput("");
-  };
-
-  const removeTag = (tag: string) => {
-    onSave(tags.filter((t) => t !== tag));
-  };
-
-  return (
-    <div>
-      <div className="flex flex-wrap gap-1 mb-2">
-        {tags.map((tag) => (
-          <span key={tag} className="flex items-center gap-1 text-xs bg-surface-secondary text-text-secondary px-2 py-0.5 rounded-full">
-            {tag}
-            <button onClick={() => removeTag(tag)} className="text-text-muted hover:text-danger">×</button>
-          </span>
-        ))}
-      </div>
-      <div className="flex gap-1.5">
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTag(); } }}
-          placeholder="Add tag…"
-          className="flex-1 px-2 py-1 border border-border rounded text-xs focus:outline-none focus:ring-1 focus:ring-brand-primary"
-        />
-        <button onClick={addTag} className="px-2 py-1 text-xs bg-surface-secondary border border-border rounded hover:bg-surface-hover">
-          Add
-        </button>
-      </div>
-    </div>
-  );
-}
 
 function XIcon() {
   return (
