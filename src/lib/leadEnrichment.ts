@@ -42,11 +42,14 @@ export interface LeadEnrichmentResult {
   twitterUrl: string | null;
 }
 
+// Any subdomain is allowed (not just "www.") so this also catches regional
+// mirrors (de.linkedin.com), mobile links (m.facebook.com), and LinkedIn
+// paths beyond /company/ and /in/ (e.g. /showcase/, /school/).
 const SOCIAL_PATTERNS: { key: keyof Omit<LeadEnrichmentResult, "email">; regex: RegExp }[] = [
-  { key: "facebookUrl", regex: /https?:\/\/(?:www\.)?facebook\.com\/[^\s"'<>)]+/i },
-  { key: "instagramUrl", regex: /https?:\/\/(?:www\.)?instagram\.com\/[^\s"'<>)]+/i },
-  { key: "linkedinUrl", regex: /https?:\/\/(?:www\.)?linkedin\.com\/(?:company|in)\/[^\s"'<>)]+/i },
-  { key: "twitterUrl", regex: /https?:\/\/(?:www\.)?(?:twitter|x)\.com\/[^\s"'<>)]+/i },
+  { key: "facebookUrl", regex: /https?:\/\/(?:[a-z0-9-]+\.)?(?:facebook|fb)\.com\/[^\s"'<>)]+/i },
+  { key: "instagramUrl", regex: /https?:\/\/(?:[a-z0-9-]+\.)?instagram\.com\/[^\s"'<>)]+/i },
+  { key: "linkedinUrl", regex: /https?:\/\/(?:[a-z0-9-]+\.)?linkedin\.com\/[^\s"'<>)]+/i },
+  { key: "twitterUrl", regex: /https?:\/\/(?:[a-z0-9-]+\.)?(?:twitter|x)\.com\/[^\s"'<>)]+/i },
 ];
 
 function trimTrailingPunctuation(raw: string): string {
