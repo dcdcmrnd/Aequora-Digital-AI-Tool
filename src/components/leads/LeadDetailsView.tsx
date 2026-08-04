@@ -84,7 +84,7 @@ export function LeadDetailsView({ lead: initialLead, initialSavedLead, prevId, n
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <Button variant="ghost" size="sm" className="-ml-3" onClick={() => router.back()}>
+        <Button variant="ghost" size="sm" className="-ml-3" onClick={() => router.push(`/leads${suffix}`)}>
           <ArrowLeft className="size-4" />
           Back to search
         </Button>

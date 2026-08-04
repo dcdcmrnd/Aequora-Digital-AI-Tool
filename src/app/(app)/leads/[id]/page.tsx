@@ -5,6 +5,7 @@ import { LeadDetailsView } from "@/components/leads/LeadDetailsView";
 import { authOptions } from "@/lib/auth";
 import { checkPermission } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
+import { LEADS_PAGE_SIZE } from "@/lib/leads/constants";
 import { listLeadIds, type LeadSortColumn } from "@/services/business";
 import type { LeadStatus } from "@/types";
 
@@ -48,6 +49,7 @@ export default async function LeadDetailsPage({
 
   let prevId: string | null = null;
   let nextId: string | null = null;
+  let currentPage: number | undefined;
   if (searchId || category || location) {
     const ids = await listLeadIds({
       searchId,
@@ -64,14 +66,20 @@ export default async function LeadDetailsPage({
     if (index !== -1) {
       prevId = index > 0 ? ids[index - 1] : null;
       nextId = index < ids.length - 1 ? ids[index + 1] : null;
+      currentPage = Math.floor(index / LEADS_PAGE_SIZE) + 1;
     }
   }
 
+  // Forwarded on Previous/Next so they keep working, and used verbatim by
+  // "Back to search" to land on /leads at exactly this lead's page — not
+  // router.back(), which after a few Next/Prev clicks would just pop through
+  // the lead-detail history instead of returning to the search results.
   const listParams = new URLSearchParams();
   for (const [key, value] of Object.entries(searchParams)) {
     const v = firstOf(value);
     if (v) listParams.set(key, v);
   }
+  if (currentPage !== undefined) listParams.set("page", String(currentPage));
 
   return (
     <LeadDetailsView

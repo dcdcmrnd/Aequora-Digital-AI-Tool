@@ -10,9 +10,10 @@ import { SearchForm, type SearchFormValues } from "@/components/leads/SearchForm
 import { useLeads } from "@/hooks/useLeads";
 import { useLeadSearch } from "@/hooks/useLeadSearch";
 import { useSavedLeads } from "@/hooks/useSavedLeads";
+import { LEADS_PAGE_SIZE } from "@/lib/leads/constants";
 import type { Lead } from "@/types";
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = LEADS_PAGE_SIZE;
 
 type SortColumn = SearchFormValues["sortBy"] | "email";
 
@@ -125,8 +126,9 @@ export function LeadsSearchView() {
     if (filters.hasEmail !== "any") params.set("hasEmail", String(filters.hasEmail === "has"));
     params.set("sortBy", sortBy);
     params.set("sortDirection", sortDirection);
+    params.set("page", String(page));
     return params.toString();
-  }, [filters, searchId, sortBy, sortDirection]);
+  }, [filters, searchId, sortBy, sortDirection, page]);
 
   function updateUrl(nextFilters: SearchFormValues, nextPage: number, nextSearchId: string | null, nextSortBy: SortColumn, nextSortDirection: "asc" | "desc") {
     router.replace(`/leads?${buildSearchParams(nextFilters, nextPage, nextSearchId, nextSortBy, nextSortDirection)}`, { scroll: false });
