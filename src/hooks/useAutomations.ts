@@ -109,21 +109,22 @@ export function useNodeContacts(automationId: string | undefined, nodeId: string
   return { ...query, runs: query.data?.runs };
 }
 
-/** "Remove from Workflow" / "Push to Next Step" for one contact's run. */
-export function useRunAction(automationId: string | undefined) {
+/** "Remove from Workflow" / "Push to Next Step" for a batch of selected contacts' runs. */
+export function useBulkRunAction(automationId: string | undefined) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ runId, action }: { runId: string; action: "remove" | "advance" }) =>
-      apiFetch<{ success: true }>(`/api/automations/${automationId}/runs/${runId}`, {
+    mutationFn: ({ runIds, action }: { runIds: string[]; action: "remove" | "advance" }) =>
+      apiFetch<{ success: true; count: number }>(`/api/automations/${automationId}/runs/bulk`, {
         method: "PATCH",
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({ runIds, action }),
       }),
-    onSuccess: (_data, variables) => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["automation-node-counts", automationId] });
       queryClient.invalidateQueries({ queryKey: ["automation-node-contacts", automationId] });
       queryClient.invalidateQueries({ queryKey: ["automation-runs", automationId] });
-      toast.success(variables.action === "remove" ? "Removed from workflow" : "Pushed to next step");
+      const verb = variables.action === "remove" ? "Removed from workflow" : "Pushed to next step";
+      toast.success(`${verb} — ${data.count} contact${data.count === 1 ? "" : "s"}`);
     },
     onError: (error) => toast.error(toastErrorMessage(error, "Couldn't perform that action")),
   });
