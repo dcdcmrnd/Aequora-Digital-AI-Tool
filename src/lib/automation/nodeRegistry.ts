@@ -1,6 +1,7 @@
 import {
   Bell,
   Briefcase,
+  CalendarClock,
   CheckSquare,
   Clock,
   GitBranch,
@@ -152,6 +153,11 @@ export const NODE_DEFINITIONS: Record<AutomationNodeType, NodeDefinition> = {
         const [h, m] = ((data.time as string) ?? "09:00").split(":").map(Number);
         return formatWeekdayTime((data.dayOfWeek as number) ?? 1, h, m, (data.timezone as string) || "America/New_York");
       }
+      if (data.mode === "event") {
+        if (!data.amount) return "Click to configure";
+        const direction = data.direction === "after" ? "after" : "before";
+        return `${data.amount} ${data.unit ?? "days"} ${direction} event date`;
+      }
       if (data.amount) return `${data.amount} ${data.unit ?? "hours"}`;
       return "Click to configure";
     },
@@ -233,6 +239,23 @@ export const NODE_DEFINITIONS: Record<AutomationNodeType, NodeDefinition> = {
     summarize: (data) => {
       if (data.mode === "round_robin") return "Round robin assign";
       return data.assigneeId ? "Assign to user" : "Click to configure";
+    },
+    hasTargetHandle: true,
+    hasSourceHandle: true,
+    isBranching: false,
+    canDuplicate: true,
+  },
+  set_event_date: {
+    category: "Contact & Pipeline",
+    label: "Set Event Date",
+    icon: CalendarClock,
+    accent: "bg-indigo-50 text-indigo-600",
+    defaultData: () => ({}),
+    summarize: (data) => {
+      const value = data.value as string | undefined;
+      if (!value) return "Click to configure";
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? "Click to configure" : `Event date: ${date.toLocaleString()}`;
     },
     hasTargetHandle: true,
     hasSourceHandle: true,

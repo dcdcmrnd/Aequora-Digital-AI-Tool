@@ -446,6 +446,7 @@ model Contact {
   address      String?
   notes        String?
   tags         String   @default("[]") // JSON array of strings
+  eventDate    DateTime? // set by the "Set Event Date" automation action; consumed by Wait's "before/after event date" mode
   sourceLeadId String?
   sourceLead   Lead?    @relation(fields: [sourceLeadId], references: [id], onDelete: SetNull)
   assignedToId String?

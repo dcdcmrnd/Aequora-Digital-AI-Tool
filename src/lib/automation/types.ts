@@ -15,6 +15,7 @@ export type AutomationNodeType =
   | "send_notification"
   | "webhook"
   | "enroll_in_automation"
+  | "set_event_date"
   | "end_workflow";
 
 export type TriggerType =

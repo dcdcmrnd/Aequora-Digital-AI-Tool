@@ -20,6 +20,11 @@ function toastErrorMessage(error: unknown, fallback: string): string {
   return error instanceof ApiError ? error.message : fallback;
 }
 
+// Stable reference so consumers that put `counts` in a dependency array
+// (e.g. AutomationCanvas's node-rebuild effect) don't re-run every render
+// while the query is still loading -- a fresh `{}` literal each render would.
+const EMPTY_COUNTS: Record<string, number> = {};
+
 export function useAutomations() {
   const queryClient = useQueryClient();
 
@@ -90,7 +95,7 @@ export function useAutomationNodeCounts(automationId: string | undefined, enable
     refetchInterval: enabled && automationId ? 10_000 : false,
   });
 
-  return { ...query, counts: query.data?.counts ?? {} };
+  return { ...query, counts: query.data?.counts ?? EMPTY_COUNTS };
 }
 
 /** Contacts currently sitting at one specific node — fetched when the user clicks that node's count badge. */

@@ -438,6 +438,26 @@ async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string,
         continue;
       }
 
+      if (node.type === "set_event_date") {
+        try {
+          if (!run.contactId) {
+            await logStep(run.id, node.id, node.type, "success", "No contact for this run");
+          } else {
+            const data = node.data as { value?: string };
+            const eventDate = data.value ? new Date(data.value) : null;
+            if (!eventDate || Number.isNaN(eventDate.getTime())) throw new Error("No event date configured for this step");
+
+            await prisma.contact.update({ where: { id: run.contactId }, data: { eventDate } });
+            await logStep(run.id, node.id, node.type, "success", `Event date set to ${eventDate.toLocaleString()}`);
+          }
+        } catch (err) {
+          await logStep(run.id, node.id, node.type, "error", err instanceof Error ? err.message : "Unknown error");
+          throw err;
+        }
+        currentNodeId = nextNodeId(flow, node.id);
+        continue;
+      }
+
       if (node.type === "condition") {
         try {
           const data = node.data as {
@@ -472,10 +492,37 @@ async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string,
       if (node.type === "wait") {
         const data = node.data as {
           mode?: string; amount?: number; unit?: WaitUnit; condition?: string;
-          dayOfWeek?: number; time?: string; timezone?: string;
+          dayOfWeek?: number; time?: string; timezone?: string; direction?: "before" | "after";
         };
 
-        if (data.mode === "condition") {
+        if (data.mode === "event") {
+          try {
+            const contact = run.contactId ? await prisma.contact.findUnique({ where: { id: run.contactId } }) : null;
+            if (!contact?.eventDate) throw new Error("Contact has no event date set — add a \"Set Event Date\" step before this wait");
+
+            const offsetMs = durationMs(data.amount ?? 1, data.unit ?? "days");
+            const direction = data.direction === "after" ? "after" : "before";
+            const target = new Date(contact.eventDate.getTime() + (direction === "before" ? -offsetMs : offsetMs));
+
+            if (target.getTime() <= Date.now()) {
+              // The target moment already passed (e.g. the event date is close, or already
+              // gone) -- proceed immediately rather than "waiting" for a time already behind us.
+              await logStep(run.id, node.id, node.type, "success", `Event wait target (${direction} event date) already passed — continuing immediately`);
+              currentNodeId = nextNodeId(flow, node.id);
+              continue;
+            }
+
+            await prisma.automationRun.update({
+              where: { id: run.id },
+              data: { status: "waiting", currentNodeId: node.id, waitUntil: target },
+            });
+            await logStep(run.id, node.id, node.type, "waiting", `Waiting until ${target.toLocaleString()} (${data.amount ?? 1} ${data.unit ?? "days"} ${direction} event date)`);
+          } catch (err) {
+            await logStep(run.id, node.id, node.type, "error", err instanceof Error ? err.message : "Unknown error");
+            throw err;
+          }
+          return; // pause here until resumed (unless we already continued above)
+        } else if (data.mode === "condition") {
           const lastTracked = await prisma.emailTracking.findFirst({
             where: { runId: run.id },
             orderBy: { createdAt: "desc" },

@@ -519,9 +519,51 @@ export function NodeConfigPanel({ node, stages, automationId, onClose, onSave, o
                   <SelectItem value="duration">A set amount of time</SelectItem>
                   <SelectItem value="schedule">A specific day &amp; time</SelectItem>
                   <SelectItem value="condition">Until the email is opened</SelectItem>
+                  <SelectItem value="event">Before/after the contact's event date</SelectItem>
                 </SelectContent>
               </Select>
             </Field>
+            {data.mode === "event" && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Amount">
+                    <Input
+                      type="number"
+                      min={1}
+                      value={(data.amount as number) ?? ""}
+                      onChange={(e) => set("amount", Number(e.target.value))}
+                    />
+                  </Field>
+                  <Field label="Unit">
+                    <Select value={(data.unit as string) ?? "days"} onValueChange={(v) => set("unit", v)}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="minutes">Minutes</SelectItem>
+                        <SelectItem value="hours">Hours</SelectItem>
+                        <SelectItem value="days">Days</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                </div>
+                <Field label="Relative to the event date">
+                  <Select value={(data.direction as string) ?? "before"} onValueChange={(v) => set("direction", v)}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="before">Before</SelectItem>
+                      <SelectItem value="after">After</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <p className="text-text-muted text-xs">
+                  Requires a <strong>Set Event Date</strong> step earlier in this workflow. If that date has already
+                  passed by the time a contact reaches this step, it continues immediately instead of waiting.
+                </p>
+              </>
+            )}
             {(data.mode ?? "duration") === "duration" && (
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Amount">
@@ -830,6 +872,22 @@ export function NodeConfigPanel({ node, stages, automationId, onClose, onSave, o
 
         {node.type === "end_workflow" && (
           <p className="text-text-secondary text-sm">Ends this contact's run here, regardless of any other steps.</p>
+        )}
+
+        {node.type === "set_event_date" && (
+          <>
+            <Field label="Event date &amp; time">
+              <Input
+                type="datetime-local"
+                value={(data.value as string) ?? ""}
+                onChange={(e) => set("value", e.target.value)}
+              />
+            </Field>
+            <p className="text-text-muted text-xs">
+              Stores this date on the contact. A later <strong>Wait</strong> step can then wait for a set amount of
+              time before or after it — e.g. a reminder 4 days before a webinar.
+            </p>
+          </>
         )}
       </div>
 

@@ -79,6 +79,22 @@ export async function trashThread(ownerId: string | null, email: string, threadI
   await gmail.users.threads.trash({ userId: "me", id: threadId });
 }
 
+/** Moves the thread to Spam — matches Gmail's own "Report spam" button. */
+export async function markThreadSpam(ownerId: string | null, email: string, threadId: string): Promise<void> {
+  const gmail = await getGmailClient(ownerId, email);
+  await gmail.users.threads.modify({ userId: "me", id: threadId, requestBody: { addLabelIds: ["SPAM"], removeLabelIds: ["INBOX"] } });
+}
+
+/** Sets the UNREAD label across every message in the thread. */
+export async function setThreadReadStatus(ownerId: string | null, email: string, threadId: string, read: boolean): Promise<void> {
+  const gmail = await getGmailClient(ownerId, email);
+  await gmail.users.threads.modify({
+    userId: "me",
+    id: threadId,
+    requestBody: read ? { removeLabelIds: ["UNREAD"] } : { addLabelIds: ["UNREAD"] },
+  });
+}
+
 /** Strips CR/LF so header values can't inject extra headers (e.g. a stray Bcc). */
 function sanitizeHeaderValue(value: string): string {
   return value.replace(/[\r\n]+/g, " ").trim();

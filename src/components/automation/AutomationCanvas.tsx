@@ -42,6 +42,7 @@ const nodeTypes: Record<AutomationNodeType | "placeholder", typeof CanvasNode | 
   send_notification: CanvasNode,
   webhook: CanvasNode,
   enroll_in_automation: CanvasNode,
+  set_event_date: CanvasNode,
   end_workflow: CanvasNode,
   placeholder: PlaceholderNode,
 };

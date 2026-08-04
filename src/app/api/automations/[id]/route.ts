@@ -11,7 +11,7 @@ const nodeSchema = z.object({
   type: z.enum([
     "trigger", "send_email", "add_tag", "remove_tag", "move_pipeline_stage", "condition", "wait",
     "create_task", "create_note", "create_opportunity", "update_contact_field", "update_opportunity",
-    "assign_contact_to_user", "send_notification", "webhook", "enroll_in_automation", "end_workflow",
+    "assign_contact_to_user", "send_notification", "webhook", "enroll_in_automation", "set_event_date", "end_workflow",
   ]),
   position: z.object({ x: z.number(), y: z.number() }),
   data: z.record(z.unknown()),

@@ -34,16 +34,20 @@ export async function GET(req: NextRequest) {
   const labelId = searchParams.get("label");
   const q = searchParams.get("q") ?? undefined;
   const account = searchParams.get("email") ?? undefined;
+  const readFilter = searchParams.get("read"); // "unread" | "read" | null (= all)
+  const readQuery = readFilter === "unread" ? "is:unread" : readFilter === "read" ? "is:read" : undefined;
 
   try {
     const gmail = await getGmailClient(ownerId, account);
     const connectedEmail = (account ?? (await getConnectedEmail(ownerId)))?.toLowerCase() ?? "";
 
     // A contact-scoped search (q) intentionally omits the label filter so it
-    // finds messages across Inbox and Sent, not just one folder.
+    // finds messages across Inbox and Sent, not just one folder. The read-status
+    // filter (Gmail's own is:unread/is:read) layers on top of either mode.
+    const combinedQuery = [q, readQuery].filter(Boolean).join(" ") || undefined;
     const listRes = await gmail.users.threads.list({
       userId: "me",
-      ...(q ? { q } : { labelIds: [labelId ?? "INBOX"] }),
+      ...(q ? { q: combinedQuery } : { labelIds: [labelId ?? "INBOX"], ...(readQuery ? { q: readQuery } : {}) }),
       maxResults: 30,
       pageToken,
     });
