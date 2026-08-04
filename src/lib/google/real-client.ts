@@ -7,10 +7,9 @@ const SEARCH_URL = "https://places.googleapis.com/v1/places:searchText";
 // Google documents a short delay before a freshly-issued nextPageToken becomes usable.
 const PAGE_TOKEN_DELAY_MS = 2_000;
 
-// NOTE: adding a bare "nextPageToken" entry here was tried to support pagination and
-// confirmed via production logs to make Google reject every request with 400 Bad
-// Request — reverted. See the response-body logging below for diagnosing the real
-// cause before trying again.
+// nextPageToken here is correct per Google's docs — the earlier 400 was caused by
+// pairing it with the request body's now-deprecated `maxResultCount` field instead
+// of `pageSize` (confirmed against Google's official Text Search pagination example).
 const FIELD_MASK = [
   "places.id",
   "places.displayName",
@@ -24,6 +23,7 @@ const FIELD_MASK = [
   "places.formattedAddress",
   "places.addressComponents",
   "places.location",
+  "nextPageToken",
 ].join(",");
 
 export function createRealGooglePlacesClient(): GooglePlacesClient {
@@ -40,7 +40,7 @@ export function createRealGooglePlacesClient(): GooglePlacesClient {
       do {
         const body = pageToken
           ? { pageToken }
-          : { textQuery: `${params.keyword} in ${params.location}`, maxResultCount: perPage };
+          : { textQuery: `${params.keyword} in ${params.location}`, pageSize: perPage };
 
         const response = await fetch(SEARCH_URL, {
           method: "POST",
