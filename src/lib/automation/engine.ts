@@ -246,6 +246,51 @@ export async function resumeRun(runId: string): Promise<void> {
   await runLoop(run.id, flow, next);
 }
 
+/** Manually stops a contact's run — used by the "Remove from Workflow" action in the builder's per-step contact list. */
+export async function removeRunFromWorkflow(runId: string): Promise<boolean> {
+  const run = await prisma.automationRun.findUnique({ where: { id: runId } });
+  if (!run) return false;
+
+  await prisma.automationRun.update({
+    where: { id: run.id },
+    data: { status: "cancelled", waitUntil: null, waitToken: null },
+  });
+  await logStep(run.id, run.currentNodeId ?? "unknown", "manual", "success", "Removed from workflow manually");
+  return true;
+}
+
+/**
+ * Manually advances a contact past its current step — used by the "Push to
+ * Next Step" action in the builder's per-step contact list. Unlike
+ * `resumeRun` (which only resumes a genuine wait), this also works for a run
+ * stuck in "error" status, letting someone unblock a contact past a failed
+ * step (e.g. a webhook that 500'd) without waiting for a fix.
+ */
+export async function pushRunToNextStep(runId: string): Promise<boolean> {
+  const run = await prisma.automationRun.findUnique({ where: { id: runId } });
+  if (!run || !run.currentNodeId || (run.status !== "waiting" && run.status !== "error")) return false;
+
+  const automation = await prisma.automation.findUnique({ where: { id: run.automationId } });
+  if (!automation) return false;
+
+  const flow = parseFlow(automation.flow);
+  const next = nextNodeId(flow, run.currentNodeId);
+
+  await prisma.automationRun.update({
+    where: { id: run.id },
+    data: { status: "running", waitUntil: null, waitToken: null, detail: null },
+  });
+  await logStep(run.id, run.currentNodeId, "manual", "success", "Manually pushed to next step");
+
+  if (!next) {
+    await prisma.automationRun.update({ where: { id: run.id }, data: { status: "completed", currentNodeId: null } });
+    return true;
+  }
+
+  await runLoop(run.id, flow, next);
+  return true;
+}
+
 async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string, enrollmentDepth = 0): Promise<void> {
   const run = await prisma.automationRun.findUnique({ where: { id: runId } });
   if (!run) return;

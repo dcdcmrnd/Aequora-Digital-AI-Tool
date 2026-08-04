@@ -80,3 +80,46 @@ export function useAutomationRuns(automationId: string, enabled: boolean) {
 
   return { ...query, runs: query.data?.runs };
 }
+
+/** How many contacts are currently sitting at each step — polled while the builder is open, powers the live badge on each node. */
+export function useAutomationNodeCounts(automationId: string | undefined, enabled: boolean) {
+  const query = useQuery({
+    queryKey: ["automation-node-counts", automationId],
+    queryFn: () => apiFetch<{ counts: Record<string, number> }>(`/api/automations/${automationId}/node-counts`),
+    enabled: enabled && !!automationId,
+    refetchInterval: enabled && automationId ? 10_000 : false,
+  });
+
+  return { ...query, counts: query.data?.counts ?? {} };
+}
+
+/** Contacts currently sitting at one specific node — fetched when the user clicks that node's count badge. */
+export function useNodeContacts(automationId: string | undefined, nodeId: string | null) {
+  const query = useQuery({
+    queryKey: ["automation-node-contacts", automationId, nodeId],
+    queryFn: () => apiFetch<{ runs: AutomationRun[] }>(`/api/automations/${automationId}/runs?nodeId=${nodeId}`),
+    enabled: !!automationId && !!nodeId,
+  });
+
+  return { ...query, runs: query.data?.runs };
+}
+
+/** "Remove from Workflow" / "Push to Next Step" for one contact's run. */
+export function useRunAction(automationId: string | undefined) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ runId, action }: { runId: string; action: "remove" | "advance" }) =>
+      apiFetch<{ success: true }>(`/api/automations/${automationId}/runs/${runId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ action }),
+      }),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["automation-node-counts", automationId] });
+      queryClient.invalidateQueries({ queryKey: ["automation-node-contacts", automationId] });
+      queryClient.invalidateQueries({ queryKey: ["automation-runs", automationId] });
+      toast.success(variables.action === "remove" ? "Removed from workflow" : "Pushed to next step");
+    },
+    onError: (error) => toast.error(toastErrorMessage(error, "Couldn't perform that action")),
+  });
+}

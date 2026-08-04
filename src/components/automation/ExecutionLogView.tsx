@@ -14,6 +14,7 @@ const STATUS_META: Record<AutomationRun["status"], { label: string; variant: "su
   waiting: { label: "Waiting", variant: "warning" },
   completed: { label: "Completed", variant: "success" },
   error: { label: "Error", variant: "danger" },
+  cancelled: { label: "Removed", variant: "muted" },
 };
 
 function StepIcon({ status }: { status: AutomationRunStep["status"] }) {

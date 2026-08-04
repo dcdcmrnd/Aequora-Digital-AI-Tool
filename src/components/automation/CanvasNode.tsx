@@ -12,6 +12,8 @@ export function CanvasNode({ type, data, selected }: NodeProps) {
   const Icon = meta.icon;
   const summary = meta.summarize(data as Record<string, unknown>);
   const isUnconfigured = summary === "Click to configure";
+  const contactCount = (data as Record<string, unknown>).__contactCount as number | undefined;
+  const onShowContacts = (data as Record<string, unknown>).__onShowContacts as (() => void) | undefined;
 
   return (
     <div
@@ -34,6 +36,19 @@ export function CanvasNode({ type, data, selected }: NodeProps) {
           </p>
         </div>
       </div>
+
+      {!!contactCount && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onShowContacts?.();
+          }}
+          className="mt-2 flex items-center gap-1 rounded-full bg-brand-primary/10 px-2 py-0.5 text-[11px] font-medium text-brand-primary hover:bg-brand-primary/20"
+        >
+          {contactCount} contact{contactCount === 1 ? "" : "s"}
+        </button>
+      )}
 
       {meta.isBranching ? (
         <>

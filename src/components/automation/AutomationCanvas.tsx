@@ -18,8 +18,10 @@ import { Redo2, Undo2 } from "lucide-react";
 import { CanvasNode } from "@/components/automation/CanvasNode";
 import { InsertableEdge } from "@/components/automation/InsertableEdge";
 import { NodeConfigPanel } from "@/components/automation/NodeConfigPanel";
+import { NodeContactsPanel } from "@/components/automation/NodeContactsPanel";
 import { NodePickerPanel } from "@/components/automation/NodePickerPanel";
 import { PlaceholderNode } from "@/components/automation/PlaceholderNode";
+import { useAutomationNodeCounts } from "@/hooks/useAutomations";
 import { NODE_DEFINITIONS } from "@/lib/automation/nodeRegistry";
 import type { AutomationFlow, AutomationNode, AutomationNodeType, PipelineStage } from "@/types";
 
@@ -92,6 +94,8 @@ function withPlaceholders(
   onPick: (sourceId: string, branch: string | undefined, type: AutomationNodeType) => void,
   onInsert: (edge: AutomationFlow["edges"][number], type: AutomationNodeType) => void,
   openPicker: (pick: (type: AutomationNodeType) => void) => void,
+  counts: Record<string, number>,
+  onShowContacts: (nodeId: string) => void,
 ): { nodes: RFNode[]; edges: RFEdge[] } {
   const phNodes: RFNode[] = [];
   const phEdges: RFEdge[] = [];
@@ -121,7 +125,12 @@ function withPlaceholders(
 
   return {
     nodes: [
-      ...nodes.map((n) => ({ id: n.id, type: n.type, position: n.position, data: n.data })),
+      ...nodes.map((n) => ({
+        id: n.id,
+        type: n.type,
+        position: n.position,
+        data: { ...n.data, __contactCount: counts[n.id] ?? 0, __onShowContacts: () => onShowContacts(n.id) },
+      })),
       ...phNodes,
     ],
     edges: [
@@ -142,6 +151,9 @@ function CanvasInner({ flow, onChange, stages, automationId }: AutomationCanvasP
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pickerPick, setPickerPick] = useState<((type: AutomationNodeType) => void) | null>(null);
   const openPicker = useCallback((pick: (type: AutomationNodeType) => void) => setPickerPick(() => pick), []);
+  const [contactsPanelNodeId, setContactsPanelNodeId] = useState<string | null>(null);
+  const { counts } = useAutomationNodeCounts(automationId, true);
+  const handleShowContacts = useCallback((nodeId: string) => setContactsPanelNodeId(nodeId), []);
 
   // Real (persisted) nodes/edges live here, separate from React Flow's
   // render state below -- this is the source of truth we report upward via
@@ -270,11 +282,19 @@ function CanvasInner({ flow, onChange, stages, automationId }: AutomationCanvasP
   const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState<RFEdge>([]);
 
   useEffect(() => {
-    const { nodes, edges } = withPlaceholders(realNodes, realEdges, handlePick, handleInsertOnEdge, openPicker);
+    const { nodes, edges } = withPlaceholders(
+      realNodes,
+      realEdges,
+      handlePick,
+      handleInsertOnEdge,
+      openPicker,
+      counts,
+      handleShowContacts,
+    );
     setRfNodes(nodes.map((n) => ({ ...n, selected: n.id === selectedId })));
     setRfEdges(edges);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [realNodes, realEdges, handlePick, handleInsertOnEdge, selectedId]);
+  }, [realNodes, realEdges, handlePick, handleInsertOnEdge, selectedId, counts, handleShowContacts]);
 
   // Report the real (non-placeholder) structure upward for saving.
   useEffect(() => {
@@ -379,6 +399,15 @@ function CanvasInner({ flow, onChange, stages, automationId }: AutomationCanvasP
             setPickerPick(null);
           }}
           onClose={() => setPickerPick(null)}
+        />
+      )}
+
+      {contactsPanelNodeId && automationId && (
+        <NodeContactsPanel
+          automationId={automationId}
+          nodeId={contactsPanelNodeId}
+          nodeLabel={NODE_DEFINITIONS[realNodes.find((n) => n.id === contactsPanelNodeId)?.type ?? "trigger"].label}
+          onClose={() => setContactsPanelNodeId(null)}
         />
       )}
     </div>

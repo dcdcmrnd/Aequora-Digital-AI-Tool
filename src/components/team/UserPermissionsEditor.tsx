@@ -8,7 +8,7 @@ interface Props {
   disabled?: boolean;
 }
 
-const GROUPS = ["Projects", "Tasks", "Notes", "Team", "Inbox", "AI", "Admin"];
+const GROUPS = ["Projects", "Tasks", "Notes", "Leads", "Contacts", "Pipeline", "Automation", "Team", "Inbox", "AI", "Admin"];
 
 export function UserPermissionsEditor({ selected, onChange, disabled }: Props) {
   const toggle = (key: PermissionType) => {

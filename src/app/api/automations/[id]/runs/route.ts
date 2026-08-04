@@ -15,14 +15,21 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const automation = await prisma.automation.findUnique({ where: { id: params.id } });
   if (!automation) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+  // When scoped to a single node (the builder's "contacts at this step" panel),
+  // only the still-actionable runs matter, and the full step history isn't needed.
+  const nodeId = req.nextUrl.searchParams.get("nodeId");
+
   const runs = await prisma.automationRun.findMany({
-    where: { automationId: params.id },
+    where: {
+      automationId: params.id,
+      ...(nodeId ? { currentNodeId: nodeId, status: { in: ["running", "waiting", "error"] } } : {}),
+    },
     include: {
       contact: { select: { id: true, name: true, email: true, company: true } },
-      steps: { orderBy: { createdAt: "asc" } },
+      ...(nodeId ? {} : { steps: { orderBy: { createdAt: "asc" } } }),
     },
     orderBy: { createdAt: "desc" },
-    take: 50,
+    take: nodeId ? 200 : 50,
   });
 
   return NextResponse.json({ runs });

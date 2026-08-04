@@ -391,7 +391,7 @@ export interface AutomationRun {
   automationId: string;
   contactId: string | null;
   contact?: Pick<Contact, "id" | "name" | "email" | "company"> | null;
-  status: "running" | "waiting" | "completed" | "error";
+  status: "running" | "waiting" | "completed" | "error" | "cancelled";
   currentNodeId: string | null;
   waitUntil: string | null;
   detail: string | null;
