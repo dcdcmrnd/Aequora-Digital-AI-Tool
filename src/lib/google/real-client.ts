@@ -7,6 +7,8 @@ const SEARCH_URL = "https://places.googleapis.com/v1/places:searchText";
 // Google documents a short delay before a freshly-issued nextPageToken becomes usable.
 const PAGE_TOKEN_DELAY_MS = 2_000;
 
+// Places API (New) strictly filters the response to only what's listed here —
+// omitting nextPageToken means Google never returns one, silently breaking pagination.
 const FIELD_MASK = [
   "places.id",
   "places.displayName",
@@ -20,6 +22,7 @@ const FIELD_MASK = [
   "places.formattedAddress",
   "places.addressComponents",
   "places.location",
+  "nextPageToken",
 ].join(",");
 
 export function createRealGooglePlacesClient(): GooglePlacesClient {
