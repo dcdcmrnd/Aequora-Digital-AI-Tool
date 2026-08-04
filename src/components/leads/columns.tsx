@@ -45,11 +45,6 @@ export function createLeadColumns({ savedLeadIds, onSave, onSaveAsContact, searc
       ),
     },
     {
-      accessorKey: "category",
-      header: "Category",
-      cell: ({ row }) => searchedCategory ?? row.original.category ?? "—",
-    },
-    {
       id: "location",
       header: "Location",
       cell: ({ row }) => {
@@ -93,6 +88,11 @@ export function createLeadColumns({ savedLeadIds, onSave, onSaveAsContact, searc
           <span className="text-text-muted">—</span>
         );
       },
+    },
+    {
+      accessorKey: "category",
+      header: "Category",
+      cell: ({ row }) => searchedCategory ?? row.original.category ?? "—",
     },
     {
       id: "performance",
