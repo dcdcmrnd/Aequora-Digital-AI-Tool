@@ -63,6 +63,16 @@ export async function POST(req: NextRequest) {
 
   const { additionalEmails, ...rest } = parsed.data;
 
+  if (rest.email) {
+    const existing = await prisma.contact.findFirst({
+      where: { email: { equals: rest.email, mode: "insensitive" } },
+      select: { id: true, name: true },
+    });
+    if (existing) {
+      return NextResponse.json({ error: `A contact with this email already exists: ${existing.name}` }, { status: 409 });
+    }
+  }
+
   const contact = await prisma.contact.create({
     data: {
       ...rest,

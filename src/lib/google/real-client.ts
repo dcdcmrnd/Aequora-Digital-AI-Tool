@@ -36,11 +36,13 @@ export function createRealGooglePlacesClient(): GooglePlacesClient {
       const target = Math.max(params.targetResults, perPage);
       const collected: MappedBusiness[] = [];
       let pageToken: string | undefined;
+      // Google requires every page request to repeat the same parameters as the
+      // initial one (textQuery/pageSize included) — a page request carrying only
+      // pageToken is rejected with "Empty text_query" (confirmed in production logs).
+      const baseBody = { textQuery: `${params.keyword} in ${params.location}`, pageSize: perPage };
 
       do {
-        const body = pageToken
-          ? { pageToken }
-          : { textQuery: `${params.keyword} in ${params.location}`, pageSize: perPage };
+        const body = pageToken ? { ...baseBody, pageToken } : baseBody;
 
         const response = await fetch(SEARCH_URL, {
           method: "POST",
