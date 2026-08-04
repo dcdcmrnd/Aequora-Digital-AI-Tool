@@ -10,19 +10,12 @@ import { SearchForm, type SearchFormValues } from "@/components/leads/SearchForm
 import { useLeads } from "@/hooks/useLeads";
 import { useLeadSearch } from "@/hooks/useLeadSearch";
 import { useSavedLeads } from "@/hooks/useSavedLeads";
-import { LEADS_PAGE_SIZE } from "@/lib/leads/constants";
+import { LEADS_PAGE_SIZE, toTitleCase } from "@/lib/leads/constants";
 import type { Lead } from "@/types";
 
 const PAGE_SIZE = LEADS_PAGE_SIZE;
 
 type SortColumn = SearchFormValues["sortBy"] | "email";
-
-function toTitleCase(value: string): string {
-  return value
-    .split(" ")
-    .map((word) => (word ? word[0].toUpperCase() + word.slice(1) : word))
-    .join(" ");
-}
 
 function parseFiltersFromParams(params: URLSearchParams): SearchFormValues | null {
   const keyword = params.get("keyword");
@@ -113,22 +106,15 @@ export function LeadsSearchView() {
   );
 
   // Carried on each lead's detail link so its Previous/Next can browse this
-  // exact same filtered/sorted list without re-deriving it from scratch.
-  const listParams = useMemo(() => {
-    if (!filters) return undefined;
-    const params = new URLSearchParams();
-    if (searchId) params.set("searchId", searchId);
-    params.set("category", toTitleCase(filters.keyword));
-    params.set("location", filters.location);
-    if (filters.minRating !== undefined) params.set("minRating", String(filters.minRating));
-    if (filters.minReviews !== undefined) params.set("minReviews", String(filters.minReviews));
-    if (filters.hasWebsite !== "any") params.set("hasWebsite", String(filters.hasWebsite === "has"));
-    if (filters.hasEmail !== "any") params.set("hasEmail", String(filters.hasEmail === "has"));
-    params.set("sortBy", sortBy);
-    params.set("sortDirection", sortDirection);
-    params.set("page", String(page));
-    return params.toString();
-  }, [filters, searchId, sortBy, sortDirection, page]);
+  // exact same filtered/sorted list, and so "Back to search" lands back on
+  // this exact search — deliberately the *same* keyword/location shape as
+  // buildSearchParams/parseFiltersFromParams above (the /leads page's own
+  // URL format), not the /api/leads query shape, so /leads can parse it back
+  // into a real search instead of falling back to its blank state.
+  const listParams = useMemo(
+    () => (filters ? buildSearchParams(filters, page, searchId, sortBy, sortDirection).toString() : undefined),
+    [filters, page, searchId, sortBy, sortDirection],
+  );
 
   function updateUrl(nextFilters: SearchFormValues, nextPage: number, nextSearchId: string | null, nextSortBy: SortColumn, nextSortDirection: "asc" | "desc") {
     router.replace(`/leads?${buildSearchParams(nextFilters, nextPage, nextSearchId, nextSortBy, nextSortDirection)}`, { scroll: false });

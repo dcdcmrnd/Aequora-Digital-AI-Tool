@@ -5,7 +5,7 @@ import { LeadDetailsView } from "@/components/leads/LeadDetailsView";
 import { authOptions } from "@/lib/auth";
 import { checkPermission } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
-import { LEADS_PAGE_SIZE } from "@/lib/leads/constants";
+import { LEADS_PAGE_SIZE, toTitleCase } from "@/lib/leads/constants";
 import { listLeadIds, type LeadSortColumn } from "@/services/business";
 import type { LeadStatus } from "@/types";
 
@@ -36,9 +36,12 @@ export default async function LeadDetailsPage({
   // The same filter/sort context the Leads search table was showing when this
   // lead was opened — reused here to compute Previous/Next without asking the
   // user to go back to the list, and forwarded again so Next/Prev keeps working
-  // as they continue browsing.
+  // as they continue browsing. Deliberately the /leads page's own URL shape
+  // (keyword/location/radius/hasWebsite="any"|"has"|"none"/...), not the
+  // /api/leads query shape, so "Back to search" can hand this same query
+  // string straight to /leads and have it reconstruct the real search.
   const searchId = firstOf(searchParams.searchId);
-  const category = firstOf(searchParams.category);
+  const keyword = firstOf(searchParams.keyword);
   const location = firstOf(searchParams.location);
   const minRating = firstOf(searchParams.minRating);
   const minReviews = firstOf(searchParams.minReviews);
@@ -46,6 +49,7 @@ export default async function LeadDetailsPage({
   const hasEmail = firstOf(searchParams.hasEmail);
   const sortBy = firstOf(searchParams.sortBy) as LeadSortColumn | undefined;
   const sortDirection = firstOf(searchParams.sortDirection) === "asc" ? "asc" : "desc";
+  const category = keyword ? toTitleCase(keyword) : undefined;
 
   let prevId: string | null = null;
   let nextId: string | null = null;
@@ -57,8 +61,8 @@ export default async function LeadDetailsPage({
       location,
       minRating: minRating ? Number(minRating) : undefined,
       minReviews: minReviews ? Number(minReviews) : undefined,
-      hasWebsite: hasWebsite === "true" ? true : hasWebsite === "false" ? false : undefined,
-      hasEmail: hasEmail === "true" ? true : hasEmail === "false" ? false : undefined,
+      hasWebsite: hasWebsite === "has" ? true : hasWebsite === "none" ? false : undefined,
+      hasEmail: hasEmail === "has" ? true : hasEmail === "none" ? false : undefined,
       sortBy,
       sortDirection,
     });
