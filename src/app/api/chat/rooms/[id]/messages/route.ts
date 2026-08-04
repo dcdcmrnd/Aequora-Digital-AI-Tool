@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { createNotification } from "@/lib/activity";
 import { prisma } from "@/lib/prisma";
+
+/** A short, human-readable preview for a notification body — content may be plain text or a JSON-encoded audio/image payload. */
+function previewChatContent(content: string): string {
+  const trimmed = content.trim();
+  if (trimmed.startsWith('{"type":"audio"')) return "🎤 Voice message";
+  if (trimmed.startsWith('{"type":"image"') || trimmed.startsWith('{"type":"gif"')) return "📷 Photo";
+  return trimmed.length > 140 ? `${trimmed.slice(0, 140)}…` : trimmed;
+}
 
 // GET /api/chat/rooms/[id]/messages
 export async function GET(
@@ -85,6 +94,24 @@ export async function POST(
       data: { lastReadAt: new Date() },
     }),
   ]);
+
+  const otherMembers = await prisma.chatMember.findMany({
+    where: { roomId: params.id, userId: { not: session.user.id } },
+    select: { userId: true },
+  });
+  const preview = previewChatContent(content.trim());
+  await Promise.all(
+    otherMembers.map((m) =>
+      createNotification({
+        userId: m.userId,
+        type: "chat_message",
+        title: `New message from ${message.sender.name}`,
+        body: preview,
+        entityType: "chat",
+        entityId: params.id,
+      }),
+    ),
+  );
 
   return NextResponse.json({
     message: { ...message, createdAt: message.createdAt.toISOString() },

@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/gmail";
 import { createNotification } from "@/lib/activity";
+import { formatWeekdayTime, getNextWeekdayOccurrenceUtc } from "@/lib/utils/schedule";
 import { applyMergeTags, contactMergeValues } from "./mergeTags";
 import type {
   AutomationEdge,
@@ -424,7 +425,10 @@ async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string,
       }
 
       if (node.type === "wait") {
-        const data = node.data as { mode?: string; amount?: number; unit?: WaitUnit; condition?: string };
+        const data = node.data as {
+          mode?: string; amount?: number; unit?: WaitUnit; condition?: string;
+          dayOfWeek?: number; time?: string; timezone?: string;
+        };
 
         if (data.mode === "condition") {
           const lastTracked = await prisma.emailTracking.findFirst({
@@ -436,6 +440,18 @@ async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string,
             data: { status: "waiting", currentNodeId: node.id, waitToken: lastTracked?.token ?? null },
           });
           await logStep(run.id, node.id, node.type, "waiting", "Waiting for email to be opened");
+        } else if (data.mode === "schedule") {
+          const [hourStr, minuteStr] = (data.time ?? "09:00").split(":");
+          const hour = Number(hourStr) || 0;
+          const minute = Number(minuteStr) || 0;
+          const timezone = data.timezone || "America/New_York";
+          const dayOfWeek = data.dayOfWeek ?? 1;
+          const waitUntil = getNextWeekdayOccurrenceUtc(dayOfWeek, hour, minute, timezone);
+          await prisma.automationRun.update({
+            where: { id: run.id },
+            data: { status: "waiting", currentNodeId: node.id, waitUntil },
+          });
+          await logStep(run.id, node.id, node.type, "waiting", `Waiting until ${formatWeekdayTime(dayOfWeek, hour, minute, timezone)}`);
         } else {
           const ms = durationMs(data.amount ?? 1, data.unit ?? "hours");
           await prisma.automationRun.update({

@@ -10,6 +10,9 @@ const ENTITY_ROUTES: Record<string, (id: string) => string> = {
   project: (id) => `/projects/${id}`,
   note: (id) => `/notes/${id}`,
   automation: (id) => `/automation/${id}`,
+  chat: (id) => `/chat?room=${id}`,
+  inbox: () => `/inbox`,
+  conversations: () => `/conversations`,
 };
 
 export function NotificationBell() {
@@ -21,10 +24,15 @@ export function NotificationBell() {
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   useEffect(() => {
-    fetch("/api/notifications")
-      .then((r) => r.json())
-      .then((data) => setNotifications(data.notifications ?? []))
-      .catch(() => {});
+    const load = () => {
+      fetch("/api/notifications")
+        .then((r) => r.json())
+        .then((data) => setNotifications(data.notifications ?? []))
+        .catch(() => {});
+    };
+    load();
+    const interval = setInterval(load, 15000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -66,6 +74,8 @@ export function NotificationBell() {
     if (type === "task_assigned") return "✓";
     if (type === "task_completed") return "✅";
     if (type === "mention") return "@";
+    if (type === "chat_message") return "💬";
+    if (type === "new_email") return "📧";
     return "🔔";
   };
 

@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/Textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/Select";
 import { CONTACT_MERGE_TAGS } from "@/lib/automation/mergeTags";
 import { NODE_DEFINITIONS } from "@/lib/automation/nodeRegistry";
+import { COMMON_TIMEZONES, WEEKDAY_LABELS } from "@/lib/utils/schedule";
 import type {
   Automation,
   AutomationConditionType,
@@ -516,6 +517,7 @@ export function NodeConfigPanel({ node, stages, automationId, onClose, onSave, o
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="duration">A set amount of time</SelectItem>
+                  <SelectItem value="schedule">A specific day &amp; time</SelectItem>
                   <SelectItem value="condition">Until the email is opened</SelectItem>
                 </SelectContent>
               </Select>
@@ -544,10 +546,47 @@ export function NodeConfigPanel({ node, stages, automationId, onClose, onSave, o
                 </Field>
               </div>
             )}
+            {data.mode === "schedule" && (
+              <>
+                <Field label="Day of week">
+                  <Select value={String((data.dayOfWeek as number) ?? 1)} onValueChange={(v) => set("dayOfWeek", Number(v))}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {WEEKDAY_LABELS.map((label, i) => (
+                        <SelectItem key={label} value={String(i)}>
+                          {label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Time">
+                    <Input type="time" value={(data.time as string) ?? "09:00"} onChange={(e) => set("time", e.target.value)} />
+                  </Field>
+                  <Field label="Timezone">
+                    <Select value={(data.timezone as string) || "America/New_York"} onValueChange={(v) => set("timezone", v)}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {COMMON_TIMEZONES.map((tz) => (
+                          <SelectItem key={tz.value} value={tz.value}>
+                            {tz.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                </div>
+              </>
+            )}
             <p className="text-text-muted text-xs">
-              {(data.mode ?? "duration") === "duration"
-                ? "This project runs on Vercel's free tier, which checks for due waits once a day — waits under a day may take up to 24h to fire. Upgrading the Vercel plan tightens this automatically."
-                : "Resumes immediately when the tracking pixel in the sent email is loaded."}
+              {data.mode === "condition"
+                ? "Resumes immediately when the tracking pixel in the sent email is loaded."
+                : "This project runs on Vercel's free tier, which checks for due waits once a day — waits may fire up to 24h later than the exact time configured. Upgrading the Vercel plan tightens this automatically."}
             </p>
           </>
         )}

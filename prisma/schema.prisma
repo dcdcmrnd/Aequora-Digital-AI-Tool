@@ -328,6 +328,11 @@ model GmailToken {
   updatedAt    DateTime @updatedAt
   ownerId      String?
   owner        User?    @relation("GmailTokenOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  // Watermark for the new-mail notification cron — messages received after
+  // this are "new" since the last check; null means never checked yet (the
+  // first run just sets this without notifying, to avoid flooding everyone
+  // with notifications for an entire mailbox's history).
+  lastCheckedAt DateTime?
 
   @@index([ownerId])
 }

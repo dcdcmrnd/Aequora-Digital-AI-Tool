@@ -18,6 +18,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import { formatWeekdayTime } from "@/lib/utils/schedule";
+
 import type { AutomationNodeType } from "./types";
 
 export type NodeCategory = "Contact & Pipeline" | "Records" | "Notifications & Webhooks" | "Flow Control";
@@ -146,6 +148,10 @@ export const NODE_DEFINITIONS: Record<AutomationNodeType, NodeDefinition> = {
     defaultData: () => ({ mode: "duration", amount: 1, unit: "hours" }),
     summarize: (data) => {
       if (data.mode === "condition") return "Until email is opened";
+      if (data.mode === "schedule") {
+        const [h, m] = ((data.time as string) ?? "09:00").split(":").map(Number);
+        return formatWeekdayTime((data.dayOfWeek as number) ?? 1, h, m, (data.timezone as string) || "America/New_York");
+      }
       if (data.amount) return `${data.amount} ${data.unit ?? "hours"}`;
       return "Click to configure";
     },
