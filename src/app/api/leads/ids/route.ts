@@ -3,10 +3,11 @@ import { getServerSession } from "next-auth";
 
 import { authOptions } from "@/lib/auth";
 import { checkPermission } from "@/lib/permissions";
-import { listLeads, type LeadSortColumn } from "@/services/business";
+import { listLeadIds, type LeadSortColumn } from "@/services/business";
 
 const SORTABLE_COLUMNS: LeadSortColumn[] = ["opportunityScore", "reviewCount", "rating", "createdAt", "email"];
 
+/** Ordered lead ids for the current filter/sort context — powers Previous/Next on the lead detail page. */
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -21,10 +22,8 @@ export async function GET(req: NextRequest) {
   const hasWebsiteParam = searchParams.get("hasWebsite");
   const hasEmailParam = searchParams.get("hasEmail");
   const sortByParam = searchParams.get("sortBy") as LeadSortColumn | null;
-  const page = searchParams.get("page");
-  const pageSize = searchParams.get("pageSize");
 
-  const result = await listLeads({
+  const ids = await listLeadIds({
     searchId: searchParams.get("searchId") ?? undefined,
     category: searchParams.get("category") ?? undefined,
     location: searchParams.get("location") ?? undefined,
@@ -35,9 +34,7 @@ export async function GET(req: NextRequest) {
     hasEmail: hasEmailParam === "true" ? true : hasEmailParam === "false" ? false : undefined,
     sortBy: sortByParam && SORTABLE_COLUMNS.includes(sortByParam) ? sortByParam : undefined,
     sortDirection: searchParams.get("sortDirection") === "asc" ? "asc" : "desc",
-    page: page ? Number(page) : undefined,
-    pageSize: pageSize ? Number(pageSize) : undefined,
   });
 
-  return NextResponse.json(result);
+  return NextResponse.json({ ids });
 }

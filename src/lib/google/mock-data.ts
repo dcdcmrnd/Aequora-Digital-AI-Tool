@@ -86,7 +86,8 @@ export function generateMockBusinesses(params: PlaceSearchParams): MappedBusines
   const centerLat = randomFloat(rng, 25, 49, 4);
   const centerLng = randomFloat(rng, -124, -68, 4);
 
-  const count = randomInt(rng, Math.min(8, params.maxResults), params.maxResults);
+  const target = Math.max(params.targetResults, params.maxResults);
+  const count = randomInt(rng, Math.min(8, target), target);
 
   return Array.from({ length: count }, (): MappedBusiness => {
     const { lat, lng } = offsetLatLng(rng, centerLat, centerLng, params.radiusMeters);

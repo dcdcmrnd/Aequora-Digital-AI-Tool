@@ -9,7 +9,7 @@ export interface LeadWithAudit extends Lead {
   audit: LeadAudit | null;
 }
 
-export type LeadSortColumn = "opportunityScore" | "reviewCount" | "rating" | "createdAt";
+export type LeadSortColumn = "opportunityScore" | "reviewCount" | "rating" | "createdAt" | "email";
 
 /**
  * Google's Places category taxonomy rarely matches the user's typed keyword
@@ -58,21 +58,8 @@ export interface ListLeadsResult {
   pageSize: number;
 }
 
-export async function listLeads(params: ListLeadsParams = {}): Promise<ListLeadsResult> {
-  const {
-    searchId,
-    category,
-    location,
-    minRating,
-    minReviews,
-    hasWebsite,
-    hasEmail,
-    search,
-    sortBy = "opportunityScore",
-    sortDirection = "desc",
-    page = 1,
-    pageSize = 25,
-  } = params;
+function buildLeadWhere(params: Omit<ListLeadsParams, "sortBy" | "sortDirection" | "page" | "pageSize">): Prisma.LeadWhereInput {
+  const { searchId, category, location, minRating, minReviews, hasWebsite, hasEmail, search } = params;
 
   const where: Prisma.LeadWhereInput = {};
   if (searchId) {
@@ -107,11 +94,29 @@ export async function listLeads(params: ListLeadsParams = {}): Promise<ListLeads
   if (hasEmail === false) where.enrichedEmail = null;
   if (search) where.name = { contains: search, mode: "insensitive" };
 
+  return where;
+}
+
+/**
+ * "email" isn't a real Lead column (it's enrichedEmail) and, being nullable,
+ * needs nulls pinned last in both directions — businesses with an email
+ * found should always surface above ones without, regardless of A-Z/Z-A.
+ */
+function buildLeadOrderBy(sortBy: LeadSortColumn, sortDirection: "asc" | "desc"): Prisma.LeadOrderByWithRelationInput {
+  if (sortBy === "email") return { enrichedEmail: { sort: sortDirection, nulls: "last" } };
+  return { [sortBy]: sortDirection };
+}
+
+export async function listLeads(params: ListLeadsParams = {}): Promise<ListLeadsResult> {
+  const { sortBy = "opportunityScore", sortDirection = "desc", page = 1, pageSize = 25 } = params;
+  const where = buildLeadWhere(params);
+  const orderBy = buildLeadOrderBy(sortBy, sortDirection);
+
   const [leads, total] = await Promise.all([
     prisma.lead.findMany({
       where,
       include: { audit: true },
-      orderBy: { [sortBy]: sortDirection },
+      orderBy,
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
@@ -119,6 +124,22 @@ export async function listLeads(params: ListLeadsParams = {}): Promise<ListLeads
   ]);
 
   return { leads, total, page, pageSize };
+}
+
+const LEAD_ID_LIST_CAP = 300;
+
+/**
+ * Just the ids, in the same order `listLeads` would return them, unpaginated
+ * (up to a safety cap) — powers Previous/Next navigation on the lead detail
+ * page without re-fetching every lead's full record.
+ */
+export async function listLeadIds(params: Omit<ListLeadsParams, "page" | "pageSize"> = {}): Promise<string[]> {
+  const { sortBy = "opportunityScore", sortDirection = "desc" } = params;
+  const where = buildLeadWhere(params);
+  const orderBy = buildLeadOrderBy(sortBy, sortDirection);
+
+  const rows = await prisma.lead.findMany({ where, orderBy, select: { id: true }, take: LEAD_ID_LIST_CAP });
+  return rows.map((r) => r.id);
 }
 
 export async function getLeadById(id: string): Promise<LeadWithAudit | null> {

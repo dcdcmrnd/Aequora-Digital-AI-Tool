@@ -6,7 +6,8 @@ import { type LeadWithAudit, upsertLeads } from "@/services/business";
 import { enrichLead } from "@/services/enrichment";
 import { searchBusinesses } from "@/services/google";
 
-const SEARCH_MAX_RESULTS = 20;
+const SEARCH_PAGE_SIZE = 20; // Google's hard per-request cap
+const SEARCH_TARGET_RESULTS = 60; // total leads to gather per search, paging past Google's per-request cap
 const SEARCH_AUDIT_CONCURRENCY = 5;
 
 export interface ExecuteSearchParams {
@@ -50,7 +51,8 @@ export async function executeSearch(params: ExecuteSearchParams): Promise<Execut
     keyword: params.keyword,
     location: params.location,
     radiusMeters,
-    maxResults: SEARCH_MAX_RESULTS,
+    maxResults: SEARCH_PAGE_SIZE,
+    targetResults: SEARCH_TARGET_RESULTS,
   });
 
   const leads = await upsertLeads(mapped, searchRow.id);

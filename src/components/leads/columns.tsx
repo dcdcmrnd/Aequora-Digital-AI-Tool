@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import type { Column, ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown, BookUser, Star } from "lucide-react";
+import type { ColumnDef } from "@tanstack/react-table";
+import { ArrowDown, ArrowUp, ArrowUpDown, BookUser, Star } from "lucide-react";
 
 import { OpportunityBadge } from "@/components/leads/OpportunityBadge";
 import { ScoreGauge } from "@/components/leads/ScoreGauge";
@@ -10,16 +10,35 @@ import { WebsiteStatus } from "@/components/leads/WebsiteStatus";
 import { Button } from "@/components/ui/Button";
 import type { Lead } from "@/types";
 
-function SortableHeader({ column, label }: { column: Column<Lead, unknown>; label: string }) {
+export type LeadSortKey = "rating" | "reviewCount" | "email" | "opportunityScore";
+/** Broader than LeadSortKey — the "Newest" (createdAt) option is only reachable via the
+    Sort By dropdown, not a clickable header, but still needs to compare against it here. */
+export type LeadActiveSortBy = LeadSortKey | "createdAt";
+
+interface ServerSortableHeaderProps {
+  label: string;
+  sortKey: LeadSortKey;
+  activeSortBy?: string;
+  activeSortDirection?: "asc" | "desc";
+  onSort: (key: LeadSortKey) => void;
+}
+
+/**
+ * Unlike tanstack's own column sorting (which only reorders the current
+ * page's rows), clicking this re-queries the backend across the whole
+ * filtered result set — sorting has to happen server-side since results are
+ * server-paginated.
+ */
+function ServerSortableHeader({ label, sortKey, activeSortBy, activeSortDirection, onSort }: ServerSortableHeaderProps) {
+  const isActive = activeSortBy === sortKey;
   return (
-    <Button
-      variant="ghost"
-      size="sm"
-      className="-ml-3"
-      onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-    >
+    <Button variant="ghost" size="sm" className="-ml-3" onClick={() => onSort(sortKey)}>
       {label}
-      <ArrowUpDown className="ml-1 size-3.5" />
+      {isActive ? (
+        activeSortDirection === "asc" ? <ArrowUp className="ml-1 size-3.5" /> : <ArrowDown className="ml-1 size-3.5" />
+      ) : (
+        <ArrowUpDown className="ml-1 size-3.5 opacity-50" />
+      )}
     </Button>
   );
 }
@@ -31,15 +50,33 @@ export interface LeadColumnsOptions {
   /** The category actually searched for (e.g. "Architects") — shown instead of
       Google's own, often too-generic place type (e.g. "Services") when set. */
   searchedCategory?: string;
+  sortBy?: LeadActiveSortBy;
+  sortDirection?: "asc" | "desc";
+  onSort: (key: LeadSortKey) => void;
+  /** Query string carrying the current search/filter/sort context, appended to each
+      lead's detail link so Previous/Next there can browse this same ordered list. */
+  listParams?: string;
 }
 
-export function createLeadColumns({ savedLeadIds, onSave, onSaveAsContact, searchedCategory }: LeadColumnsOptions): ColumnDef<Lead>[] {
+export function createLeadColumns({
+  savedLeadIds,
+  onSave,
+  onSaveAsContact,
+  searchedCategory,
+  sortBy,
+  sortDirection,
+  onSort,
+  listParams,
+}: LeadColumnsOptions): ColumnDef<Lead>[] {
   return [
     {
       accessorKey: "name",
       header: "Business",
       cell: ({ row }) => (
-        <Link href={`/leads/${row.original.id}`} className="text-text-primary font-medium hover:underline">
+        <Link
+          href={`/leads/${row.original.id}${listParams ? `?${listParams}` : ""}`}
+          className="text-text-primary font-medium hover:underline"
+        >
           {row.original.name}
         </Link>
       ),
@@ -55,7 +92,9 @@ export function createLeadColumns({ savedLeadIds, onSave, onSaveAsContact, searc
     },
     {
       accessorKey: "rating",
-      header: ({ column }) => <SortableHeader column={column} label="Rating" />,
+      header: () => (
+        <ServerSortableHeader label="Rating" sortKey="rating" activeSortBy={sortBy} activeSortDirection={sortDirection} onSort={onSort} />
+      ),
       cell: ({ row }) =>
         row.original.rating !== null ? (
           <span className="inline-flex items-center gap-1">
@@ -68,7 +107,9 @@ export function createLeadColumns({ savedLeadIds, onSave, onSaveAsContact, searc
     },
     {
       accessorKey: "reviewCount",
-      header: ({ column }) => <SortableHeader column={column} label="Reviews" />,
+      header: () => (
+        <ServerSortableHeader label="Reviews" sortKey="reviewCount" activeSortBy={sortBy} activeSortDirection={sortDirection} onSort={onSort} />
+      ),
     },
     {
       id: "website",
@@ -77,7 +118,9 @@ export function createLeadColumns({ savedLeadIds, onSave, onSaveAsContact, searc
     },
     {
       id: "email",
-      header: "Email",
+      header: () => (
+        <ServerSortableHeader label="Email" sortKey="email" activeSortBy={sortBy} activeSortDirection={sortDirection} onSort={onSort} />
+      ),
       cell: ({ row }) => {
         const email = row.original.enrichedEmail;
         return email ? (
@@ -106,7 +149,15 @@ export function createLeadColumns({ savedLeadIds, onSave, onSaveAsContact, searc
     },
     {
       accessorKey: "opportunityScore",
-      header: ({ column }) => <SortableHeader column={column} label="Opportunity Score" />,
+      header: () => (
+        <ServerSortableHeader
+          label="Opportunity Score"
+          sortKey="opportunityScore"
+          activeSortBy={sortBy}
+          activeSortDirection={sortDirection}
+          onSort={onSort}
+        />
+      ),
       cell: ({ row }) => <OpportunityBadge score={row.original.opportunityScore} />,
     },
     {

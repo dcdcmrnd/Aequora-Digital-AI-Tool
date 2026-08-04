@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AlertCircle } from "lucide-react";
 
+import type { LeadSortKey } from "@/components/leads/columns";
 import { LeadTable } from "@/components/leads/LeadTable";
 import { SearchForm, type SearchFormValues } from "@/components/leads/SearchForm";
 import { useLeads } from "@/hooks/useLeads";
@@ -12,6 +13,8 @@ import { useSavedLeads } from "@/hooks/useSavedLeads";
 import type { Lead } from "@/types";
 
 const PAGE_SIZE = 10;
+
+type SortColumn = SearchFormValues["sortBy"] | "email";
 
 function toTitleCase(value: string): string {
   return value
@@ -40,7 +43,13 @@ function parseFiltersFromParams(params: URLSearchParams): SearchFormValues | nul
   };
 }
 
-function buildSearchParams(filters: SearchFormValues, page: number, searchId: string | null): URLSearchParams {
+function buildSearchParams(
+  filters: SearchFormValues,
+  page: number,
+  searchId: string | null,
+  sortBy: SortColumn,
+  sortDirection: "asc" | "desc",
+): URLSearchParams {
   const params = new URLSearchParams();
   params.set("keyword", filters.keyword);
   params.set("location", filters.location);
@@ -49,7 +58,8 @@ function buildSearchParams(filters: SearchFormValues, page: number, searchId: st
   if (filters.minReviews !== undefined) params.set("minReviews", String(filters.minReviews));
   params.set("hasWebsite", filters.hasWebsite);
   params.set("hasEmail", filters.hasEmail);
-  params.set("sortBy", filters.sortBy);
+  params.set("sortBy", sortBy);
+  params.set("sortDirection", sortDirection);
   params.set("page", String(page));
   if (searchId) params.set("searchId", searchId);
   return params;
@@ -71,6 +81,15 @@ export function LeadsSearchView() {
   // (via Lead.lastSearchId) instead of re-deriving "what matched" through
   // fuzzy category/location text matching against the whole shared table.
   const [searchId, setSearchId] = useState<string | null>(() => searchParams.get("searchId"));
+  // Independent from the search form's own "Sort By" dropdown — clicking a
+  // column header (Rating/Reviews/Email/Opportunity Score) updates this
+  // directly and re-queries the DB, without re-running the Google search.
+  const [sortBy, setSortBy] = useState<SortColumn>(
+    () => (searchParams.get("sortBy") as SortColumn) || "opportunityScore",
+  );
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">(
+    () => (searchParams.get("sortDirection") === "asc" ? "asc" : "desc"),
+  );
 
   const savedLeadIds = useMemo(() => new Set((savedLeads ?? []).map((saved) => saved.leadId)), [savedLeads]);
 
@@ -84,29 +103,48 @@ export function LeadsSearchView() {
           minReviews: filters.minReviews,
           hasWebsite: filters.hasWebsite === "any" ? undefined : filters.hasWebsite === "has",
           hasEmail: filters.hasEmail === "any" ? undefined : filters.hasEmail === "has",
-          sortBy: filters.sortBy,
-          sortDirection: "desc",
+          sortBy,
+          sortDirection,
           page,
           pageSize: PAGE_SIZE,
         }
-      : { page, pageSize: PAGE_SIZE },
+      : { page, pageSize: PAGE_SIZE, sortBy, sortDirection },
   );
 
-  function updateUrl(nextFilters: SearchFormValues, nextPage: number, nextSearchId: string | null) {
-    router.replace(`/leads?${buildSearchParams(nextFilters, nextPage, nextSearchId)}`, { scroll: false });
+  // Carried on each lead's detail link so its Previous/Next can browse this
+  // exact same filtered/sorted list without re-deriving it from scratch.
+  const listParams = useMemo(() => {
+    if (!filters) return undefined;
+    const params = new URLSearchParams();
+    if (searchId) params.set("searchId", searchId);
+    params.set("category", toTitleCase(filters.keyword));
+    params.set("location", filters.location);
+    if (filters.minRating !== undefined) params.set("minRating", String(filters.minRating));
+    if (filters.minReviews !== undefined) params.set("minReviews", String(filters.minReviews));
+    if (filters.hasWebsite !== "any") params.set("hasWebsite", String(filters.hasWebsite === "has"));
+    if (filters.hasEmail !== "any") params.set("hasEmail", String(filters.hasEmail === "has"));
+    params.set("sortBy", sortBy);
+    params.set("sortDirection", sortDirection);
+    return params.toString();
+  }, [filters, searchId, sortBy, sortDirection]);
+
+  function updateUrl(nextFilters: SearchFormValues, nextPage: number, nextSearchId: string | null, nextSortBy: SortColumn, nextSortDirection: "asc" | "desc") {
+    router.replace(`/leads?${buildSearchParams(nextFilters, nextPage, nextSearchId, nextSortBy, nextSortDirection)}`, { scroll: false });
   }
 
   function handleSubmit(values: SearchFormValues) {
     setFilters(values);
     setPage(1);
     setSearchId(null);
-    updateUrl(values, 1, null);
+    setSortBy(values.sortBy);
+    setSortDirection("desc");
+    updateUrl(values, 1, null, values.sortBy, "desc");
     search.mutate(
       { keyword: values.keyword, location: values.location, radiusMeters: values.radiusMeters },
       {
         onSuccess: (result) => {
           setSearchId(result.searchId);
-          updateUrl(values, 1, result.searchId);
+          updateUrl(values, 1, result.searchId, values.sortBy, "desc");
         },
       },
     );
@@ -114,7 +152,16 @@ export function LeadsSearchView() {
 
   function handlePageChange(nextPage: number) {
     setPage(nextPage);
-    if (filters) updateUrl(filters, nextPage, searchId);
+    if (filters) updateUrl(filters, nextPage, searchId, sortBy, sortDirection);
+  }
+
+  function handleSort(key: LeadSortKey) {
+    const nextDirection: "asc" | "desc" =
+      sortBy === key ? (sortDirection === "asc" ? "desc" : "asc") : key === "email" ? "asc" : "desc";
+    setSortBy(key);
+    setSortDirection(nextDirection);
+    setPage(1);
+    if (filters) updateUrl(filters, 1, searchId, key, nextDirection);
   }
 
   function handleSave(lead: Lead) {
@@ -150,6 +197,10 @@ export function LeadsSearchView() {
           total={leads.data.total}
           onPageChange={handlePageChange}
           searchedCategory={filters ? toTitleCase(filters.keyword) : undefined}
+          sortBy={sortBy}
+          sortDirection={sortDirection}
+          onSort={handleSort}
+          listParams={listParams}
         />
       ) : (
         <p className="text-text-muted text-sm">Search for a business category and location to get started.</p>

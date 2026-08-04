@@ -4,7 +4,10 @@ export const placeSearchParamsSchema = z.object({
   keyword: z.string().min(1),
   location: z.string().min(1),
   radiusMeters: z.number().int().positive().max(50_000).default(5_000),
+  /** Google's hard per-request cap — the client pages past this via nextPageToken to reach targetResults. */
   maxResults: z.number().int().positive().max(20).default(20),
+  /** Desired total across all pages — the client keeps paging (via nextPageToken) until it hits this or Google runs out of pages. */
+  targetResults: z.number().int().positive().max(60).default(20),
 });
 export type PlaceSearchParams = z.infer<typeof placeSearchParamsSchema>;
 
@@ -55,5 +58,6 @@ export type PlaceApiPlace = z.infer<typeof placeSchema>;
 
 export const placeApiResponseSchema = z.object({
   places: z.array(placeSchema).optional(),
+  nextPageToken: z.string().optional(),
 });
 export type PlaceApiResponse = z.infer<typeof placeApiResponseSchema>;

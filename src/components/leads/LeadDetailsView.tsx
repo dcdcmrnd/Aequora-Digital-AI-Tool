@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, BookUser, Bookmark, ExternalLink, Mail, MapPin, Phone, RefreshCw, Search } from "lucide-react";
+import { ArrowLeft, BookUser, Bookmark, ChevronLeft, ChevronRight, ExternalLink, Mail, MapPin, Phone, RefreshCw, Search } from "lucide-react";
 
 import { AuditCard } from "@/components/leads/AuditCard";
 import { NotesEditor } from "@/components/leads/NotesEditor";
@@ -21,9 +21,13 @@ import { LEAD_STATUSES, type Lead, type LeadStatus, type SavedLead } from "@/typ
 interface LeadDetailsViewProps {
   lead: Lead;
   initialSavedLead: SavedLead | null;
+  /** Neighbors in the search-result list this lead was opened from — powers Previous/Next below. */
+  prevId?: string | null;
+  nextId?: string | null;
+  listParams?: string;
 }
 
-export function LeadDetailsView({ lead: initialLead, initialSavedLead }: LeadDetailsViewProps) {
+export function LeadDetailsView({ lead: initialLead, initialSavedLead, prevId, nextId, listParams }: LeadDetailsViewProps) {
   const router = useRouter();
   const audit = useLeadAudit(initialLead.id);
   const enrich = useLeadEnrich(initialLead.id);
@@ -75,12 +79,38 @@ export function LeadDetailsView({ lead: initialLead, initialSavedLead }: LeadDet
       : []),
   ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
+  const suffix = listParams ? `?${listParams}` : "";
+
   return (
     <div className="space-y-6">
-      <Button variant="ghost" size="sm" className="-ml-3" onClick={() => router.back()}>
-        <ArrowLeft className="size-4" />
-        Back to search
-      </Button>
+      <div className="flex items-center justify-between">
+        <Button variant="ghost" size="sm" className="-ml-3" onClick={() => router.back()}>
+          <ArrowLeft className="size-4" />
+          Back to search
+        </Button>
+        {(prevId || nextId) && (
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!prevId}
+              onClick={() => prevId && router.push(`/leads/${prevId}${suffix}`)}
+            >
+              <ChevronLeft className="size-4" />
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!nextId}
+              onClick={() => nextId && router.push(`/leads/${nextId}${suffix}`)}
+            >
+              Next
+              <ChevronRight className="size-4" />
+            </Button>
+          </div>
+        )}
+      </div>
 
       <div className="flex items-start justify-between gap-4">
         <div>

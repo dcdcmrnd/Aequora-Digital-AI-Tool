@@ -6,6 +6,10 @@ import { authOptions } from "@/lib/auth";
 import { checkPermission } from "@/lib/permissions";
 import { executeSearch } from "@/services/search";
 
+// Fetching up to 60 leads (paginated Google calls) plus auditing/enriching each
+// takes longer than the platform default — give it real headroom.
+export const maxDuration = 60;
+
 const searchSchema = z.object({
   keyword: z.string().min(1),
   location: z.string().min(1),

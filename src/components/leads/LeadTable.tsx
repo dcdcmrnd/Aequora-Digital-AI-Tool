@@ -1,17 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import {
-  flexRender,
-  getCoreRowModel,
-  getFilteredRowModel,
-  getSortedRowModel,
-  useReactTable,
-  type SortingState,
-} from "@tanstack/react-table";
+import { flexRender, getCoreRowModel, getFilteredRowModel, useReactTable } from "@tanstack/react-table";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
-import { createLeadColumns } from "@/components/leads/columns";
+import { createLeadColumns, type LeadActiveSortBy, type LeadSortKey } from "@/components/leads/columns";
 import { ContactFormModal } from "@/components/contacts/ContactFormModal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -27,26 +20,42 @@ interface LeadTableProps {
   total: number;
   onPageChange: (page: number) => void;
   searchedCategory?: string;
+  sortBy?: LeadActiveSortBy;
+  sortDirection?: "asc" | "desc";
+  onSort: (key: LeadSortKey) => void;
+  listParams?: string;
 }
 
-export function LeadTable({ data, savedLeadIds, onSave, page, pageSize, total, onPageChange, searchedCategory }: LeadTableProps) {
-  const [sorting, setSorting] = useState<SortingState>([]);
+export function LeadTable({
+  data,
+  savedLeadIds,
+  onSave,
+  page,
+  pageSize,
+  total,
+  onPageChange,
+  searchedCategory,
+  sortBy,
+  sortDirection,
+  onSort,
+  listParams,
+}: LeadTableProps) {
   const [globalFilter, setGlobalFilter] = useState("");
   const [contactPrefillLead, setContactPrefillLead] = useState<Lead | null>(null);
 
   const columns = useMemo(
-    () => createLeadColumns({ savedLeadIds, onSave, onSaveAsContact: setContactPrefillLead, searchedCategory }),
-    [savedLeadIds, onSave, searchedCategory],
+    () => createLeadColumns({ savedLeadIds, onSave, onSaveAsContact: setContactPrefillLead, searchedCategory, sortBy, sortDirection, onSort, listParams }),
+    [savedLeadIds, onSave, searchedCategory, sortBy, sortDirection, onSort, listParams],
   );
 
+  // Sorting is server-driven (see onSort) since results are server-paginated —
+  // only the "search this page" text filter stays client-side here.
   const table = useReactTable({
     data,
     columns,
-    state: { sorting, globalFilter },
-    onSortingChange: setSorting,
+    state: { globalFilter },
     onGlobalFilterChange: setGlobalFilter,
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     globalFilterFn: (row, _columnId, filterValue) =>
       row.original.name.toLowerCase().includes(String(filterValue).toLowerCase()),

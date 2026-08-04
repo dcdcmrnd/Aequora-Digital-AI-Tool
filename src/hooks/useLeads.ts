@@ -16,7 +16,7 @@ export interface UseLeadsParams {
   /** true = has an enriched email on file, false = no email found, undefined = both */
   hasEmail?: boolean;
   search?: string;
-  sortBy?: "opportunityScore" | "reviewCount" | "rating" | "createdAt";
+  sortBy?: "opportunityScore" | "reviewCount" | "rating" | "createdAt" | "email";
   sortDirection?: "asc" | "desc";
   page?: number;
   pageSize?: number;
