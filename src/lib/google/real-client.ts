@@ -7,8 +7,10 @@ const SEARCH_URL = "https://places.googleapis.com/v1/places:searchText";
 // Google documents a short delay before a freshly-issued nextPageToken becomes usable.
 const PAGE_TOKEN_DELAY_MS = 2_000;
 
-// Places API (New) strictly filters the response to only what's listed here —
-// omitting nextPageToken means Google never returns one, silently breaking pagination.
+// NOTE: adding a bare "nextPageToken" entry here was tried to support pagination and
+// confirmed via production logs to make Google reject every request with 400 Bad
+// Request — reverted. See the response-body logging below for diagnosing the real
+// cause before trying again.
 const FIELD_MASK = [
   "places.id",
   "places.displayName",
@@ -22,7 +24,6 @@ const FIELD_MASK = [
   "places.formattedAddress",
   "places.addressComponents",
   "places.location",
-  "nextPageToken",
 ].join(",");
 
 export function createRealGooglePlacesClient(): GooglePlacesClient {
@@ -52,6 +53,8 @@ export function createRealGooglePlacesClient(): GooglePlacesClient {
         });
 
         if (!response.ok) {
+          const errorBody = await response.text().catch(() => "");
+          console.error("Google Places API error", response.status, errorBody);
           throw new Error(`Google Places API error: ${response.status} ${response.statusText}`);
         }
 
