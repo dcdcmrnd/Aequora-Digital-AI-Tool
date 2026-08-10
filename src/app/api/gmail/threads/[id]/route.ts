@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { findOrCreateContactByEmail } from "@/lib/contactLinking";
+import { findContactByEmail } from "@/lib/contactLinking";
 import { archiveThread, extractBody, extractContact, getConnectedEmail, getGmailClient, getHeader, trashThread } from "@/lib/gmail";
 import { checkPermission } from "@/lib/permissions";
 
@@ -73,14 +73,20 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
     const firstHeaders = thread.data.messages?.[0]?.payload?.headers ?? [];
 
-    // Auto-link this thread's other party to a CRM contact — same as the
-    // thread list, and same scope restriction (agency inbox only).
+    // Link this thread's other party to an existing CRM contact if there is
+    // one — same as the thread list, and same scope restriction (agency
+    // inbox only). Never creates a new contact; contactName/contactEmail are
+    // still returned so the client can offer a manual "Save as Contact".
     let contactId: string | null = null;
+    let contactName: string | null = null;
+    let contactEmail: string | null = null;
     if (scopeParam === "agency") {
       const lastMessage = messages[messages.length - 1];
       if (lastMessage) {
         const contact = extractContact(lastMessage.from, lastMessage.to, lastMessage.isOutgoing);
-        contactId = await findOrCreateContactByEmail(contact.email, contact.name, session.user.id);
+        contactId = await findContactByEmail(contact.email);
+        contactName = contact.name;
+        contactEmail = contact.email;
       }
     }
 
@@ -90,6 +96,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       status: hadUnread ? "unread" : "read",
       messages,
       contactId,
+      contactName,
+      contactEmail,
     });
   } catch (err: any) {
     if (err.message?.includes("Gmail not connected")) {

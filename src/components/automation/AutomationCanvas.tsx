@@ -89,6 +89,13 @@ function layout(nodes: AutomationNode[], edges: AutomationFlow["edges"]): Automa
   }));
 }
 
+interface NodeMenuActions {
+  onCopyNode: (nodeId: string) => void;
+  onCopySubtree: (nodeId: string) => void;
+  onDeleteNode: (nodeId: string) => void;
+  onDeleteSubtree: (nodeId: string) => void;
+}
+
 function withPlaceholders(
   nodes: AutomationNode[],
   edges: AutomationFlow["edges"],
@@ -97,6 +104,7 @@ function withPlaceholders(
   openPicker: (pick: (type: AutomationNodeType) => void) => void,
   counts: Record<string, number>,
   onShowContacts: (nodeId: string) => void,
+  menuActions: NodeMenuActions,
 ): { nodes: RFNode[]; edges: RFEdge[] } {
   const phNodes: RFNode[] = [];
   const phEdges: RFEdge[] = [];
@@ -130,7 +138,15 @@ function withPlaceholders(
         id: n.id,
         type: n.type,
         position: n.position,
-        data: { ...n.data, __contactCount: counts[n.id] ?? 0, __onShowContacts: () => onShowContacts(n.id) },
+        data: {
+          ...n.data,
+          __contactCount: counts[n.id] ?? 0,
+          __onShowContacts: () => onShowContacts(n.id),
+          __onCopyNode: () => menuActions.onCopyNode(n.id),
+          __onCopySubtree: () => menuActions.onCopySubtree(n.id),
+          __onDeleteNode: () => menuActions.onDeleteNode(n.id),
+          __onDeleteSubtree: () => menuActions.onDeleteSubtree(n.id),
+        },
       })),
       ...phNodes,
     ],
@@ -273,6 +289,108 @@ function CanvasInner({ flow, onChange, stages, automationId }: AutomationCanvasP
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [realNodes, realEdges, commit]);
 
+  // Duplicates a node AND its entire downstream chain (including nested
+  // branches), splicing the whole copy in immediately after the original --
+  // every dead-end in the copy reconnects to whatever the original already
+  // led to, extending the single-node "Copy action" convention above to a
+  // whole subtree. Not offered for branching (condition) nodes: a condition
+  // has two outgoing edges, so there's no single "next step" to splice the
+  // copy's own two branches back into.
+  const handleCopySubtree = useCallback((nodeId: string) => {
+    const idsToCopy: string[] = [];
+    function collect(id: string) {
+      idsToCopy.push(id);
+      realEdges.filter((e) => e.source === id).forEach((e) => collect(e.target));
+    }
+    collect(nodeId);
+
+    const idMap = new Map(idsToCopy.map((id) => [id, crypto.randomUUID()]));
+    const copiedNodes: AutomationNode[] = idsToCopy.map((id) => {
+      const original = realNodes.find((n) => n.id === id)!;
+      return { id: idMap.get(id)!, type: original.type, position: { x: 0, y: 0 }, data: { ...original.data } };
+    });
+
+    // Edges fully inside the copied subtree get remapped to the new ids so
+    // nested branches (e.g. a condition partway down the chain) are preserved.
+    const internalEdges = realEdges
+      .filter((e) => idMap.has(e.source) && idMap.has(e.target))
+      .map((e) => ({
+        id: crypto.randomUUID(),
+        source: idMap.get(e.source)!,
+        target: idMap.get(e.target)!,
+        sourceHandle: e.sourceHandle ?? null,
+      }));
+
+    // Every dead-end in the copied subtree (a node with no outgoing edge at
+    // all -- there can be more than one if a nested condition branches)
+    // reconnects to whatever the original top-level node already led to.
+    const originalOutgoing = realEdges.find((e) => e.source === nodeId && e.sourceHandle == null);
+    const leafOriginalIds = idsToCopy.filter((id) => !realEdges.some((e) => e.source === id));
+    const reconnectEdges = originalOutgoing
+      ? leafOriginalIds.map((leafId) => ({
+          id: crypto.randomUUID(),
+          source: idMap.get(leafId)!,
+          target: originalOutgoing.target,
+          sourceHandle: null,
+        }))
+      : [];
+
+    const rootCopyId = idMap.get(nodeId)!;
+    const rootEdge = { id: crypto.randomUUID(), source: nodeId, target: rootCopyId, sourceHandle: null };
+
+    const nextEdges = originalOutgoing
+      ? [...realEdges.filter((e) => e.id !== originalOutgoing.id), rootEdge, ...internalEdges, ...reconnectEdges]
+      : [...realEdges, rootEdge, ...internalEdges];
+
+    commit(layout([...realNodes, ...copiedNodes], nextEdges), nextEdges);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [realNodes, realEdges, commit]);
+
+  // Removes just one node, reconnecting its incoming edge(s) straight to its
+  // outgoing edge's target so the rest of the chain keeps running --
+  // deleting a single step should never take its downstream actions with it.
+  // Not offered for branching (condition) nodes: with two outgoing edges,
+  // reconnecting a single incoming edge to both would make one branch
+  // unreachable (the engine only ever follows the first matching edge for a
+  // given handle), so those must go through handleDeleteSubtree instead.
+  const handleDeleteSingleNode = useCallback((nodeId: string) => {
+    const incoming = realEdges.filter((e) => e.target === nodeId);
+    const outgoing = realEdges.filter((e) => e.source === nodeId);
+
+    const bridgeEdges = incoming.flatMap((inEdge) =>
+      outgoing.map((outEdge) => ({
+        id: crypto.randomUUID(),
+        source: inEdge.source,
+        target: outEdge.target,
+        sourceHandle: inEdge.sourceHandle ?? null,
+      })),
+    );
+
+    const nextEdges = [...realEdges.filter((e) => e.target !== nodeId && e.source !== nodeId), ...bridgeEdges];
+    const nextNodes = realNodes.filter((n) => n.id !== nodeId);
+
+    commit(layout(nextNodes, nextEdges), nextEdges);
+    setSelectedId((prev) => (prev === nodeId ? null : prev));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [realNodes, realEdges, commit]);
+
+  // Deletes a node and everything downstream of it -- the previous default
+  // (and only) delete behavior, kept as an explicit "Delete all actions" choice.
+  const handleDeleteSubtree = useCallback((nodeId: string) => {
+    const toRemove = new Set<string>();
+    function collect(id: string) {
+      toRemove.add(id);
+      realEdges.filter((e) => e.source === id).forEach((e) => collect(e.target));
+    }
+    collect(nodeId);
+    commit(
+      realNodes.filter((n) => !toRemove.has(n.id)),
+      realEdges.filter((e) => !toRemove.has(e.source) && !toRemove.has(e.target)),
+    );
+    setSelectedId((prev) => (prev && toRemove.has(prev) ? null : prev));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [realNodes, realEdges, commit]);
+
   // React Flow owns rendering + measurement state. We rebuild the desired
   // node/edge list (real + freshly computed placeholders) whenever the real
   // structure changes and hand it to React Flow's own setters, which merge
@@ -281,6 +399,16 @@ function CanvasInner({ flow, onChange, stages, automationId }: AutomationCanvasP
   // never silently drops the "finished measuring, now show it" event.
   const [rfNodes, setRfNodes, onNodesChange] = useNodesState<RFNode>([]);
   const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState<RFEdge>([]);
+
+  const menuActions = useMemo<NodeMenuActions>(
+    () => ({
+      onCopyNode: handleDuplicateNode,
+      onCopySubtree: handleCopySubtree,
+      onDeleteNode: handleDeleteSingleNode,
+      onDeleteSubtree: handleDeleteSubtree,
+    }),
+    [handleDuplicateNode, handleCopySubtree, handleDeleteSingleNode, handleDeleteSubtree],
+  );
 
   useEffect(() => {
     const { nodes, edges } = withPlaceholders(
@@ -291,11 +419,12 @@ function CanvasInner({ flow, onChange, stages, automationId }: AutomationCanvasP
       openPicker,
       counts,
       handleShowContacts,
+      menuActions,
     );
     setRfNodes(nodes.map((n) => ({ ...n, selected: n.id === selectedId })));
     setRfEdges(edges);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [realNodes, realEdges, handlePick, handleInsertOnEdge, selectedId, counts, handleShowContacts]);
+  }, [realNodes, realEdges, handlePick, handleInsertOnEdge, selectedId, counts, handleShowContacts, menuActions]);
 
   // Report the real (non-placeholder) structure upward for saving.
   useEffect(() => {
@@ -316,19 +445,17 @@ function CanvasInner({ flow, onChange, stages, automationId }: AutomationCanvasP
     setSelectedId(null);
   }
 
-  function handleDeleteNode() {
+  // The side panel's single "Delete" button: safe single-node delete for
+  // ordinary steps, falls back to subtree delete for condition nodes (see
+  // handleDeleteSingleNode for why single delete isn't safe there).
+  function handleDeleteSelected() {
     if (!selectedId) return;
-    const toRemove = new Set<string>();
-    function collect(id: string) {
-      toRemove.add(id);
-      realEdges.filter((e) => e.source === id).forEach((e) => collect(e.target));
+    const node = realNodes.find((n) => n.id === selectedId);
+    if (node && NODE_DEFINITIONS[node.type].isBranching) {
+      handleDeleteSubtree(selectedId);
+    } else {
+      handleDeleteSingleNode(selectedId);
     }
-    collect(selectedId);
-    commit(
-      realNodes.filter((n) => !toRemove.has(n.id)),
-      realEdges.filter((e) => !toRemove.has(e.source) && !toRemove.has(e.target)),
-    );
-    setSelectedId(null);
   }
 
   function handleDuplicateAndClose() {
@@ -386,7 +513,7 @@ function CanvasInner({ flow, onChange, stages, automationId }: AutomationCanvasP
           automationId={automationId}
           onClose={() => setSelectedId(null)}
           onSave={handleSaveNode}
-          onDelete={handleDeleteNode}
+          onDelete={handleDeleteSelected}
           canDelete={selectedNode.type !== "trigger"}
           onDuplicate={handleDuplicateAndClose}
           canDuplicate={NODE_DEFINITIONS[selectedNode.type].canDuplicate}

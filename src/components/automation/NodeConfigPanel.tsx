@@ -591,11 +591,15 @@ export function NodeConfigPanel({ node, stages, automationId, onClose, onSave, o
             {data.mode === "schedule" && (
               <>
                 <Field label="Day of week">
-                  <Select value={String((data.dayOfWeek as number) ?? 1)} onValueChange={(v) => set("dayOfWeek", Number(v))}>
+                  <Select
+                    value={data.dayOfWeek === null ? "any" : String((data.dayOfWeek as number) ?? 1)}
+                    onValueChange={(v) => set("dayOfWeek", v === "any" ? null : Number(v))}
+                  >
                     <SelectTrigger className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="any">Any day — next occurrence of the time below</SelectItem>
                       {WEEKDAY_LABELS.map((label, i) => (
                         <SelectItem key={label} value={String(i)}>
                           {label}

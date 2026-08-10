@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { User } from "lucide-react";
+import { User, UserPlus } from "lucide-react";
 import toast from "react-hot-toast";
 import { Button } from "@/components/ui/Button";
+import { ContactFormModal } from "@/components/contacts/ContactFormModal";
 import { ComposeModal } from "./ComposeModal";
 import { ContactQuickView } from "./ContactQuickView";
 import { SignatureManager } from "./SignatureManager";
@@ -42,6 +43,8 @@ interface ThreadDetail {
   status: "unread" | "read";
   messages: ThreadMessage[];
   contactId?: string | null;
+  contactName?: string | null;
+  contactEmail?: string | null;
 }
 
 type Label = "INBOX" | "SENT" | "SPAM";
@@ -89,6 +92,7 @@ export function InboxView({ scope, isConnected, accounts, isAdmin, currentUserId
   const [replyOpen, setReplyOpen] = useState(false);
   const [signaturesOpen, setSignaturesOpen] = useState(false);
   const [contactPanelId, setContactPanelId] = useState<string | null>(null);
+  const [savingContact, setSavingContact] = useState(false);
   // Mobile: show thread list (false) or email detail (true)
   const [mobileShowDetail, setMobileShowDetail] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -166,6 +170,20 @@ export function InboxView({ scope, isConnected, accounts, isAdmin, currentUserId
 
   const goBackToList = () => {
     setMobileShowDetail(false);
+  };
+
+  // Re-fetches just the open thread — used after manually saving a contact
+  // so the header switches from "Save as Contact" to "View Contact" without
+  // a full list reload (the just-created contact is now found by email).
+  const reloadSelectedThread = async () => {
+    if (!selected) return;
+    try {
+      const res = await fetch(`/api/gmail/threads/${selected.id}?${new URLSearchParams({ email: activeAccount, scope })}`);
+      const data = await res.json();
+      if (res.ok && Array.isArray(data.messages)) setSelected(data);
+    } catch {
+      // Non-critical — the contact was still saved either way.
+    }
   };
 
   const handleThreadAction = async (action: "archive" | "trash") => {
@@ -590,6 +608,16 @@ export function InboxView({ scope, isConnected, accounts, isAdmin, currentUserId
                       <User className="size-4" />
                     </button>
                   )}
+                  {scope === "agency" && !selected.contactId && selected.contactEmail && (
+                    <button
+                      type="button"
+                      onClick={() => setSavingContact(true)}
+                      title="Save as Contact"
+                      className="text-text-muted hover:text-text-primary p-1.5 rounded-btn hover:bg-surface-secondary transition-colors"
+                    >
+                      <UserPlus className="size-4" />
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => handleThreadAction("archive")}
@@ -731,6 +759,15 @@ export function InboxView({ scope, isConnected, accounts, isAdmin, currentUserId
       )}
 
       {contactPanelId && <ContactQuickView contactId={contactPanelId} onClose={() => setContactPanelId(null)} />}
+
+      {selected && (
+        <ContactFormModal
+          open={savingContact}
+          onClose={() => setSavingContact(false)}
+          prefill={{ name: selected.contactName || selected.contactEmail || "", email: selected.contactEmail || undefined }}
+          onSaved={reloadSelectedThread}
+        />
+      )}
     </div>
   );
 }

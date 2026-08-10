@@ -2,7 +2,7 @@ import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/gmail";
 import { createNotification } from "@/lib/activity";
-import { formatWeekdayTime, getNextWeekdayOccurrenceUtc } from "@/lib/utils/schedule";
+import { formatDailyTime, formatWeekdayTime, getNextTimeOccurrenceUtc, getNextWeekdayOccurrenceUtc } from "@/lib/utils/schedule";
 import { applyMergeTags, contactMergeValues } from "./mergeTags";
 import type {
   AutomationEdge,
@@ -520,7 +520,7 @@ async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string,
       if (node.type === "wait") {
         const data = node.data as {
           mode?: string; amount?: number; unit?: WaitUnit; condition?: string;
-          dayOfWeek?: number; time?: string; timezone?: string; direction?: "before" | "after";
+          dayOfWeek?: number | null; time?: string; timezone?: string; direction?: "before" | "after";
         };
 
         if (data.mode === "event") {
@@ -565,13 +565,25 @@ async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string,
           const hour = Number(hourStr) || 0;
           const minute = Number(minuteStr) || 0;
           const timezone = data.timezone || "America/New_York";
-          const dayOfWeek = data.dayOfWeek ?? 1;
-          const waitUntil = getNextWeekdayOccurrenceUtc(dayOfWeek, hour, minute, timezone);
+          // dayOfWeek === null means "Any day" — wait for the next occurrence
+          // of the time itself instead of pinning a specific weekday.
+          // undefined (nodes configured before this option existed) keeps the
+          // original Monday default so existing automations don't change.
+          let waitUntil: Date;
+          let waitLabel: string;
+          if (data.dayOfWeek === null) {
+            waitUntil = getNextTimeOccurrenceUtc(hour, minute, timezone);
+            waitLabel = formatDailyTime(hour, minute, timezone);
+          } else {
+            const dayOfWeek = data.dayOfWeek ?? 1;
+            waitUntil = getNextWeekdayOccurrenceUtc(dayOfWeek, hour, minute, timezone);
+            waitLabel = formatWeekdayTime(dayOfWeek, hour, minute, timezone);
+          }
           await prisma.automationRun.update({
             where: { id: run.id },
             data: { status: "waiting", currentNodeId: node.id, waitUntil },
           });
-          await logStep(run.id, node.id, node.type, "waiting", `Waiting until ${formatWeekdayTime(dayOfWeek, hour, minute, timezone)}`);
+          await logStep(run.id, node.id, node.type, "waiting", `Waiting until ${waitLabel}`);
         } else {
           const ms = durationMs(data.amount ?? 1, data.unit ?? "hours");
           await prisma.automationRun.update({

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { findOrCreateContactByEmail } from "@/lib/contactLinking";
+import { findContactByEmail } from "@/lib/contactLinking";
 import { extractContact, getGmailClient, getConnectedEmail, getHeader } from "@/lib/gmail";
 import { checkPermission } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
@@ -64,10 +64,10 @@ export async function GET(req: NextRequest) {
         const contact = extractContact(from, to, isOutgoing);
         const isUnread = messages.some((m) => m.labelIds?.includes("UNREAD"));
 
-        // Auto-link every business email in the shared Conversations inbox to a
-        // CRM contact — deliberately not done for scope="own" (personal inboxes).
-        const contactId =
-          scopeParam === "agency" ? await findOrCreateContactByEmail(contact.email, contact.name, session.user.id) : null;
+        // Link to an existing CRM contact if this sender is already one —
+        // deliberately not done for scope="own" (personal inboxes), and
+        // deliberately doesn't create a new contact (see findContactByEmail).
+        const contactId = scopeParam === "agency" ? await findContactByEmail(contact.email) : null;
 
         return {
           id: t.id!,

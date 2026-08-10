@@ -19,7 +19,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { formatWeekdayTime } from "@/lib/utils/schedule";
+import { formatDailyTime, formatWeekdayTime } from "@/lib/utils/schedule";
 
 import type { AutomationNodeType } from "./types";
 
@@ -151,7 +151,10 @@ export const NODE_DEFINITIONS: Record<AutomationNodeType, NodeDefinition> = {
       if (data.mode === "condition") return "Until email is opened";
       if (data.mode === "schedule") {
         const [h, m] = ((data.time as string) ?? "09:00").split(":").map(Number);
-        return formatWeekdayTime((data.dayOfWeek as number) ?? 1, h, m, (data.timezone as string) || "America/New_York");
+        const timezone = (data.timezone as string) || "America/New_York";
+        return data.dayOfWeek === null
+          ? `Daily at ${formatDailyTime(h, m, timezone)}`
+          : formatWeekdayTime((data.dayOfWeek as number) ?? 1, h, m, timezone);
       }
       if (data.mode === "event") {
         if (!data.amount) return "Click to configure";

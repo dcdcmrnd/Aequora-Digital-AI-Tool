@@ -58,3 +58,33 @@ export function formatWeekdayTime(dayOfWeek: number, hour: number, minute: numbe
   const tzLabel = COMMON_TIMEZONES.find((t) => t.value === timeZone)?.label ?? timeZone;
   return `${day}s at ${hh}:${mm} ${ampm} (${tzLabel})`;
 }
+
+/**
+ * The next UTC instant at which it is `hour:minute` in `timeZone`, on
+ * whatever day that next turns out to be (today if the time hasn't passed
+ * yet, otherwise tomorrow) -- the day-agnostic counterpart to
+ * getNextWeekdayOccurrenceUtc, for "wait until a specific time" without
+ * pinning a day of the week.
+ */
+export function getNextTimeOccurrenceUtc(hour: number, minute: number, timeZone: string, from: Date = new Date()): Date {
+  const todayStr = formatInTimeZone(from, timeZone, "yyyy-MM-dd");
+  const hh = String(hour).padStart(2, "0");
+  const mm = String(minute).padStart(2, "0");
+
+  let target = fromZonedTime(`${todayStr}T${hh}:${mm}:00`, timeZone);
+  if (target.getTime() <= from.getTime()) {
+    const tomorrow = new Date(`${todayStr}T00:00:00Z`);
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+    target = fromZonedTime(`${tomorrow.toISOString().slice(0, 10)}T${hh}:${mm}:00`, timeZone);
+  }
+
+  return target;
+}
+
+export function formatDailyTime(hour: number, minute: number, timeZone: string): string {
+  const hh = String(hour % 12 === 0 ? 12 : hour % 12);
+  const mm = String(minute).padStart(2, "0");
+  const ampm = hour < 12 ? "AM" : "PM";
+  const tzLabel = COMMON_TIMEZONES.find((t) => t.value === timeZone)?.label ?? timeZone;
+  return `${hh}:${mm} ${ampm} (${tzLabel})`;
+}
