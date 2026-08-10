@@ -48,6 +48,7 @@ model User {
   passwordResetTokens  PasswordResetToken[]
   gmailTokens          GmailToken[]         @relation("GmailTokenOwner")
   assignedContacts     Contact[]            @relation("ContactAssignee")
+  callsInitiated       Call[]               @relation("CallInitiator")
 }
 
 model Invitation {
@@ -463,6 +464,7 @@ model Contact {
   opportunities Opportunity[]
   automationRuns AutomationRun[]
   emailTracking EmailTracking[]
+  calls          Call[]
 }
 
 // --- Pipeline / Opportunities ---
@@ -562,4 +564,33 @@ model EmailTracking {
   createdAt      DateTime       @default(now())
 
   @@index([gmailThreadId])
+}
+
+// --- Calling (Twilio) ---
+
+// Singleton, same pattern as CompanySettings — the agency's one purchased
+// Twilio number used as caller ID for every outbound click-to-call.
+model TwilioSettings {
+  id             String   @id @default("singleton")
+  phoneNumberSid String? // Twilio's IncomingPhoneNumber SID, once purchased
+  phoneNumber    String? // E.164, e.g. +15551234567
+  updatedAt      DateTime @updatedAt
+}
+
+model Call {
+  id            String   @id @default(cuid())
+  contactId     String?
+  contact       Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  userId        String
+  user          User     @relation("CallInitiator", fields: [userId], references: [id], onDelete: Cascade)
+  toNumber      String
+  fromNumber    String
+  // queued | ringing | in-progress | completed | failed | busy | no-answer | canceled
+  status        String   @default("queued")
+  durationSec   Int?
+  twilioCallSid String?  @unique
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([contactId])
 }

@@ -9,6 +9,7 @@ interface Props {
   documentsPanel: React.ReactNode;
   categoriesPanel: React.ReactNode;
   emailPanel: React.ReactNode;
+  phonePanel: React.ReactNode;
 }
 
 const TABS = [
@@ -17,11 +18,12 @@ const TABS = [
   { id: "documents", label: "Documents" },
   { id: "categories", label: "Note Categories" },
   { id: "email", label: "Agency Email" },
+  { id: "phone", label: "Calling" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
 
-export function SettingsTabs({ teamPanel, companyPanel, documentsPanel, categoriesPanel, emailPanel }: Props) {
+export function SettingsTabs({ teamPanel, companyPanel, documentsPanel, categoriesPanel, emailPanel, phonePanel }: Props) {
   const [active, setActive] = useState<TabId>("team");
 
   return (
@@ -48,6 +50,7 @@ export function SettingsTabs({ teamPanel, companyPanel, documentsPanel, categori
       {active === "documents" && documentsPanel}
       {active === "categories" && categoriesPanel}
       {active === "email" && emailPanel}
+      {active === "phone" && phonePanel}
     </div>
   );
 }

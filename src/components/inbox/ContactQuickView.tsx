@@ -5,6 +5,7 @@ import { Briefcase, Mail, Pencil, Phone, Workflow, X } from "lucide-react";
 
 import { BulkWorkflowModal } from "@/components/contacts/BulkActionsBar";
 import { ContactFormModal } from "@/components/contacts/ContactFormModal";
+import { CallButton } from "@/components/calls/CallWidget";
 import { Button } from "@/components/ui/Button";
 import { TagInput } from "@/components/ui/TagInput";
 import { useContact, useContactTags, useContacts } from "@/hooks/useContacts";
@@ -62,6 +63,7 @@ export function ContactQuickView({ contactId, onClose }: ContactQuickViewProps) 
                 <div className="flex items-center gap-2 text-text-secondary">
                   <Phone className="size-3.5 shrink-0" />
                   <span>{contact.phone}</span>
+                  <CallButton contactId={contact.id} name={contact.name} phone={contact.phone} />
                 </div>
               )}
               {contact.company && (

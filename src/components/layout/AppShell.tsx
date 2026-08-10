@@ -5,7 +5,9 @@ import { usePathname } from "next/navigation";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 import { ChatHeadBubbles } from "@/components/chat/ChatHeadBubbles";
+import { CallWidget } from "@/components/calls/CallWidget";
 import { ChatHeadsProvider } from "@/lib/chatHeadsStore";
+import { CallProvider } from "@/lib/callStore";
 
 interface Props {
   companyName: string;
@@ -32,41 +34,44 @@ export function AppShell({ companyName, companyLogoUrl, children }: Props) {
 
   return (
     <ChatHeadsProvider>
-      <div className="flex h-screen overflow-hidden bg-surface-secondary">
-        {/* Desktop sidebar */}
-        <div className="hidden md:flex md:flex-shrink-0">
-          <Sidebar companyName={companyName} companyLogoUrl={companyLogoUrl} />
-        </div>
-
-        {/* Mobile sidebar overlay */}
-        {sidebarOpen && (
-          <div className="fixed inset-0 z-50 md:hidden flex">
-            <div
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-              onClick={() => setSidebarOpen(false)}
-            />
-            <div className="relative w-[260px] flex-shrink-0">
-              <Sidebar
-                companyName={companyName}
-                companyLogoUrl={companyLogoUrl}
-                onClose={() => setSidebarOpen(false)}
-              />
-            </div>
+      <CallProvider>
+        <div className="flex h-screen overflow-hidden bg-surface-secondary">
+          {/* Desktop sidebar */}
+          <div className="hidden md:flex md:flex-shrink-0">
+            <Sidebar companyName={companyName} companyLogoUrl={companyLogoUrl} />
           </div>
-        )}
 
-        {/* Main content */}
-        <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-          <Header onMenuClick={() => setSidebarOpen(true)} />
-          <main className="flex-1 overflow-y-auto">
-            <div className="max-w-7xl mx-auto px-4 py-4 md:px-6 md:py-6">
-              {children}
+          {/* Mobile sidebar overlay */}
+          {sidebarOpen && (
+            <div className="fixed inset-0 z-50 md:hidden flex">
+              <div
+                className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                onClick={() => setSidebarOpen(false)}
+              />
+              <div className="relative w-[260px] flex-shrink-0">
+                <Sidebar
+                  companyName={companyName}
+                  companyLogoUrl={companyLogoUrl}
+                  onClose={() => setSidebarOpen(false)}
+                />
+              </div>
             </div>
-          </main>
-        </div>
+          )}
 
-        <ChatHeadBubbles />
-      </div>
+          {/* Main content */}
+          <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+            <Header onMenuClick={() => setSidebarOpen(true)} />
+            <main className="flex-1 overflow-y-auto">
+              <div className="max-w-7xl mx-auto px-4 py-4 md:px-6 md:py-6">
+                {children}
+              </div>
+            </main>
+          </div>
+
+          <ChatHeadBubbles />
+          <CallWidget />
+        </div>
+      </CallProvider>
     </ChatHeadsProvider>
   );
 }

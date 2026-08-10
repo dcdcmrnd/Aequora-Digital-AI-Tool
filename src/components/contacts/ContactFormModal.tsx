@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { MessageSquare, Plus, X } from "lucide-react";
 
 import { ContactConversationModal } from "@/components/contacts/ContactConversationModal";
+import { CallButton } from "@/components/calls/CallWidget";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
@@ -203,7 +204,12 @@ export function ContactFormModal({ open, onClose, contact, prefill, onSaved }: C
             </div>
           </Field>
           <Field label="Phone">
-            <Input value={form.phone} onChange={(e) => set("phone", e.target.value)} />
+            <div className="flex items-center gap-2">
+              <Input value={form.phone} onChange={(e) => set("phone", e.target.value)} className="flex-1" />
+              {isEditing && form.phone.trim() && (
+                <CallButton contactId={contact.id} name={contact.name} phone={form.phone.trim()} />
+              )}
+            </div>
           </Field>
           <Field label="Website">
             <Input value={form.website} onChange={(e) => set("website", e.target.value)} />

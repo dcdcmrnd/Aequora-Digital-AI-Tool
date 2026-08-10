@@ -30,6 +30,7 @@
     "@tiptap/extension-text-style": "^3.29.2",
     "@tiptap/react": "^3.29.2",
     "@tiptap/starter-kit": "^3.29.2",
+    "@twilio/voice-sdk": "^2.18.3",
     "@types/papaparse": "^5.5.2",
     "@uiw/react-md-editor": "^4.0.4",
     "@vercel/analytics": "^2.0.1",
@@ -55,6 +56,7 @@
     "react-hot-toast": "^2.4.1",
     "resend": "^6.18.1",
     "tailwind-merge": "^2.3.0",
+    "twilio": "^6.0.2",
     "zod": "^3.25.76"
   },
   "devDependencies": {

@@ -7,6 +7,7 @@ import { AgencyEmailPanel } from "@/components/settings/AgencyEmailPanel";
 import { CategoryManager } from "@/components/settings/CategoryManager";
 import { CompanySettingsPanel } from "@/components/settings/CompanySettingsPanel";
 import { DocumentsManager } from "@/components/settings/DocumentsManager";
+import { PhoneSettingsPanel } from "@/components/settings/PhoneSettingsPanel";
 import { SettingsTabs } from "@/components/settings/SettingsTabs";
 import { TeamView } from "@/components/team/TeamView";
 import { ProfileForm } from "@/components/profile/ProfileForm";
@@ -108,6 +109,7 @@ export default async function SettingsPage() {
         documentsPanel={<DocumentsManager initial={serializedDocuments as any} />}
         categoriesPanel={<CategoryManager categories={categories as any} />}
         emailPanel={<AgencyEmailPanel emails={connectedEmails} />}
+        phonePanel={<PhoneSettingsPanel />}
       />
     </div>
   );
