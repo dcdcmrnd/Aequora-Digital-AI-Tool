@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AlertCircle, Search } from "lucide-react";
 
@@ -87,6 +87,26 @@ export function LeadsSearchView() {
     () => (searchParams.get("sortDirection") === "asc" ? "asc" : "desc"),
   );
   const [manualAuditOpen, setManualAuditOpen] = useState(false);
+  // Searches the *entire* current result set (name or website, across every
+  // page) rather than just the rows on screen — debounced so it doesn't fire
+  // a query on every keystroke.
+  const [searchInput, setSearchInput] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const isFirstSearchChange = useRef(true);
+
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedSearch(searchInput.trim()), 400);
+    return () => clearTimeout(handle);
+  }, [searchInput]);
+
+  useEffect(() => {
+    if (isFirstSearchChange.current) {
+      isFirstSearchChange.current = false;
+      return;
+    }
+    setPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch]);
 
   const savedLeadIds = useMemo(() => new Set((savedLeads ?? []).map((saved) => saved.leadId)), [savedLeads]);
 
@@ -100,12 +120,13 @@ export function LeadsSearchView() {
           minReviews: filters.minReviews,
           hasWebsite: filters.hasWebsite === "any" ? undefined : filters.hasWebsite === "has",
           hasEmail: filters.hasEmail === "any" ? undefined : filters.hasEmail === "has",
+          search: debouncedSearch || undefined,
           sortBy,
           sortDirection,
           page,
           pageSize: PAGE_SIZE,
         }
-      : { page, pageSize: PAGE_SIZE, sortBy, sortDirection },
+      : { page, pageSize: PAGE_SIZE, sortBy, sortDirection, search: debouncedSearch || undefined },
   );
 
   // Carried on each lead's detail link so its Previous/Next can browse this
@@ -200,6 +221,8 @@ export function LeadsSearchView() {
           sortDirection={sortDirection}
           onSort={handleSort}
           listParams={listParams}
+          searchQuery={searchInput}
+          onSearchChange={setSearchInput}
         />
       ) : (
         <p className="text-text-muted text-sm">Search for a business category and location to get started.</p>

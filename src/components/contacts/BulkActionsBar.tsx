@@ -249,7 +249,7 @@ function BulkPipelineModal({ selectedIds, onClose, onDone }: { selectedIds: stri
   );
 }
 
-function BulkWorkflowModal({ selectedIds, onClose, onDone }: { selectedIds: string[]; onClose: () => void; onDone: () => void }) {
+export function BulkWorkflowModal({ selectedIds, onClose, onDone }: { selectedIds: string[]; onClose: () => void; onDone: () => void }) {
   const { automations } = useAutomations();
   const [automationId, setAutomationId] = useState("");
   const [saving, setSaving] = useState(false);

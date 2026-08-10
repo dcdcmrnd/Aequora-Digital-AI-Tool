@@ -66,8 +66,9 @@ export function useContacts() {
         method: "PATCH",
         body: JSON.stringify(input),
       }),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       invalidate();
+      queryClient.invalidateQueries({ queryKey: ["contact", variables.id] });
       toast.success("Contact updated");
     },
     onError: (error) => toast.error(toastErrorMessage(error, "Failed to update contact")),
@@ -97,6 +98,15 @@ export function useContacts() {
   });
 
   return { ...query, contacts: query.data?.contacts, createContact, updateContact, deleteContact, importContacts };
+}
+
+export function useContact(id: string | null) {
+  const query = useQuery({
+    queryKey: ["contact", id],
+    queryFn: () => apiFetch<{ contact: Contact }>(`/api/contacts/${id}`),
+    enabled: !!id,
+  });
+  return { ...query, contact: query.data?.contact };
 }
 
 export function useContactTags() {

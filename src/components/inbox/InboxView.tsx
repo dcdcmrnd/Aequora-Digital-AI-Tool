@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { User } from "lucide-react";
 import toast from "react-hot-toast";
 import { Button } from "@/components/ui/Button";
 import { ComposeModal } from "./ComposeModal";
+import { ContactQuickView } from "./ContactQuickView";
 import { SignatureManager } from "./SignatureManager";
 import { cn } from "@/lib/utils";
 
@@ -19,6 +21,8 @@ interface ThreadSummary {
   contactEmail: string;
   /** Set only for Sent-tab threads: whether the recipient has opened it. null = not tracked (e.g. sent before open-tracking shipped). */
   opened?: boolean | null;
+  /** Only set for scope="agency" — the shared Conversations inbox auto-links every thread to a CRM contact. */
+  contactId?: string | null;
 }
 
 interface ThreadMessage {
@@ -37,6 +41,7 @@ interface ThreadDetail {
   subject: string;
   status: "unread" | "read";
   messages: ThreadMessage[];
+  contactId?: string | null;
 }
 
 type Label = "INBOX" | "SENT" | "SPAM";
@@ -83,6 +88,7 @@ export function InboxView({ scope, isConnected, accounts, isAdmin, currentUserId
   const [composeOpen, setComposeOpen] = useState(false);
   const [replyOpen, setReplyOpen] = useState(false);
   const [signaturesOpen, setSignaturesOpen] = useState(false);
+  const [contactPanelId, setContactPanelId] = useState<string | null>(null);
   // Mobile: show thread list (false) or email detail (true)
   const [mobileShowDetail, setMobileShowDetail] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -574,6 +580,16 @@ export function InboxView({ scope, isConnected, accounts, isAdmin, currentUserId
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  {scope === "agency" && selected.contactId && (
+                    <button
+                      type="button"
+                      onClick={() => setContactPanelId(selected.contactId!)}
+                      title="View Contact"
+                      className="text-text-muted hover:text-text-primary p-1.5 rounded-btn hover:bg-surface-secondary transition-colors"
+                    >
+                      <User className="size-4" />
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => handleThreadAction("archive")}
@@ -713,6 +729,8 @@ export function InboxView({ scope, isConnected, accounts, isAdmin, currentUserId
           references={lastMessage.id}
         />
       )}
+
+      {contactPanelId && <ContactQuickView contactId={contactPanelId} onClose={() => setContactPanelId(null)} />}
     </div>
   );
 }

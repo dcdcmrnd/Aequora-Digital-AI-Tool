@@ -188,3 +188,13 @@ export function extractBody(payload: any): { html: string; text: string } {
 export function getHeader(headers: { name?: string | null; value?: string | null }[], name: string) {
   return headers.find((h) => h.name?.toLowerCase() === name.toLowerCase())?.value ?? "";
 }
+
+/** Pulls a display name + email out of a "Name" <email> style header — the other party on a thread (sender for received mail, recipient for sent mail). */
+export function extractContact(from: string, to: string, isOutgoing: boolean) {
+  const raw = isOutgoing ? to : from;
+  const match = raw.match(/^"?([^"<]+)"?\s*<?([^>]*)>?$/);
+  return {
+    name: match?.[1]?.trim() || raw,
+    email: match?.[2]?.trim() || raw,
+  };
+}

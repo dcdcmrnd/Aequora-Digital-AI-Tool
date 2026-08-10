@@ -62,6 +62,11 @@ function buildLeadWhere(params: Omit<ListLeadsParams, "sortBy" | "sortDirection"
   const { searchId, category, location, minRating, minReviews, hasWebsite, hasEmail, search } = params;
 
   const where: Prisma.LeadWhereInput = {};
+  // Accumulated separately from `where.OR` (already used by category matching
+  // below) so each of these narrows the result set independently instead of
+  // merging into one flat OR — every entry here must ALL match.
+  const andConditions: Prisma.LeadWhereInput[] = [];
+
   if (searchId) {
     where.lastSearchId = searchId;
   } else {
@@ -75,14 +80,14 @@ function buildLeadWhere(params: Omit<ListLeadsParams, "sortBy" | "sortDirection"
       // somewhere in city/state/country, so a two-part location narrows
       // correctly instead of a single token (e.g. a stray "TX") over-matching.
       const tokens = location.split(",").map((t) => t.trim()).filter(Boolean);
-      if (tokens.length > 0) {
-        where.AND = tokens.map((token) => ({
+      for (const token of tokens) {
+        andConditions.push({
           OR: [
             { city: { contains: token, mode: "insensitive" as const } },
             { state: { contains: token, mode: "insensitive" as const } },
             { country: { contains: token, mode: "insensitive" as const } },
           ],
-        }));
+        });
       }
     }
   }
@@ -92,7 +97,18 @@ function buildLeadWhere(params: Omit<ListLeadsParams, "sortBy" | "sortDirection"
   if (hasWebsite === false) where.website = null;
   if (hasEmail === true) where.enrichedEmail = { not: null };
   if (hasEmail === false) where.enrichedEmail = null;
-  if (search) where.name = { contains: search, mode: "insensitive" };
+  if (search) {
+    // Matches by name OR website — someone pasting in a URL should find the
+    // business by it, not just by typing its name.
+    andConditions.push({
+      OR: [
+        { name: { contains: search, mode: "insensitive" as const } },
+        { website: { contains: search, mode: "insensitive" as const } },
+      ],
+    });
+  }
+
+  if (andConditions.length > 0) where.AND = andConditions;
 
   return where;
 }

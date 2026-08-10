@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { flexRender, getCoreRowModel, getFilteredRowModel, useReactTable } from "@tanstack/react-table";
+import { flexRender, getCoreRowModel, useReactTable } from "@tanstack/react-table";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { createLeadColumns, type LeadActiveSortBy, type LeadSortKey } from "@/components/leads/columns";
@@ -24,6 +24,8 @@ interface LeadTableProps {
   sortDirection?: "asc" | "desc";
   onSort: (key: LeadSortKey) => void;
   listParams?: string;
+  searchQuery: string;
+  onSearchChange: (value: string) => void;
 }
 
 export function LeadTable({
@@ -39,8 +41,9 @@ export function LeadTable({
   sortDirection,
   onSort,
   listParams,
+  searchQuery,
+  onSearchChange,
 }: LeadTableProps) {
-  const [globalFilter, setGlobalFilter] = useState("");
   const [contactPrefillLead, setContactPrefillLead] = useState<Lead | null>(null);
 
   const columns = useMemo(
@@ -48,17 +51,13 @@ export function LeadTable({
     [savedLeadIds, onSave, searchedCategory, sortBy, sortDirection, onSort, listParams],
   );
 
-  // Sorting is server-driven (see onSort) since results are server-paginated —
-  // only the "search this page" text filter stays client-side here.
+  // Sorting AND searching are both server-driven (see onSort/onSearchChange)
+  // since results are server-paginated — a client-only filter would only ever
+  // see the current page's rows, not the full matching result set.
   const table = useReactTable({
     data,
     columns,
-    state: { globalFilter },
-    onGlobalFilterChange: setGlobalFilter,
     getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    globalFilterFn: (row, _columnId, filterValue) =>
-      row.original.name.toLowerCase().includes(String(filterValue).toLowerCase()),
   });
 
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
@@ -66,9 +65,9 @@ export function LeadTable({
   return (
     <div className="space-y-3">
       <Input
-        placeholder="Search this page..."
-        value={globalFilter}
-        onChange={(event) => setGlobalFilter(event.target.value)}
+        placeholder="Search by business name or website..."
+        value={searchQuery}
+        onChange={(event) => onSearchChange(event.target.value)}
         className="max-w-xs"
       />
 
