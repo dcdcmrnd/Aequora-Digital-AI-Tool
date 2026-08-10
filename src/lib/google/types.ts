@@ -1,7 +1,9 @@
 import { z } from "zod";
 
 export const placeSearchParamsSchema = z.object({
-  keyword: z.string().min(1),
+  // Optional — an empty keyword browses every business Google returns for
+  // the location alone, instead of narrowing to one category.
+  keyword: z.string(),
   location: z.string().min(1),
   radiusMeters: z.number().int().positive().max(50_000).default(5_000),
   /** Google's hard per-request cap — the client pages past this via nextPageToken to reach targetResults. */

@@ -44,6 +44,8 @@ export interface ListLeadsParams {
   hasWebsite?: boolean;
   /** true = has an enriched email on file, false = no email found, undefined = both */
   hasEmail?: boolean;
+  /** true = restrict to leads whose email passed the MX check — implies hasEmail */
+  emailValid?: boolean;
   search?: string;
   sortBy?: LeadSortColumn;
   sortDirection?: "asc" | "desc";
@@ -59,7 +61,7 @@ export interface ListLeadsResult {
 }
 
 function buildLeadWhere(params: Omit<ListLeadsParams, "sortBy" | "sortDirection" | "page" | "pageSize">): Prisma.LeadWhereInput {
-  const { searchId, category, location, minRating, minReviews, hasWebsite, hasEmail, search } = params;
+  const { searchId, category, location, minRating, minReviews, hasWebsite, hasEmail, emailValid, search } = params;
 
   const where: Prisma.LeadWhereInput = {};
   // Accumulated separately from `where.OR` (already used by category matching
@@ -97,6 +99,7 @@ function buildLeadWhere(params: Omit<ListLeadsParams, "sortBy" | "sortDirection"
   if (hasWebsite === false) where.website = null;
   if (hasEmail === true) where.enrichedEmail = { not: null };
   if (hasEmail === false) where.enrichedEmail = null;
+  if (emailValid === true) where.enrichedEmailValid = true;
   if (search) {
     // Matches by name OR website — someone pasting in a URL should find the
     // business by it, not just by typing its name.
@@ -117,9 +120,16 @@ function buildLeadWhere(params: Omit<ListLeadsParams, "sortBy" | "sortDirection"
  * "email" isn't a real Lead column (it's enrichedEmail) and, being nullable,
  * needs nulls pinned last in both directions — businesses with an email
  * found should always surface above ones without, regardless of A-Z/Z-A.
+ * MX-verified emails are also ranked ahead of unverified ones first, so
+ * sorting by email surfaces working addresses before alphabetizing.
  */
-function buildLeadOrderBy(sortBy: LeadSortColumn, sortDirection: "asc" | "desc"): Prisma.LeadOrderByWithRelationInput {
-  if (sortBy === "email") return { enrichedEmail: { sort: sortDirection, nulls: "last" } };
+function buildLeadOrderBy(
+  sortBy: LeadSortColumn,
+  sortDirection: "asc" | "desc",
+): Prisma.LeadOrderByWithRelationInput | Prisma.LeadOrderByWithRelationInput[] {
+  if (sortBy === "email") {
+    return [{ enrichedEmailValid: "desc" }, { enrichedEmail: { sort: sortDirection, nulls: "last" } }];
+  }
   return { [sortBy]: sortDirection };
 }
 

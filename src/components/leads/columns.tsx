@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ArrowDown, ArrowUp, ArrowUpDown, BookUser, Star } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, BookUser, CheckCircle2, Star } from "lucide-react";
 
 import { OpportunityBadge } from "@/components/leads/OpportunityBadge";
 import { ScoreGauge } from "@/components/leads/ScoreGauge";
@@ -122,13 +122,31 @@ export function createLeadColumns({
         <ServerSortableHeader label="Email" sortKey="email" activeSortBy={sortBy} activeSortDirection={sortDirection} onSort={onSort} />
       ),
       cell: ({ row }) => {
-        const email = row.original.enrichedEmail;
-        return email ? (
-          <a href={`mailto:${email}`} className="text-brand-primary hover:underline" onClick={(e) => e.stopPropagation()}>
-            {email}
-          </a>
-        ) : (
-          <span className="text-text-muted">—</span>
+        const { enrichedEmail: email, enrichedEmailValid: valid, enrichedOwnerName: ownerName } = row.original;
+        if (!email) return <span className="text-text-muted">—</span>;
+        return (
+          <div className="min-w-0">
+            <div className="flex items-center gap-1">
+              <a
+                href={`mailto:${email}`}
+                className="text-brand-primary truncate hover:underline"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {email}
+              </a>
+              {valid === true && (
+                <span title="Domain accepts mail">
+                  <CheckCircle2 className="size-3.5 shrink-0 text-emerald-600" />
+                </span>
+              )}
+              {valid === false && (
+                <span title="No mail server found for this domain">
+                  <AlertTriangle className="size-3.5 shrink-0 text-amber-500" />
+                </span>
+              )}
+            </div>
+            {ownerName && <p className="text-text-muted truncate text-xs">{ownerName}</p>}
+          </div>
         );
       },
     },

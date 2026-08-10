@@ -11,7 +11,9 @@ import { executeSearch } from "@/services/search";
 export const maxDuration = 60;
 
 const searchSchema = z.object({
-  keyword: z.string().min(1),
+  // Optional — an empty keyword browses every business Google returns for
+  // the location alone, instead of narrowing to one category.
+  keyword: z.string(),
   location: z.string().min(1),
   radiusMeters: z.number().int().positive().max(50_000).optional(),
 });
@@ -27,7 +29,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const parsed = searchSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Enter a keyword and location." }, { status: 400 });
+    return NextResponse.json({ error: "Enter a location to search." }, { status: 400 });
   }
 
   const result = await executeSearch({ userId: session.user.id, ...parsed.data });

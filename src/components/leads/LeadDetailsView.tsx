@@ -2,7 +2,22 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, BookUser, Bookmark, ChevronLeft, ChevronRight, ExternalLink, Mail, MapPin, Phone, RefreshCw, Search } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  BookUser,
+  Bookmark,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  ExternalLink,
+  Mail,
+  MapPin,
+  Phone,
+  RefreshCw,
+  Search,
+  User,
+} from "lucide-react";
 
 import { AuditCard } from "@/components/leads/AuditCard";
 import { NotesEditor } from "@/components/leads/NotesEditor";
@@ -174,7 +189,24 @@ export function LeadDetailsView({ lead: initialLead, initialSavedLead, prevId, n
                     <Mail className="text-text-muted size-4 shrink-0" />
                     {lead.enrichedEmail ?? "—"}
                     {lead.enrichedEmail && <CopyButton value={lead.enrichedEmail} label="Email" />}
+                    {lead.enrichedEmailValid === true && (
+                      <span title="Domain accepts mail">
+                        <CheckCircle2 className="size-4 shrink-0 text-emerald-600" />
+                      </span>
+                    )}
+                    {lead.enrichedEmailValid === false && (
+                      <span title="No mail server found for this domain">
+                        <AlertTriangle className="size-4 shrink-0 text-amber-500" />
+                      </span>
+                    )}
                   </div>
+                  {lead.enrichedOwnerName && (
+                    <div className="flex items-center gap-2">
+                      <User className="text-text-muted size-4 shrink-0" />
+                      <span>{lead.enrichedOwnerName}</span>
+                      <span className="text-text-muted text-xs">(best guess from email)</span>
+                    </div>
+                  )}
                   {enrichedLinks.length > 0 && (
                     <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
                       {enrichedLinks.map((s) => (
@@ -286,7 +318,10 @@ export function LeadDetailsView({ lead: initialLead, initialSavedLead, prevId, n
           open={savingContact}
           onClose={() => setSavingContact(false)}
           prefill={{
-            name: lead.name,
+            // When we have a best-guess owner name, that's the person — the
+            // business name belongs in "company" instead of standing in for it.
+            name: lead.enrichedOwnerName ?? lead.name,
+            company: lead.enrichedOwnerName ? lead.name : undefined,
             phone: lead.phone ?? undefined,
             website: lead.website ?? undefined,
             address: lead.address ?? undefined,

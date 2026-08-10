@@ -92,54 +92,58 @@ export function AutomationBuilder({ automation }: AutomationBuilderProps) {
         className="max-w-md text-base font-medium"
       />
 
-      <div className="rounded-card border-border flex flex-col gap-2 border bg-white p-3 sm:flex-row sm:gap-8">
-        <label className="flex items-start gap-2 text-sm text-text-secondary select-none">
-          <input
-            type="checkbox"
-            checked={allowMultipleEntries}
-            onChange={(e) => setAllowMultipleEntries(e.target.checked)}
-            className="mt-0.5 h-4 w-4 rounded border-border text-brand-primary focus:ring-brand-primary"
-          />
-          <span>
-            Allow multiple entries
-            <span className="text-text-muted block text-xs">
-              A contact can be in this workflow more than once at the same time.
-            </span>
-          </span>
-        </label>
-        <label className="flex items-start gap-2 text-sm text-text-secondary select-none">
-          <input
-            type="checkbox"
-            checked={allowReentry}
-            onChange={(e) => setAllowReentry(e.target.checked)}
-            className="mt-0.5 h-4 w-4 rounded border-border text-brand-primary focus:ring-brand-primary"
-          />
-          <span>
-            Allow re-entry
-            <span className="text-text-muted block text-xs">
-              A contact who already finished this workflow once can enter it again later. Turn off for
-              one-time-only messages.
-            </span>
-          </span>
-        </label>
-      </div>
-
-      {isEditing ? (
-        <Tabs value={tab} onValueChange={setTab}>
-          <TabsList>
-            <TabsTrigger value="builder">Builder</TabsTrigger>
-            <TabsTrigger value="logs">Execution Log</TabsTrigger>
-          </TabsList>
-          <TabsContent value="builder">
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList>
+          <TabsTrigger value="builder">Builder</TabsTrigger>
+          <TabsTrigger value="settings">Settings</TabsTrigger>
+          {isEditing && <TabsTrigger value="logs">Execution Log</TabsTrigger>}
+        </TabsList>
+        <TabsContent value="builder">
+          {isEditing ? (
             <AutomationCanvas flow={flow} onChange={setFlow} stages={stages} automationId={automation.id} />
-          </TabsContent>
+          ) : (
+            <AutomationCanvas flow={flow} onChange={setFlow} stages={stages} />
+          )}
+        </TabsContent>
+        <TabsContent value="settings">
+          <div className="rounded-card border-border flex flex-col gap-4 border bg-white p-4 sm:flex-row sm:gap-8">
+            <label className="flex items-start gap-2 text-sm text-text-secondary select-none">
+              <input
+                type="checkbox"
+                checked={allowMultipleEntries}
+                onChange={(e) => setAllowMultipleEntries(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-border text-brand-primary focus:ring-brand-primary"
+              />
+              <span>
+                Allow multiple entries
+                <span className="text-text-muted block text-xs">
+                  A contact can be in this workflow more than once at the same time.
+                </span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2 text-sm text-text-secondary select-none">
+              <input
+                type="checkbox"
+                checked={allowReentry}
+                onChange={(e) => setAllowReentry(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-border text-brand-primary focus:ring-brand-primary"
+              />
+              <span>
+                Allow re-entry
+                <span className="text-text-muted block text-xs">
+                  A contact who already finished this workflow once can enter it again later. Turn off for
+                  one-time-only messages.
+                </span>
+              </span>
+            </label>
+          </div>
+        </TabsContent>
+        {isEditing && (
           <TabsContent value="logs">
             <ExecutionLogView automationId={automation.id} enabled={tab === "logs"} />
           </TabsContent>
-        </Tabs>
-      ) : (
-        <AutomationCanvas flow={flow} onChange={setFlow} stages={stages} />
-      )}
+        )}
+      </Tabs>
 
       {isEditing && testOpen && (
         <TestWithContactModal automationId={automation.id} onClose={() => setTestOpen(false)} />

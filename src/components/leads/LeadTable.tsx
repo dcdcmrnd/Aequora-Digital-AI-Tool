@@ -125,10 +125,18 @@ export function LeadTable({
           open={!!contactPrefillLead}
           onClose={() => setContactPrefillLead(null)}
           prefill={{
-            name: contactPrefillLead.name,
+            // When we have a best-guess owner name, that's the person — the
+            // business name belongs in "company" instead of standing in for it.
+            name: contactPrefillLead.enrichedOwnerName ?? contactPrefillLead.name,
+            company: contactPrefillLead.enrichedOwnerName ? contactPrefillLead.name : undefined,
             phone: contactPrefillLead.phone ?? undefined,
             website: contactPrefillLead.website ?? undefined,
             address: contactPrefillLead.address ?? undefined,
+            email: contactPrefillLead.enrichedEmail ?? undefined,
+            facebookUrl: contactPrefillLead.enrichedFacebookUrl ?? undefined,
+            instagramUrl: contactPrefillLead.enrichedInstagramUrl ?? undefined,
+            linkedinUrl: contactPrefillLead.enrichedLinkedinUrl ?? undefined,
+            twitterUrl: contactPrefillLead.enrichedTwitterUrl ?? undefined,
             sourceLeadId: contactPrefillLead.id,
           }}
         />

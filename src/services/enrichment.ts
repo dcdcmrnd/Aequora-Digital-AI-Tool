@@ -26,6 +26,8 @@ export async function enrichLead(lead: Lead): Promise<Lead> {
       where: { id: lead.id },
       data: {
         enrichedEmail: result.email,
+        enrichedEmailValid: result.emailValid,
+        enrichedOwnerName: result.ownerName,
         enrichedFacebookUrl: result.facebookUrl,
         enrichedInstagramUrl: result.instagramUrl,
         enrichedLinkedinUrl: result.linkedinUrl,

@@ -93,7 +93,7 @@ export async function executeSearch(params: ExecuteSearchParams): Promise<Execut
     action: "created",
     entityType: "lead_search",
     entityId: searchRow.id,
-    entityName: `${params.keyword} in ${params.location}`,
+    entityName: params.keyword ? `${params.keyword} in ${params.location}` : `All businesses in ${params.location}`,
     metadata: { resultsCount: results.length },
   });
 

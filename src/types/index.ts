@@ -269,6 +269,8 @@ export interface Lead {
   opportunityScore: number;
   opportunityScoreUpdatedAt: string | null;
   enrichedEmail: string | null;
+  enrichedEmailValid: boolean | null;
+  enrichedOwnerName: string | null;
   enrichedFacebookUrl: string | null;
   enrichedInstagramUrl: string | null;
   enrichedLinkedinUrl: string | null;

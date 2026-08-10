@@ -39,7 +39,9 @@ export function createRealGooglePlacesClient(): GooglePlacesClient {
       // Google requires every page request to repeat the same parameters as the
       // initial one (textQuery/pageSize included) — a page request carrying only
       // pageToken is rejected with "Empty text_query" (confirmed in production logs).
-      const baseBody = { textQuery: `${params.keyword} in ${params.location}`, pageSize: perPage };
+      // No keyword = browse every business Google returns for the location alone.
+      const textQuery = params.keyword.trim() ? `${params.keyword} in ${params.location}` : `businesses in ${params.location}`;
+      const baseBody = { textQuery, pageSize: perPage };
 
       do {
         const body = pageToken ? { ...baseBody, pageToken } : baseBody;

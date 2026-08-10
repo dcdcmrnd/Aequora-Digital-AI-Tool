@@ -15,6 +15,8 @@ export interface UseLeadsParams {
   hasWebsite?: boolean;
   /** true = has an enriched email on file, false = no email found, undefined = both */
   hasEmail?: boolean;
+  /** true = restrict to leads whose email passed the MX check */
+  emailValid?: boolean;
   search?: string;
   sortBy?: "opportunityScore" | "reviewCount" | "rating" | "createdAt" | "email";
   sortDirection?: "asc" | "desc";

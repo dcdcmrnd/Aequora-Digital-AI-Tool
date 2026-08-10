@@ -17,6 +17,13 @@ const BUSINESS_STATUSES = [
 
 const METERS_PER_DEGREE_LAT = 111_320;
 
+// Used when a search has no keyword ("browse all businesses in this
+// location") so mock mode still returns a plausible, varied mix.
+const GENERIC_CATEGORIES = [
+  "Restaurant", "Coffee Shop", "Law Firm", "Dentist", "Auto Repair Shop",
+  "Hair Salon", "Real Estate Agency", "Accounting Firm", "Gym", "Plumbing Company",
+];
+
 function pickBusinessStatus(rng: SeededRandom): string {
   const roll = rng();
   let cumulative = 0;
@@ -78,7 +85,7 @@ export function generateMockBusinesses(params: PlaceSearchParams): MappedBusines
   faker.seed(Math.floor(rng() * 2 ** 31));
 
   const { city, state, country } = parseLocation(params.location);
-  const category = toTitleCase(params.keyword);
+  const fixedCategory = params.keyword.trim() ? toTitleCase(params.keyword) : null;
 
   // Arbitrary but stable "center" for the searched location, since we
   // don't have a geocoding API in the stack — good enough to scatter
@@ -92,6 +99,7 @@ export function generateMockBusinesses(params: PlaceSearchParams): MappedBusines
   return Array.from({ length: count }, (): MappedBusiness => {
     const { lat, lng } = offsetLatLng(rng, centerLat, centerLng, params.radiusMeters);
     const hasWebsite = !randomBool(rng, 0.3);
+    const category = fixedCategory ?? GENERIC_CATEGORIES[randomInt(rng, 0, GENERIC_CATEGORIES.length - 1)];
     const name = `${faker.company.name()} ${category}`;
 
     return {

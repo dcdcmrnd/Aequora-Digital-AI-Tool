@@ -19,6 +19,7 @@ const HAS_WEBSITE_OPTIONS = [
 const HAS_EMAIL_OPTIONS = [
   { value: "any", label: "Any" },
   { value: "has", label: "Has Email" },
+  { value: "valid", label: "Verified Email Only" },
   { value: "none", label: "No Email Found" },
 ] as const;
 
@@ -58,13 +59,15 @@ const BUSINESS_CATEGORIES = [
 ] as const;
 
 const searchFormSchema = z.object({
-  keyword: z.string().min(1, "Enter a category or keyword"),
+  // Optional — leave blank to browse every business Google returns for the
+  // location alone, rather than narrowing to one category.
+  keyword: z.string(),
   location: z.string().min(1, "Enter a city or location"),
   radiusMeters: z.coerce.number().int().positive(),
   minRating: z.coerce.number().min(0).max(5).optional(),
   minReviews: z.coerce.number().int().min(0).optional(),
   hasWebsite: z.enum(["any", "has", "none"]),
-  hasEmail: z.enum(["any", "has", "none"]),
+  hasEmail: z.enum(["any", "has", "valid", "none"]),
   sortBy: z.enum(["opportunityScore", "reviewCount", "rating", "createdAt"]),
 });
 
@@ -104,7 +107,11 @@ export function SearchForm({ defaultValues, onSubmit, isSearching }: SearchFormP
               <FormItem className="lg:col-span-2">
                 <FormLabel>Business Category</FormLabel>
                 <FormControl>
-                  <Input placeholder="e.g. plumbers, dentists, coffee shops" list="business-categories" {...field} />
+                  <Input
+                    placeholder="e.g. plumbers, dentists, coffee shops — leave blank to browse all businesses"
+                    list="business-categories"
+                    {...field}
+                  />
                 </FormControl>
                 <datalist id="business-categories">
                   {BUSINESS_CATEGORIES.map((cat) => (

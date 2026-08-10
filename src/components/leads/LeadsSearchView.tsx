@@ -22,7 +22,9 @@ type SortColumn = SearchFormValues["sortBy"] | "email";
 function parseFiltersFromParams(params: URLSearchParams): SearchFormValues | null {
   const keyword = params.get("keyword");
   const location = params.get("location");
-  if (!keyword || !location) return null;
+  // keyword === "" is a deliberate "browse all categories" search, distinct
+  // from the param being entirely absent (this page was never searched).
+  if (keyword === null || !location) return null;
 
   const minRatingRaw = params.get("minRating");
   const minReviewsRaw = params.get("minReviews");
@@ -114,12 +116,13 @@ export function LeadsSearchView() {
     filters
       ? {
           searchId: searchId ?? undefined,
-          category: toTitleCase(filters.keyword),
+          category: filters.keyword ? toTitleCase(filters.keyword) : undefined,
           location: filters.location,
           minRating: filters.minRating,
           minReviews: filters.minReviews,
           hasWebsite: filters.hasWebsite === "any" ? undefined : filters.hasWebsite === "has",
-          hasEmail: filters.hasEmail === "any" ? undefined : filters.hasEmail === "has",
+          hasEmail: filters.hasEmail === "any" ? undefined : filters.hasEmail !== "none",
+          emailValid: filters.hasEmail === "valid" ? true : undefined,
           search: debouncedSearch || undefined,
           sortBy,
           sortDirection,
@@ -216,7 +219,7 @@ export function LeadsSearchView() {
           pageSize={leads.data.pageSize}
           total={leads.data.total}
           onPageChange={handlePageChange}
-          searchedCategory={filters ? toTitleCase(filters.keyword) : undefined}
+          searchedCategory={filters?.keyword ? toTitleCase(filters.keyword) : undefined}
           sortBy={sortBy}
           sortDirection={sortDirection}
           onSort={handleSort}

@@ -358,6 +358,12 @@ model Lead {
   opportunityScore          Int       @default(0)
   opportunityScoreUpdatedAt DateTime?
   enrichedEmail             String?
+  // Best-effort MX lookup on enrichedEmail's domain -- null = not checked
+  // (e.g. no email found), true = domain accepts mail, false = no MX record found.
+  enrichedEmailValid        Boolean?
+  // Best-effort guess at the email owner's name, derived only when the local
+  // part looks personal (e.g. "john.smith@") rather than generic ("info@").
+  enrichedOwnerName         String?
   enrichedFacebookUrl       String?
   enrichedInstagramUrl      String?
   enrichedLinkedinUrl       String?
