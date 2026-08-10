@@ -8,3 +8,20 @@ export function toTitleCase(value: string): string {
     .map((word) => (word ? word[0].toUpperCase() + word.slice(1) : word))
     .join(" ");
 }
+
+/**
+ * "Save as Contact" name prefill for a lead: the business name always goes
+ * in the Company field. When an owner name was found, it's split into
+ * First/Last so the contact record is about the actual person; otherwise
+ * the business name itself fills First Name (rather than being split
+ * word-by-word, which mangles multi-word business names) so the contact
+ * isn't left with a blank name.
+ */
+export function leadContactNamePrefill(
+  businessName: string,
+  ownerName: string | null | undefined,
+): { firstName: string; lastName?: string } {
+  if (!ownerName?.trim()) return { firstName: businessName };
+  const parts = ownerName.trim().split(/\s+/).filter(Boolean);
+  return { firstName: parts[0], lastName: parts.slice(1).join(" ") || undefined };
+}

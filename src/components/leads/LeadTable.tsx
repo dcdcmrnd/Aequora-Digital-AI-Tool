@@ -9,6 +9,7 @@ import { ContactFormModal } from "@/components/contacts/ContactFormModal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/Table";
+import { leadContactNamePrefill } from "@/lib/leads/constants";
 import type { Lead } from "@/types";
 
 interface LeadTableProps {
@@ -125,10 +126,11 @@ export function LeadTable({
           open={!!contactPrefillLead}
           onClose={() => setContactPrefillLead(null)}
           prefill={{
-            // When we have a best-guess owner name, that's the person — the
-            // business name belongs in "company" instead of standing in for it.
-            name: contactPrefillLead.enrichedOwnerName ?? contactPrefillLead.name,
-            company: contactPrefillLead.enrichedOwnerName ? contactPrefillLead.name : undefined,
+            // The business name always goes in Company; First/Last name is
+            // the owner if we found one, otherwise falls back to the
+            // business name so the contact isn't left blank.
+            ...leadContactNamePrefill(contactPrefillLead.name, contactPrefillLead.enrichedOwnerName),
+            company: contactPrefillLead.name,
             phone: contactPrefillLead.phone ?? undefined,
             website: contactPrefillLead.website ?? undefined,
             address: contactPrefillLead.address ?? undefined,

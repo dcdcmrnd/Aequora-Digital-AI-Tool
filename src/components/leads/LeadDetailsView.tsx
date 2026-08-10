@@ -32,6 +32,7 @@ import { useAuditRecommendations } from "@/hooks/useAuditRecommendations";
 import { useLeadAudit } from "@/hooks/useLeadAudit";
 import { useLeadEnrich } from "@/hooks/useLeadEnrich";
 import { useSavedLeads } from "@/hooks/useSavedLeads";
+import { leadContactNamePrefill } from "@/lib/leads/constants";
 import { cn, formatDate } from "@/lib/utils";
 import { LEAD_STATUSES, type Lead, type LeadStatus, type SavedLead } from "@/types";
 
@@ -331,10 +332,11 @@ export function LeadDetailsView({ lead: initialLead, initialSavedLead, prevId, n
           open={savingContact}
           onClose={() => setSavingContact(false)}
           prefill={{
-            // When we have a best-guess owner name, that's the person — the
-            // business name belongs in "company" instead of standing in for it.
-            name: lead.enrichedOwnerName ?? lead.name,
-            company: lead.enrichedOwnerName ? lead.name : undefined,
+            // The business name always goes in Company; First/Last name is
+            // the owner if we found one, otherwise falls back to the
+            // business name so the contact isn't left blank.
+            ...leadContactNamePrefill(lead.name, lead.enrichedOwnerName),
+            company: lead.name,
             phone: lead.phone ?? undefined,
             website: lead.website ?? undefined,
             address: lead.address ?? undefined,
