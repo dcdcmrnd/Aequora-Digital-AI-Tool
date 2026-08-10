@@ -39,7 +39,12 @@ export interface GooglePlacesClient {
 const addressComponentSchema = z.object({
   longText: z.string(),
   shortText: z.string().optional(),
-  types: z.array(z.string()),
+  // Google's API (New) doesn't always populate `types` on every address
+  // component despite documenting it as present -- confirmed in production,
+  // where it crashed the entire search (a single missing `types` on any one
+  // of ~20 results rejected the whole Zod-parsed response, so nothing loaded
+  // and the search silently showed no results).
+  types: z.array(z.string()).default([]),
 });
 
 const placeSchema = z.object({
