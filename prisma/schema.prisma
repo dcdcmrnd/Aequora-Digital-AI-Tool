@@ -502,6 +502,11 @@ model Automation {
   id          String          @id @default(cuid())
   name        String
   isActive    Boolean         @default(true)
+  // Contact entry control -- default true/true preserves this app's original
+  // behavior (every trigger fire enrolls, with no dedup) for automations that
+  // existed before these settings shipped.
+  allowMultipleEntries Boolean @default(true) // false = a contact already actively running/waiting in this automation is skipped on a repeat trigger
+  allowReentry         Boolean @default(true) // false = a contact who already finished a run here (any terminal status) is skipped on a repeat trigger
   flow        String          @default("{\"nodes\":[],\"edges\":[]}") // React Flow nodes+edges, JSON string
   createdById String
   createdBy   User            @relation("AutomationCreator", fields: [createdById], references: [id], onDelete: Cascade)

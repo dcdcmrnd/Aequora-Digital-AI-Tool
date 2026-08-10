@@ -30,6 +30,8 @@ const flowSchema = z.object({ nodes: z.array(nodeSchema), edges: z.array(edgeSch
 const automationSchema = z.object({
   name: z.string().min(1, "Name is required."),
   isActive: z.boolean().default(true),
+  allowMultipleEntries: z.boolean().default(true),
+  allowReentry: z.boolean().default(true),
   flow: flowSchema.default(EMPTY_FLOW),
 });
 
@@ -81,6 +83,8 @@ export async function POST(req: NextRequest) {
     data: {
       name: parsed.data.name,
       isActive: parsed.data.isActive,
+      allowMultipleEntries: parsed.data.allowMultipleEntries,
+      allowReentry: parsed.data.allowReentry,
       flow: JSON.stringify(parsed.data.flow),
       createdById: session.user.id,
     },

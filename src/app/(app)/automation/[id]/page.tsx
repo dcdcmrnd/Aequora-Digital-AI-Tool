@@ -22,6 +22,8 @@ export default async function EditAutomationPage({ params }: { params: { id: str
         id: automation.id,
         name: automation.name,
         isActive: automation.isActive,
+        allowMultipleEntries: automation.allowMultipleEntries,
+        allowReentry: automation.allowReentry,
         flow: JSON.parse(automation.flow),
         createdById: automation.createdById,
         createdAt: automation.createdAt.toISOString(),

@@ -403,6 +403,10 @@ export interface Automation {
   id: string;
   name: string;
   isActive: boolean;
+  /** false = block a new run while this contact already has one active (running/waiting) here. */
+  allowMultipleEntries: boolean;
+  /** false = block a new run once this contact has ever finished a run here before. */
+  allowReentry: boolean;
   flow: AutomationFlow;
   createdById: string;
   runs?: AutomationRun[];

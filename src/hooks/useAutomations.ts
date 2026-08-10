@@ -9,6 +9,8 @@ import type { Automation, AutomationFlow, AutomationRun } from "@/types";
 export interface AutomationInput {
   name: string;
   isActive: boolean;
+  allowMultipleEntries: boolean;
+  allowReentry: boolean;
   flow: AutomationFlow;
 }
 

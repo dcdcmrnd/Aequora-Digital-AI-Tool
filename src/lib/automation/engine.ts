@@ -159,6 +159,35 @@ async function evaluateConditionRule(rule: ConditionRule, run: { id: string; con
   return { result: !!lastTracked?.openedAt, detail: "Email was opened" };
 }
 
+const ACTIVE_RUN_STATUSES = ["running", "waiting"];
+const TERMINAL_RUN_STATUSES = ["completed", "error", "cancelled"];
+
+/**
+ * Applies an automation's entry-control settings for one contact:
+ * - allowMultipleEntries=false blocks a new run while one is already active
+ *   (running/waiting) for this contact in this automation.
+ * - allowReentry=false blocks a new run once this contact has ever finished
+ *   a run here before (completed/error/cancelled), regardless of whether
+ *   they're currently active — for workflows meant to reach a contact once.
+ * Both default true, so automations created before these settings existed
+ * keep their original behavior (every trigger fire enrolls, no dedup).
+ */
+async function canEnterAutomation(
+  automation: { id: string; allowMultipleEntries: boolean; allowReentry: boolean },
+  contactId: string,
+): Promise<boolean> {
+  if (automation.allowMultipleEntries && automation.allowReentry) return true;
+
+  const priorRuns = await prisma.automationRun.findMany({
+    where: { automationId: automation.id, contactId },
+    select: { status: true },
+  });
+
+  if (!automation.allowMultipleEntries && priorRuns.some((r) => ACTIVE_RUN_STATUSES.includes(r.status))) return false;
+  if (!automation.allowReentry && priorRuns.some((r) => TERMINAL_RUN_STATUSES.includes(r.status))) return false;
+  return true;
+}
+
 /** Finds active automations whose trigger matches the fired event and starts a run for each. */
 export async function runAutomationsForTrigger(event: TriggerEvent): Promise<void> {
   try {
@@ -171,6 +200,8 @@ export async function runAutomationsForTrigger(event: TriggerEvent): Promise<voi
 
       const firstNodeId = nextNodeId(flow, triggerNode.id);
       if (!firstNodeId) continue; // trigger configured but nothing attached yet
+
+      if (event.contactId && !(await canEnterAutomation(automation, event.contactId))) continue;
 
       const run = await prisma.automationRun.create({
         data: {
@@ -192,8 +223,8 @@ export async function runAutomationsForTrigger(event: TriggerEvent): Promise<voi
 /**
  * Manually enrolls a contact into an automation's flow, skipping trigger
  * matching entirely (e.g. a bulk "Add to Workflow" action from the Contacts
- * list). Returns false if the contact is already running or waiting in
- * this automation, or if the trigger has no action attached yet.
+ * list). Returns false if the automation's entry-control settings block it
+ * for this contact right now, or if the trigger has no action attached yet.
  */
 export async function enrollContactInAutomation(automationId: string, contactId: string, depth = 0): Promise<boolean> {
   if (depth > MAX_ENROLLMENT_DEPTH) return false;
@@ -201,10 +232,7 @@ export async function enrollContactInAutomation(automationId: string, contactId:
   const automation = await prisma.automation.findUnique({ where: { id: automationId } });
   if (!automation) return false;
 
-  const existing = await prisma.automationRun.findFirst({
-    where: { automationId, contactId, status: { in: ["running", "waiting"] } },
-  });
-  if (existing) return false;
+  if (!(await canEnterAutomation(automation, contactId))) return false;
 
   const flow = parseFlow(automation.flow);
   const triggerNode = flow.nodes.find((n) => n.type === "trigger");

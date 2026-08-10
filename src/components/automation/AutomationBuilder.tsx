@@ -32,6 +32,8 @@ export function AutomationBuilder({ automation }: AutomationBuilderProps) {
 
   const [name, setName] = useState(automation?.name ?? "");
   const [isActive, setIsActive] = useState(automation?.isActive ?? true);
+  const [allowMultipleEntries, setAllowMultipleEntries] = useState(automation?.allowMultipleEntries ?? true);
+  const [allowReentry, setAllowReentry] = useState(automation?.allowReentry ?? true);
   const [flow, setFlow] = useState<AutomationFlow>(automation?.flow ?? blankFlow());
   const [tab, setTab] = useState("builder");
   const [testOpen, setTestOpen] = useState(false);
@@ -41,7 +43,7 @@ export function AutomationBuilder({ automation }: AutomationBuilderProps) {
 
   function handleSave() {
     if (!name.trim()) return;
-    const input = { name: name.trim(), isActive, flow };
+    const input = { name: name.trim(), isActive, allowMultipleEntries, allowReentry, flow };
     const onSuccess = { onSuccess: () => router.push("/automation") };
 
     if (isEditing) {
@@ -89,6 +91,38 @@ export function AutomationBuilder({ automation }: AutomationBuilderProps) {
         placeholder="Automation name, e.g. Welcome new contacts"
         className="max-w-md text-base font-medium"
       />
+
+      <div className="rounded-card border-border flex flex-col gap-2 border bg-white p-3 sm:flex-row sm:gap-8">
+        <label className="flex items-start gap-2 text-sm text-text-secondary select-none">
+          <input
+            type="checkbox"
+            checked={allowMultipleEntries}
+            onChange={(e) => setAllowMultipleEntries(e.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-border text-brand-primary focus:ring-brand-primary"
+          />
+          <span>
+            Allow multiple entries
+            <span className="text-text-muted block text-xs">
+              A contact can be in this workflow more than once at the same time.
+            </span>
+          </span>
+        </label>
+        <label className="flex items-start gap-2 text-sm text-text-secondary select-none">
+          <input
+            type="checkbox"
+            checked={allowReentry}
+            onChange={(e) => setAllowReentry(e.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-border text-brand-primary focus:ring-brand-primary"
+          />
+          <span>
+            Allow re-entry
+            <span className="text-text-muted block text-xs">
+              A contact who already finished this workflow once can enter it again later. Turn off for
+              one-time-only messages.
+            </span>
+          </span>
+        </label>
+      </div>
 
       {isEditing ? (
         <Tabs value={tab} onValueChange={setTab}>

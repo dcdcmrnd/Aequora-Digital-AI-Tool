@@ -29,6 +29,8 @@ const flowSchema = z.object({ nodes: z.array(nodeSchema), edges: z.array(edgeSch
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
   isActive: z.boolean().optional(),
+  allowMultipleEntries: z.boolean().optional(),
+  allowReentry: z.boolean().optional(),
   flow: flowSchema.optional(),
 });
 
@@ -69,6 +71,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     data: {
       ...(parsed.data.name !== undefined && { name: parsed.data.name }),
       ...(parsed.data.isActive !== undefined && { isActive: parsed.data.isActive }),
+      ...(parsed.data.allowMultipleEntries !== undefined && { allowMultipleEntries: parsed.data.allowMultipleEntries }),
+      ...(parsed.data.allowReentry !== undefined && { allowReentry: parsed.data.allowReentry }),
       ...(parsed.data.flow !== undefined && { flow: JSON.stringify(parsed.data.flow) }),
     },
   });
