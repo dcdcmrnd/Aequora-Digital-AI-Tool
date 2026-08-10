@@ -106,8 +106,8 @@ export function AutomationBuilder({ automation }: AutomationBuilderProps) {
           )}
         </TabsContent>
         <TabsContent value="settings">
-          <div className="rounded-card border-border flex flex-col gap-4 border bg-white p-4 sm:flex-row sm:gap-8">
-            <label className="flex items-start gap-2 text-sm text-text-secondary select-none">
+          <div className="rounded-card border-border divide-border divide-y border bg-white">
+            <label className="flex items-start gap-2 p-4 text-sm text-text-secondary select-none">
               <input
                 type="checkbox"
                 checked={allowMultipleEntries}
@@ -121,7 +121,7 @@ export function AutomationBuilder({ automation }: AutomationBuilderProps) {
                 </span>
               </span>
             </label>
-            <label className="flex items-start gap-2 text-sm text-text-secondary select-none">
+            <label className="flex items-start gap-2 p-4 text-sm text-text-secondary select-none">
               <input
                 type="checkbox"
                 checked={allowReentry}
