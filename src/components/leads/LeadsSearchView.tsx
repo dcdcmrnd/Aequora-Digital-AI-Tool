@@ -2,11 +2,13 @@
 
 import { useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Search } from "lucide-react";
 
 import type { LeadSortKey } from "@/components/leads/columns";
 import { LeadTable } from "@/components/leads/LeadTable";
+import { ManualAuditModal } from "@/components/leads/ManualAuditModal";
 import { SearchForm, type SearchFormValues } from "@/components/leads/SearchForm";
+import { Button } from "@/components/ui/Button";
 import { useLeads } from "@/hooks/useLeads";
 import { useLeadSearch } from "@/hooks/useLeadSearch";
 import { useSavedLeads } from "@/hooks/useSavedLeads";
@@ -84,6 +86,7 @@ export function LeadsSearchView() {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">(
     () => (searchParams.get("sortDirection") === "asc" ? "asc" : "desc"),
   );
+  const [manualAuditOpen, setManualAuditOpen] = useState(false);
 
   const savedLeadIds = useMemo(() => new Set((savedLeads ?? []).map((saved) => saved.leadId)), [savedLeads]);
 
@@ -159,12 +162,20 @@ export function LeadsSearchView() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-text-primary text-2xl font-semibold tracking-tight">Leads</h1>
-        <p className="text-text-muted text-sm">Find local businesses and score them as prospecting opportunities.</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-text-primary text-2xl font-semibold tracking-tight">Leads</h1>
+          <p className="text-text-muted text-sm">Find local businesses and score them as prospecting opportunities.</p>
+        </div>
+        <Button variant="secondary" size="sm" onClick={() => setManualAuditOpen(true)}>
+          <Search className="size-3.5" />
+          Audit a Specific Business
+        </Button>
       </div>
 
       <SearchForm onSubmit={handleSubmit} isSearching={search.isPending} defaultValues={filters ?? undefined} />
+
+      <ManualAuditModal open={manualAuditOpen} onClose={() => setManualAuditOpen(false)} />
 
       {leads.isError && (
         <div className="border-danger/40 rounded-card text-danger flex items-center gap-2 border bg-red-50 p-4 text-sm">

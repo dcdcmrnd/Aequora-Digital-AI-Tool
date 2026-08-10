@@ -1,3 +1,5 @@
+import crypto from "crypto";
+
 import { logActivity } from "@/lib/activity";
 import { prisma } from "@/lib/prisma";
 import { mapWithConcurrency } from "@/lib/utils/concurrency";
@@ -96,4 +98,74 @@ export async function executeSearch(params: ExecuteSearchParams): Promise<Execut
   });
 
   return { leads: results, resultsCount: results.length, searchId: searchRow.id };
+}
+
+export interface ManualLeadParams {
+  userId: string;
+  name?: string;
+  website?: string;
+}
+
+function normalizeWebsite(input: string): string {
+  const trimmed = input.trim();
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
+function hostnameFallbackName(website: string): string {
+  try {
+    return new URL(website).hostname.replace(/^www\./, "");
+  } catch {
+    return website;
+  }
+}
+
+/**
+ * Lets someone audit one specific, already-known business by name and/or
+ * website without going through a Google Places search first — reuses the
+ * same audit+enrich pipeline a real search runs on every result. Re-auditing
+ * a website already added this way updates that same lead instead of piling
+ * up duplicates.
+ */
+export async function runManualLeadAudit(params: ManualLeadParams): Promise<LeadWithAudit> {
+  const website = params.website?.trim() ? normalizeWebsite(params.website) : null;
+  const name = params.name?.trim() || (website ? hostnameFallbackName(website) : null);
+  if (!name) throw new Error("Enter a business name or website.");
+
+  const existing = website
+    ? await prisma.lead.findFirst({
+        where: { website: { equals: website, mode: "insensitive" }, googlePlaceId: { startsWith: "manual-" } },
+      })
+    : null;
+
+  const lead = existing
+    ? await prisma.lead.update({ where: { id: existing.id }, data: { name } })
+    : await prisma.lead.create({
+        data: { googlePlaceId: `manual-${crypto.randomUUID()}`, name, website },
+      });
+
+  let current = lead;
+  let audit = null;
+  try {
+    const outcome = await auditLead(current);
+    current = outcome.lead;
+    audit = outcome.audit;
+  } catch (error) {
+    console.error(`Audit failed for manual lead ${lead.id}:`, error);
+  }
+  try {
+    current = await enrichLead(current);
+  } catch (error) {
+    console.error(`Enrichment failed for manual lead ${lead.id}:`, error);
+  }
+
+  await logActivity({
+    userId: params.userId,
+    action: existing ? "updated" : "created",
+    entityType: "lead",
+    entityId: current.id,
+    entityName: current.name,
+    metadata: { source: "manual" },
+  });
+
+  return { ...current, audit };
 }
