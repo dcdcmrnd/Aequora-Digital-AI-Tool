@@ -6,6 +6,7 @@ import { ExternalLink, MessageSquare, Pencil, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { CopyButton } from "@/components/ui/CopyButton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/Table";
+import { CallButton } from "@/components/calls/CallWidget";
 import { ContactConversationModal } from "@/components/contacts/ContactConversationModal";
 import { ContactFormModal } from "@/components/contacts/ContactFormModal";
 import { useContacts } from "@/hooks/useContacts";
@@ -107,6 +108,7 @@ export function ContactsTable({ contacts, canManage, selectedIds, onToggle, onTo
                     <div className="flex items-center gap-1.5">
                       <span className="text-text-primary">{contact.phone}</span>
                       <CopyButton value={contact.phone} label="Phone" />
+                      <CallButton contactId={contact.id} name={contact.name} phone={contact.phone} />
                     </div>
                   ) : (
                     <span className="text-text-muted">—</span>

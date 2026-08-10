@@ -23,6 +23,7 @@ import { AuditCard } from "@/components/leads/AuditCard";
 import { NotesEditor } from "@/components/leads/NotesEditor";
 import { OpportunityBadge } from "@/components/leads/OpportunityBadge";
 import { WebsiteStatus } from "@/components/leads/WebsiteStatus";
+import { CallButton } from "@/components/calls/CallWidget";
 import { ContactFormModal } from "@/components/contacts/ContactFormModal";
 import { Button } from "@/components/ui/Button";
 import { CopyButton } from "@/components/ui/CopyButton";
@@ -165,6 +166,7 @@ export function LeadDetailsView({ lead: initialLead, initialSavedLead, prevId, n
                 <Phone className="text-text-muted size-4 shrink-0" />
                 {lead.phone ?? "—"}
                 {lead.phone && <CopyButton value={lead.phone} label="Phone" />}
+                {lead.phone && <CallButton name={lead.name} phone={lead.phone} />}
               </div>
               <div className="flex items-center gap-2">
                 <WebsiteStatus website={lead.website} httpsEnabled={lead.audit?.httpsEnabled} />

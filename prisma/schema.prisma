@@ -573,10 +573,19 @@ model EmailTracking {
 
 // --- Calling (Twilio) ---
 
-// Singleton, same pattern as CompanySettings — the agency's one purchased
-// Twilio number used as caller ID for every outbound click-to-call.
+// Singleton, same pattern as CompanySettings. Holds the agency's Twilio
+// account connection (entered once via Settings → Calling — "Connect
+// Twilio" — instead of Vercel env vars) plus the one purchased number used
+// as caller ID for every outbound click-to-call. The API Key and TwiML App
+// are auto-provisioned by our backend from accountSid/authToken at connect
+// time, so the admin only ever has to paste those two values.
 model TwilioSettings {
   id             String   @id @default("singleton")
+  accountSid     String?
+  authToken      String?
+  apiKeySid      String? // auto-created via the Twilio REST API at connect time
+  apiKeySecret   String? // only ever returned once by Twilio at creation; stored here
+  twimlAppSid    String? // auto-created Voice TwiML App pointing at /api/twilio/voice
   phoneNumberSid String? // Twilio's IncomingPhoneNumber SID, once purchased
   phoneNumber    String? // E.164, e.g. +15551234567
   updatedAt      DateTime @updatedAt

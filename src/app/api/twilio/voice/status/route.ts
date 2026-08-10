@@ -2,17 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import twilio from "twilio";
 
 import { prisma } from "@/lib/prisma";
+import { getTwilioCredentials } from "@/lib/twilio";
 
 /** Twilio-only status callback for the dialed leg of a click-to-call — updates the Call record's status/duration as it progresses. Signature-verified, same reasoning as /api/twilio/voice. */
 export async function POST(req: NextRequest) {
-  const authToken = process.env.TWILIO_AUTH_TOKEN;
-  if (!authToken) return new NextResponse("Twilio is not configured.", { status: 503 });
+  const creds = await getTwilioCredentials();
+  if (!creds) return new NextResponse("Twilio is not configured.", { status: 503 });
 
   const rawBody = await req.text();
   const params = Object.fromEntries(new URLSearchParams(rawBody));
   const signature = req.headers.get("X-Twilio-Signature") ?? "";
 
-  if (!twilio.validateRequest(authToken, signature, req.url, params)) {
+  if (!twilio.validateRequest(creds.authToken, signature, req.url, params)) {
     return new NextResponse("Invalid signature.", { status: 403 });
   }
 

@@ -14,7 +14,7 @@ export async function GET() {
   const settings = await prisma.twilioSettings.findUnique({ where: { id: "singleton" } });
   return NextResponse.json({
     phoneNumber: settings?.phoneNumber ?? null,
-    twilioConfigured: isTwilioConfigured(),
+    twilioConfigured: await isTwilioConfigured(),
   });
 }
 
@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (session.user.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  if (!isTwilioConfigured()) {
+  if (!(await isTwilioConfigured())) {
     return NextResponse.json({ error: "not_configured" }, { status: 503 });
   }
 
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const client = createTwilioClient();
+    const client = await createTwilioClient();
     const purchased = await client.incomingPhoneNumbers.create({ phoneNumber: parsed.data.phoneNumber });
 
     await prisma.twilioSettings.upsert({
@@ -70,7 +70,7 @@ export async function DELETE() {
   if (!settings?.phoneNumberSid) return NextResponse.json({ error: "No number to release." }, { status: 400 });
 
   try {
-    const client = createTwilioClient();
+    const client = await createTwilioClient();
     await client.incomingPhoneNumbers(settings.phoneNumberSid).remove();
   } catch (err) {
     return NextResponse.json(

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import twilio from "twilio";
 
 import { prisma } from "@/lib/prisma";
-import { isE164 } from "@/lib/twilio";
+import { getTwilioCredentials, isE164 } from "@/lib/twilio";
 
 /**
  * TwiML webhook Twilio calls when the browser Device (Twilio Voice SDK)
@@ -13,14 +13,14 @@ import { isE164 } from "@/lib/twilio";
  * on the agency's dime.
  */
 export async function POST(req: NextRequest) {
-  const authToken = process.env.TWILIO_AUTH_TOKEN;
-  if (!authToken) return new NextResponse("Twilio is not configured.", { status: 503 });
+  const creds = await getTwilioCredentials();
+  if (!creds) return new NextResponse("Twilio is not configured.", { status: 503 });
 
   const rawBody = await req.text();
   const params = Object.fromEntries(new URLSearchParams(rawBody));
   const signature = req.headers.get("X-Twilio-Signature") ?? "";
 
-  if (!twilio.validateRequest(authToken, signature, req.url, params)) {
+  if (!twilio.validateRequest(creds.authToken, signature, req.url, params)) {
     return new NextResponse("Invalid signature.", { status: 403 });
   }
 

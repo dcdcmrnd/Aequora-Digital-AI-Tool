@@ -10,14 +10,14 @@ export async function GET(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (session.user.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  if (!isTwilioConfigured()) {
+  if (!(await isTwilioConfigured())) {
     return NextResponse.json({ error: "not_configured" }, { status: 503 });
   }
 
   const areaCode = req.nextUrl.searchParams.get("areaCode");
 
   try {
-    const client = createTwilioClient();
+    const client = await createTwilioClient();
     const results = await client
       .availablePhoneNumbers("US")
       .local.list({ ...(areaCode ? { areaCode: Number(areaCode) } : {}), limit: 10 });

@@ -7,6 +7,7 @@ import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, BookUser, CheckCircle2,
 import { OpportunityBadge } from "@/components/leads/OpportunityBadge";
 import { ScoreGauge } from "@/components/leads/ScoreGauge";
 import { WebsiteStatus } from "@/components/leads/WebsiteStatus";
+import { CallButton } from "@/components/calls/CallWidget";
 import { Button } from "@/components/ui/Button";
 import type { Lead } from "@/types";
 
@@ -197,6 +198,7 @@ export function createLeadColumns({
             >
               <BookUser className="size-3.5" />
             </Button>
+            {row.original.phone && <CallButton name={row.original.name} phone={row.original.phone} />}
           </div>
         );
       },

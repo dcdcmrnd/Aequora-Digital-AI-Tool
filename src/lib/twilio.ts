@@ -1,25 +1,43 @@
 import twilio from "twilio";
 
-/** Whether the base Twilio account credentials are configured at all. */
-export function isTwilioConfigured(): boolean {
-  return !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN);
+import { prisma } from "@/lib/prisma";
+
+export interface TwilioCredentials {
+  accountSid: string;
+  authToken: string;
+  apiKeySid: string | null;
+  apiKeySecret: string | null;
+  twimlAppSid: string | null;
 }
 
-/** Whether everything needed to issue browser Voice access tokens is configured. */
-export function isVoiceConfigured(): boolean {
-  return (
-    isTwilioConfigured() &&
-    !!process.env.TWILIO_API_KEY_SID &&
-    !!process.env.TWILIO_API_KEY_SECRET &&
-    !!process.env.TWILIO_TWIML_APP_SID
-  );
+/** Reads the agency's Twilio connection from the DB (set once via Settings → Calling). */
+export async function getTwilioCredentials(): Promise<TwilioCredentials | null> {
+  const settings = await prisma.twilioSettings.findUnique({ where: { id: "singleton" } });
+  if (!settings?.accountSid || !settings.authToken) return null;
+  return {
+    accountSid: settings.accountSid,
+    authToken: settings.authToken,
+    apiKeySid: settings.apiKeySid,
+    apiKeySecret: settings.apiKeySecret,
+    twimlAppSid: settings.twimlAppSid,
+  };
 }
 
-export function createTwilioClient() {
-  const accountSid = process.env.TWILIO_ACCOUNT_SID;
-  const authToken = process.env.TWILIO_AUTH_TOKEN;
-  if (!accountSid || !authToken) throw new Error("Twilio is not configured");
-  return twilio(accountSid, authToken);
+/** Whether the base Twilio account is connected at all. */
+export async function isTwilioConfigured(): Promise<boolean> {
+  return (await getTwilioCredentials()) !== null;
+}
+
+/** Whether everything needed to issue browser Voice access tokens is set up. */
+export async function isVoiceConfigured(): Promise<boolean> {
+  const creds = await getTwilioCredentials();
+  return !!(creds?.apiKeySid && creds.apiKeySecret && creds.twimlAppSid);
+}
+
+export async function createTwilioClient() {
+  const creds = await getTwilioCredentials();
+  if (!creds) throw new Error("Twilio is not connected");
+  return twilio(creds.accountSid, creds.authToken);
 }
 
 /** E.164: optional leading +, 1-15 digits, first digit 1-9. */

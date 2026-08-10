@@ -23,6 +23,10 @@ export function PhoneSettingsPanel() {
   const [searching, setSearching] = useState(false);
   const [purchasing, setPurchasing] = useState<string | null>(null);
   const [releasing, setReleasing] = useState(false);
+  const [accountSid, setAccountSid] = useState("");
+  const [authToken, setAuthToken] = useState("");
+  const [connecting, setConnecting] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
 
   async function loadStatus() {
     setLoading(true);
@@ -108,6 +112,43 @@ export function PhoneSettingsPanel() {
     }
   }
 
+  async function handleConnect() {
+    setConnecting(true);
+    try {
+      const res = await fetch("/api/twilio/connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accountSid: accountSid.trim(), authToken: authToken.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Couldn't connect Twilio.");
+      toast.success("Twilio connected");
+      setAccountSid("");
+      setAuthToken("");
+      await loadStatus();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't connect Twilio.");
+    } finally {
+      setConnecting(false);
+    }
+  }
+
+  async function handleDisconnect() {
+    if (!confirm("Disconnect Twilio? Calling will stop working until you reconnect.")) return;
+    setDisconnecting(true);
+    try {
+      const res = await fetch("/api/twilio/connect", { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Couldn't disconnect Twilio.");
+      toast.success("Twilio disconnected");
+      await loadStatus();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't disconnect Twilio.");
+    } finally {
+      setDisconnecting(false);
+    }
+  }
+
   return (
     <div className="rounded-card border border-border bg-white p-5 max-w-lg">
       <div className="flex items-start gap-3">
@@ -125,9 +166,39 @@ export function PhoneSettingsPanel() {
           {loading ? (
             <p className="text-text-muted mt-4 text-sm">Loading...</p>
           ) : !configured ? (
-            <div className="mt-4 rounded-input border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-              Twilio isn&apos;t connected yet. Add TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_API_KEY_SID,
-              TWILIO_API_KEY_SECRET, and TWILIO_TWIML_APP_SID as environment variables first.
+            <div className="mt-4 space-y-3">
+              <div className="rounded-input border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                Twilio isn&apos;t connected yet. Log in to your{" "}
+                <a
+                  href="https://console.twilio.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium underline"
+                >
+                  Twilio Console
+                </a>{" "}
+                and paste your Account SID and Auth Token below — both are shown right on the console home
+                page. We&apos;ll automatically set up everything else needed for calling.
+              </div>
+              <Input
+                placeholder="Account SID (starts with AC...)"
+                value={accountSid}
+                onChange={(e) => setAccountSid(e.target.value)}
+              />
+              <Input
+                placeholder="Auth Token"
+                type="password"
+                value={authToken}
+                onChange={(e) => setAuthToken(e.target.value)}
+              />
+              <Button
+                size="sm"
+                onClick={handleConnect}
+                loading={connecting}
+                disabled={!accountSid.trim() || !authToken.trim()}
+              >
+                Connect Twilio
+              </Button>
             </div>
           ) : currentNumber ? (
             <div className="mt-4 space-y-2">
@@ -137,6 +208,14 @@ export function PhoneSettingsPanel() {
                   Release
                 </Button>
               </div>
+              <button
+                type="button"
+                onClick={handleDisconnect}
+                disabled={disconnecting}
+                className="text-text-muted hover:text-danger text-xs disabled:opacity-40"
+              >
+                Disconnect Twilio
+              </button>
             </div>
           ) : (
             <div className="mt-4 space-y-3">
