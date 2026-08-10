@@ -27,6 +27,7 @@ import { ContactFormModal } from "@/components/contacts/ContactFormModal";
 import { Button } from "@/components/ui/Button";
 import { CopyButton } from "@/components/ui/CopyButton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/Select";
+import { useAuditRecommendations } from "@/hooks/useAuditRecommendations";
 import { useLeadAudit } from "@/hooks/useLeadAudit";
 import { useLeadEnrich } from "@/hooks/useLeadEnrich";
 import { useSavedLeads } from "@/hooks/useSavedLeads";
@@ -45,6 +46,7 @@ interface LeadDetailsViewProps {
 export function LeadDetailsView({ lead: initialLead, initialSavedLead, prevId, nextId, listParams }: LeadDetailsViewProps) {
   const router = useRouter();
   const audit = useLeadAudit(initialLead.id);
+  const recommendations = useAuditRecommendations(initialLead.id);
   const enrich = useLeadEnrich(initialLead.id);
   const savedLeads = useSavedLeads();
   const [lead, setLead] = useState(initialLead);
@@ -252,7 +254,16 @@ export function LeadDetailsView({ lead: initialLead, initialSavedLead, prevId, n
               {audit.isPending ? "Auditing..." : "Re-run Audit"}
             </Button>
           </div>
-          <AuditCard audit={lead.audit} website={lead.website} />
+          <AuditCard
+            audit={lead.audit}
+            website={lead.website}
+            onGenerateRecommendations={() =>
+              recommendations.mutate(undefined, {
+                onSuccess: (data) => setLead((prev) => ({ ...prev, audit: data.audit })),
+              })
+            }
+            isGeneratingRecommendations={recommendations.isPending}
+          />
 
           <div className="rounded-card border-border border bg-white p-4">
             <h3 className="text-text-primary mb-3 text-sm font-semibold">Timeline</h3>

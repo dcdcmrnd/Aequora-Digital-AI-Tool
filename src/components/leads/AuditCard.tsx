@@ -1,17 +1,20 @@
-import { CheckCircle2, XCircle } from "lucide-react";
+import { CheckCircle2, Sparkles, XCircle } from "lucide-react";
 
 import { ScoreGauge } from "@/components/leads/ScoreGauge";
 import { WebsiteStatus } from "@/components/leads/WebsiteStatus";
+import { Button } from "@/components/ui/Button";
 import { Separator } from "@/components/ui/Separator";
-import { formatRelativeTime } from "@/lib/utils";
+import { cn, formatRelativeTime } from "@/lib/utils";
 import type { LeadAudit } from "@/types";
 
 interface AuditCardProps {
   audit: LeadAudit | null | undefined;
   website: string | null;
+  onGenerateRecommendations?: () => void;
+  isGeneratingRecommendations?: boolean;
 }
 
-export function AuditCard({ audit, website }: AuditCardProps) {
+export function AuditCard({ audit, website, onGenerateRecommendations, isGeneratingRecommendations }: AuditCardProps) {
   if (!website) {
     return (
       <div className="rounded-card border-border border bg-white p-4">
@@ -64,6 +67,40 @@ export function AuditCard({ audit, website }: AuditCardProps) {
           </li>
         ))}
       </ul>
+
+      {onGenerateRecommendations && (
+        <>
+          <Separator className="my-4" />
+          <div className="flex items-center justify-between">
+            <h4 className="text-text-primary text-sm font-semibold">Recommendations</h4>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={onGenerateRecommendations}
+              loading={isGeneratingRecommendations}
+            >
+              <Sparkles className="size-3.5" />
+              {audit.aiRecommendations ? "Regenerate" : "Get AI Recommendations"}
+            </Button>
+          </div>
+          {audit.aiRecommendations ? (
+            <div className={cn("mt-3 rounded-input bg-surface-secondary p-3", isGeneratingRecommendations && "opacity-50")}>
+              <p className="text-text-primary text-sm whitespace-pre-wrap">{audit.aiRecommendations}</p>
+              {audit.aiRecommendationsAt && (
+                <p className="text-text-muted mt-2 text-xs">
+                  Generated {formatRelativeTime(audit.aiRecommendationsAt)}
+                </p>
+              )}
+            </div>
+          ) : (
+            !isGeneratingRecommendations && (
+              <p className="text-text-muted mt-2 text-sm">
+                Get specific, Aequora-service-based suggestions for helping this business grow.
+              </p>
+            )
+          )}
+        </>
+      )}
     </div>
   );
 }

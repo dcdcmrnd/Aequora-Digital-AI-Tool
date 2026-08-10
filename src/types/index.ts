@@ -246,6 +246,8 @@ export interface LeadAudit {
   sslValid: boolean | null;
   pageSpeed: number | null;
   overallScore: number | null;
+  aiRecommendations: string | null;
+  aiRecommendationsAt: string | null;
   lastScanned: string;
   createdAt: string;
 }

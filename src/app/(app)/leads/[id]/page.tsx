@@ -98,6 +98,7 @@ export default async function LeadDetailsPage({
               ...lead.audit,
               lastScanned: lead.audit.lastScanned.toISOString(),
               createdAt: lead.audit.createdAt.toISOString(),
+              aiRecommendationsAt: lead.audit.aiRecommendationsAt?.toISOString() ?? null,
             }
           : null,
       }}

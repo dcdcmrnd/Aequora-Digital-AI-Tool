@@ -399,6 +399,11 @@ model LeadAudit {
   sslValid           Boolean?
   pageSpeed          Float?
   overallScore       Int?
+  // AI-generated ("Get AI Recommendations" button) — plain text, regenerated on
+  // demand, not tied to lastScanned since someone may want fresh advice without
+  // re-running the underlying PageSpeed audit.
+  aiRecommendations   String?
+  aiRecommendationsAt DateTime?
   lastScanned        DateTime @default(now())
   createdAt          DateTime @default(now())
 }
