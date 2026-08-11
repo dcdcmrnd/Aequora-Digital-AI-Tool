@@ -8,6 +8,8 @@ import {
   Mail,
   Octagon,
   Pencil,
+  Shuffle,
+  Sparkles,
   StickyNote,
   Tag,
   TagsIcon,
@@ -35,6 +37,8 @@ export interface NodeDefinition {
   hasTargetHandle: boolean;
   hasSourceHandle: boolean;
   isBranching: boolean;
+  /** Labels for the two branch handles of a branching node — defaults to "Yes"/"No" (condition) when omitted. */
+  branchLabels?: { first: string; second: string };
   canDuplicate: boolean;
 }
 
@@ -141,6 +145,22 @@ export const NODE_DEFINITIONS: Record<AutomationNodeType, NodeDefinition> = {
     isBranching: true,
     canDuplicate: false,
   },
+  split: {
+    category: "Flow Control",
+    label: "Split (A/B Test)",
+    icon: Shuffle,
+    accent: "bg-pink-50 text-pink-600",
+    defaultData: () => ({ splitPercent: 50 }),
+    summarize: (data) => {
+      const pct = (data.splitPercent as number | undefined) ?? 50;
+      return `${pct}% / ${100 - pct}%`;
+    },
+    hasTargetHandle: true,
+    hasSourceHandle: true,
+    isBranching: true,
+    branchLabels: { first: "A", second: "B" },
+    canDuplicate: false,
+  },
   wait: {
     category: "Flow Control",
     label: "Wait",
@@ -188,6 +208,18 @@ export const NODE_DEFINITIONS: Record<AutomationNodeType, NodeDefinition> = {
     accent: "bg-amber-50 text-amber-600",
     defaultData: () => ({}),
     summarize: (data) => (data.title ? `Create note: "${data.title}"` : "Click to configure"),
+    hasTargetHandle: true,
+    hasSourceHandle: true,
+    isBranching: false,
+    canDuplicate: true,
+  },
+  ai_prompt: {
+    category: "Records",
+    label: "AI Prompt",
+    icon: Sparkles,
+    accent: "bg-violet-50 text-violet-600",
+    defaultData: () => ({ field: "notes" }),
+    summarize: (data) => (data.prompt ? `AI writes to ${data.field ?? "notes"}` : "Click to configure"),
     hasTargetHandle: true,
     hasSourceHandle: true,
     isBranching: false,

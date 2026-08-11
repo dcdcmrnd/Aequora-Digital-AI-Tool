@@ -508,6 +508,24 @@ export function NodeConfigPanel({ node, stages, automationId, onClose, onSave, o
           </>
         )}
 
+        {node.type === "split" && (
+          <>
+            <Field label="Percent down Path A" hint="the rest go down Path B">
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                value={(data.splitPercent as number | undefined) ?? 50}
+                onChange={(e) => set("splitPercent", Math.min(100, Math.max(0, Number(e.target.value))))}
+              />
+            </Field>
+            <p className="text-text-muted text-xs">
+              Each contact is randomly assigned to <strong>A</strong> or <strong>B</strong> at the given split —
+              useful for testing two different follow-up approaches against each other.
+            </p>
+          </>
+        )}
+
         {node.type === "wait" && (
           <>
             <Field label="Wait for">
@@ -734,6 +752,38 @@ export function NodeConfigPanel({ node, stages, automationId, onClose, onSave, o
             <Field label="Content">
               <Textarea value={(data.content as string) ?? ""} onChange={(e) => set("content", e.target.value)} rows={5} />
             </Field>
+          </>
+        )}
+
+        {node.type === "ai_prompt" && (
+          <>
+            <Field label="Prompt">
+              <Textarea
+                value={(data.prompt as string) ?? ""}
+                onChange={(e) => set("prompt", e.target.value)}
+                rows={5}
+                placeholder={'e.g. "Write a short, friendly opening line for a follow-up email to {{contact.first_name}} at {{contact.company}}."'}
+              />
+            </Field>
+            <MergeTagRow onInsert={insertMergeTagAppend("prompt")} hint="click to insert into the prompt" />
+            <Field label="Save result to">
+              <Select value={(data.field as string) ?? "notes"} onValueChange={(v) => set("field", v)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a field" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CONTACT_TEXT_FIELDS.map((f) => (
+                    <SelectItem key={f} value={f}>
+                      {CONTACT_FIELD_LABELS[f]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <p className="text-text-muted text-xs">
+              Overwrites whatever is already in that field with Claude's response — pair with an earlier
+              step if you need to keep the original value elsewhere first.
+            </p>
           </>
         )}
 

@@ -116,6 +116,30 @@ export async function generateAuditRecommendations(input: AuditRecommendationsIn
   return text.text.trim();
 }
 
+/**
+ * Runs an arbitrary, team-authored prompt (from the "AI Prompt" automation
+ * action) through Claude with the same Aequora business-consultant framing
+ * as the rest of this file. Merge tags in the prompt are already resolved
+ * by the caller before this runs — this function only talks to the model.
+ */
+export async function runAiPrompt(prompt: string): Promise<string> {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    throw new Error("AI Prompt step isn't configured — ANTHROPIC_API_KEY is missing.");
+  }
+
+  const client = getAnthropicClient();
+  const response = await client.messages.create({
+    model: "claude-sonnet-5",
+    max_tokens: 400,
+    system: AEQUORA_BUSINESS_CONTEXT,
+    messages: [{ role: "user", content: prompt }],
+  });
+
+  const text = response.content.find((block) => block.type === "text");
+  if (!text || text.type !== "text") throw new Error("The AI didn't return a usable response.");
+  return text.text.trim();
+}
+
 export function buildTaskAssistantSystemPrompt(context: {
   userName: string;
   userRole: string;

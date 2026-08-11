@@ -158,8 +158,8 @@ export function CanvasNode({ type, data, selected }: NodeProps) {
       {meta.isBranching ? (
         <>
           <div className="mt-2 flex justify-between px-1 text-[10px] font-medium">
-            <span className="text-emerald-600">Yes</span>
-            <span className="text-danger">No</span>
+            <span className="text-emerald-600">{meta.branchLabels?.first ?? "Yes"}</span>
+            <span className="text-danger">{meta.branchLabels?.second ?? "No"}</span>
           </div>
           <Handle type="source" position={Position.Bottom} id="yes" style={{ left: "28%" }} className="!bg-emerald-500 !size-2" />
           <Handle type="source" position={Position.Bottom} id="no" style={{ left: "72%" }} className="!bg-danger !size-2" />

@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
+import { runAiPrompt } from "@/lib/ai";
 import { sendEmail } from "@/lib/gmail";
 import { createNotification } from "@/lib/activity";
 import { formatDailyTime, formatWeekdayTime, getNextTimeOccurrenceUtc, getNextWeekdayOccurrenceUtc } from "@/lib/utils/schedule";
@@ -517,6 +518,18 @@ async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string,
         continue;
       }
 
+      if (node.type === "split") {
+        // Independently random per contact per pass through this node —
+        // matches GHL's A/B split semantics (a testing tool, not something
+        // that needs to be stable/repeatable for the same contact).
+        const data = node.data as { splitPercent?: number };
+        const splitPercent = data.splitPercent ?? 50;
+        const wentA = Math.random() * 100 < splitPercent;
+        await logStep(run.id, node.id, node.type, "success", `Split ${splitPercent}/${100 - splitPercent} — went ${wentA ? "A" : "B"}`);
+        currentNodeId = nextNodeId(flow, node.id, wentA ? "yes" : "no");
+        continue;
+      }
+
       if (node.type === "wait") {
         const data = node.data as {
           mode?: string; amount?: number; unit?: WaitUnit; condition?: string;
@@ -644,6 +657,31 @@ async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string,
             data: { title, content, authorId: systemUserId, projectId: data.projectId || undefined, categoryId: data.categoryId || undefined },
           });
           await logStep(run.id, node.id, node.type, "success", `Created note "${note.title}"`);
+        } catch (err) {
+          await logStep(run.id, node.id, node.type, "error", err instanceof Error ? err.message : "Unknown error");
+          throw err;
+        }
+        currentNodeId = nextNodeId(flow, node.id);
+        continue;
+      }
+
+      if (node.type === "ai_prompt") {
+        try {
+          if (!run.contactId) {
+            await logStep(run.id, node.id, node.type, "success", "No contact for this run");
+          } else {
+            const data = node.data as { prompt?: string; field?: ContactTextField };
+            if (!data.prompt) throw new Error("No prompt configured for this step");
+            const field = data.field && CONTACT_TEXT_FIELDS.includes(data.field) ? data.field : "notes";
+
+            const contact = await prisma.contact.findUnique({ where: { id: run.contactId } });
+            const mergeValues = contact ? contactMergeValues(contact) : {};
+            const prompt = applyMergeTags(data.prompt, mergeValues);
+
+            const result = await runAiPrompt(prompt);
+            await prisma.contact.update({ where: { id: run.contactId }, data: { [field]: result } });
+            await logStep(run.id, node.id, node.type, "success", `AI wrote to ${field}`);
+          }
         } catch (err) {
           await logStep(run.id, node.id, node.type, "error", err instanceof Error ? err.message : "Unknown error");
           throw err;

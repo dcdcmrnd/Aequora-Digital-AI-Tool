@@ -10,8 +10,8 @@ import { EMPTY_FLOW } from "@/lib/automation/types";
 const nodeSchema = z.object({
   id: z.string(),
   type: z.enum([
-    "trigger", "send_email", "add_tag", "remove_tag", "move_pipeline_stage", "condition", "wait",
-    "create_task", "create_note", "create_opportunity", "update_contact_field", "update_opportunity",
+    "trigger", "send_email", "add_tag", "remove_tag", "move_pipeline_stage", "condition", "split", "wait",
+    "create_task", "create_note", "create_opportunity", "ai_prompt", "update_contact_field", "update_opportunity",
     "assign_contact_to_user", "send_notification", "webhook", "enroll_in_automation", "set_event_date", "end_workflow",
   ]),
   position: z.object({ x: z.number(), y: z.number() }),
