@@ -1,14 +1,33 @@
 "use client";
 
 import { useState } from "react";
-import { Briefcase, Mail, Pencil, Phone, Workflow, X } from "lucide-react";
+import { Briefcase, Mail, Pencil, Phone, PhoneCall, Workflow, X } from "lucide-react";
 
 import { BulkWorkflowModal } from "@/components/contacts/BulkActionsBar";
 import { ContactFormModal } from "@/components/contacts/ContactFormModal";
 import { CallButton } from "@/components/calls/CallWidget";
 import { Button } from "@/components/ui/Button";
 import { TagInput } from "@/components/ui/TagInput";
-import { useContact, useContactTags, useContacts } from "@/hooks/useContacts";
+import { useContact, useContactCalls, useContactTags, useContacts } from "@/hooks/useContacts";
+import { formatRelativeTime } from "@/lib/utils";
+
+const CALL_STATUS_LABEL: Record<string, string> = {
+  "queued": "Queued",
+  "ringing": "Ringing",
+  "in-progress": "In progress",
+  "completed": "Completed",
+  "failed": "Failed",
+  "busy": "Busy",
+  "no-answer": "No answer",
+  "canceled": "Canceled",
+};
+
+function formatCallDuration(seconds: number | null): string {
+  if (!seconds) return "";
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
 
 interface ContactQuickViewProps {
   contactId: string;
@@ -22,6 +41,7 @@ interface ContactQuickViewProps {
  */
 export function ContactQuickView({ contactId, onClose }: ContactQuickViewProps) {
   const { contact, isLoading } = useContact(contactId);
+  const { calls } = useContactCalls(contactId);
   const { updateContact } = useContacts();
   const { tags: tagSuggestions } = useContactTags();
   const [editOpen, setEditOpen] = useState(false);
@@ -83,6 +103,34 @@ export function ContactQuickView({ contactId, onClose }: ContactQuickViewProps) 
                 suggestions={tagSuggestions}
               />
             </div>
+
+            {calls.length > 0 && (
+              <div>
+                <p className="text-text-secondary mb-1 flex items-center gap-1.5 text-xs font-medium">
+                  <PhoneCall className="size-3.5" />
+                  Call History
+                </p>
+                <div className="space-y-2">
+                  {calls.map((call) => (
+                    <div key={call.id} className="rounded-input border border-border p-2 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-text-primary font-medium">
+                          {CALL_STATUS_LABEL[call.status] ?? call.status}
+                        </span>
+                        <span className="text-text-muted">{formatRelativeTime(call.createdAt)}</span>
+                      </div>
+                      <div className="text-text-muted mt-0.5 flex items-center gap-2">
+                        <span>{call.user.name}</span>
+                        {call.durationSec !== null && <span>{formatCallDuration(call.durationSec)}</span>}
+                      </div>
+                      {call.recordingSid && (
+                        <audio controls preload="none" className="mt-1.5 h-8 w-full" src={`/api/calls/${call.id}/recording`} />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="flex gap-2 pt-2">
               <Button size="sm" variant="secondary" className="flex-1" onClick={() => setWorkflowOpen(true)}>

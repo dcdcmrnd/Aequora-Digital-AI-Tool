@@ -42,10 +42,25 @@ export async function POST(req: NextRequest) {
 
   const statusCallbackUrl = new URL("/api/twilio/voice/status", req.url);
   statusCallbackUrl.searchParams.set("callId", call.id);
+  const recordingStatusCallbackUrl = new URL("/api/twilio/voice/recording", req.url);
+  const announceUrl = new URL("/api/twilio/voice/announce", req.url);
 
-  const dial = twiml.dial({ callerId: call.fromNumber });
+  const dial = twiml.dial({
+    callerId: call.fromNumber,
+    // Recording starts once the call is answered — never rings/voicemail.
+    // The announce URL below plays a spoken disclosure to the called party
+    // first (Twilio's "call screening" pattern: fetches its own TwiML for
+    // just that leg, then bridges automatically once it finishes), so
+    // recording only actually starts after they've heard it — required in
+    // two-party-consent states, and good practice everywhere else.
+    record: "record-from-answer",
+    recordingStatusCallback: recordingStatusCallbackUrl.toString(),
+    recordingStatusCallbackMethod: "POST",
+    recordingStatusCallbackEvent: ["completed"],
+  });
   dial.number(
     {
+      url: announceUrl.toString(),
       statusCallback: statusCallbackUrl.toString(),
       statusCallbackEvent: ["initiated", "ringing", "answered", "completed"],
       statusCallbackMethod: "POST",

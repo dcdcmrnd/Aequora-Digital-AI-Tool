@@ -603,6 +603,13 @@ model Call {
   status        String   @default("queued")
   durationSec   Int?
   twilioCallSid String?  @unique
+  // Set once Twilio finishes processing the recording (recordingStatusCallback,
+  // "completed"). recordingUrl is Twilio's own API URL, not directly playable —
+  // audio is fetched server-side via /api/calls/[id]/recording so the browser
+  // never needs Twilio credentials.
+  recordingSid         String? @unique
+  recordingUrl         String?
+  recordingDurationSec Int?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

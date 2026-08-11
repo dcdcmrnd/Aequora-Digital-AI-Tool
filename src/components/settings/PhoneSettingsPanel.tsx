@@ -159,8 +159,9 @@ export function PhoneSettingsPanel() {
           <h3 className="text-sm font-semibold text-text-primary">Calling</h3>
           <p className="text-sm text-text-secondary mt-0.5">
             Purchase a US phone number to enable click-to-call from any contact. Outbound calling only for
-            now — no SMS or inbound calls yet. Each number carries a recurring monthly charge from Twilio,
-            plus per-minute call rates.
+            now — no SMS or inbound calls yet. Every call is recorded, with a spoken disclosure played to
+            the person you're calling first — required in some states, good practice everywhere. Each number
+            carries a recurring monthly charge from Twilio, plus per-minute call and recording-storage rates.
           </p>
 
           {loading ? (

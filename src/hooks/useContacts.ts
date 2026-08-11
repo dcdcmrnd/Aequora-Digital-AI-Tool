@@ -100,6 +100,27 @@ export function useContacts() {
   return { ...query, contacts: query.data?.contacts, createContact, updateContact, deleteContact, importContacts };
 }
 
+export interface ContactCall {
+  id: string;
+  toNumber: string;
+  fromNumber: string;
+  status: string;
+  durationSec: number | null;
+  recordingSid: string | null;
+  recordingDurationSec: number | null;
+  createdAt: string;
+  user: { id: string; name: string };
+}
+
+export function useContactCalls(id: string | null) {
+  const query = useQuery({
+    queryKey: ["contact-calls", id],
+    queryFn: () => apiFetch<{ calls: ContactCall[] }>(`/api/contacts/${id}/calls`),
+    enabled: !!id,
+  });
+  return { ...query, calls: query.data?.calls ?? [] };
+}
+
 export function useContact(id: string | null) {
   const query = useQuery({
     queryKey: ["contact", id],
