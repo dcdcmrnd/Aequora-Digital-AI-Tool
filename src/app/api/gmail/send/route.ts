@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { verifyAndCacheForContacts } from "@/lib/emailVerification";
 import { sendEmail } from "@/lib/gmail";
 import { checkPermission } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
@@ -32,6 +33,23 @@ export async function POST(req: NextRequest) {
     const contact = firstRecipient
       ? await prisma.contact.findFirst({ where: { email: { equals: firstRecipient, mode: "insensitive" } } })
       : null;
+
+    if (contact?.emailBounced) {
+      return NextResponse.json(
+        { error: `A previous email to this address bounced${contact.emailBounceReason ? ` (${contact.emailBounceReason})` : ""}. Update the contact's email before sending again.` },
+        { status: 400 },
+      );
+    }
+
+    if (firstRecipient) {
+      const status = await verifyAndCacheForContacts(firstRecipient);
+      if (status === "invalid") {
+        return NextResponse.json(
+          { error: "This address failed verification — invalid format or the domain can't receive mail. Double-check it before sending." },
+          { status: 400 },
+        );
+      }
+    }
 
     const trackingToken = crypto.randomBytes(16).toString("hex");
     await prisma.emailTracking.create({ data: { token: trackingToken, contactId: contact?.id } });

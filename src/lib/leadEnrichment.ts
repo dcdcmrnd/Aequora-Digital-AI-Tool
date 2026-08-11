@@ -1,6 +1,8 @@
 import { promises as dns } from "dns";
 import net from "net";
 
+import { hasMxRecord } from "@/lib/emailVerification";
+
 const FETCH_TIMEOUT_MS = 8000;
 const MAX_BYTES = 500_000;
 
@@ -124,21 +126,6 @@ function guessOwnerNameFromHtml(html: string): string | null {
   const after = text.slice(keywordMatch.index + keywordMatch[0].length, keywordMatch.index + keywordMatch[0].length + 40);
   const nameMatch = after.match(OWNER_NAME_PATTERN);
   return nameMatch ? nameMatch[1].trim() : null;
-}
-
-const MX_LOOKUP_TIMEOUT_MS = 4_000;
-
-/** Best-effort "can this domain receive mail at all" check — false on any lookup failure (no MX, NXDOMAIN, timeout). Not full deliverability verification, just a sanity check that rules out obviously dead domains. */
-async function hasMxRecord(domain: string): Promise<boolean> {
-  try {
-    const records = await Promise.race([
-      dns.resolveMx(domain),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("MX lookup timed out")), MX_LOOKUP_TIMEOUT_MS)),
-    ]);
-    return records.length > 0;
-  } catch {
-    return false;
-  }
 }
 
 /** Personal-looking addresses first (more likely to reach an actual owner), generic role addresses last; ties keep page order. */

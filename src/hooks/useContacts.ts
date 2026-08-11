@@ -97,7 +97,16 @@ export function useContacts() {
     onError: (error) => toast.error(toastErrorMessage(error, "Failed to import contacts")),
   });
 
-  return { ...query, contacts: query.data?.contacts, createContact, updateContact, deleteContact, importContacts };
+  const bulkVerify = useMutation({
+    mutationFn: () => apiFetch<{ checked: number; valid: number; invalid: number }>("/api/contacts/bulk-verify", { method: "POST" }),
+    onSuccess: (result) => {
+      invalidate();
+      toast.success(`Checked ${result.checked} email${result.checked === 1 ? "" : "s"} — ${result.valid} valid, ${result.invalid} invalid`);
+    },
+    onError: (error) => toast.error(toastErrorMessage(error, "Failed to verify emails")),
+  });
+
+  return { ...query, contacts: query.data?.contacts, createContact, updateContact, deleteContact, importContacts, bulkVerify };
 }
 
 export interface ContactCall {

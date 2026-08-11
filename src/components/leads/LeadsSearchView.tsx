@@ -2,14 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertCircle, Search, UserPlus, X } from "lucide-react";
+import { AlertCircle, Search, ShieldCheck, UserPlus, X } from "lucide-react";
 
 import type { LeadSortKey } from "@/components/leads/columns";
 import { LeadTable } from "@/components/leads/LeadTable";
 import { ManualAuditModal } from "@/components/leads/ManualAuditModal";
 import { SearchForm, type SearchFormValues } from "@/components/leads/SearchForm";
 import { Button } from "@/components/ui/Button";
-import { useBulkSaveLeadsAsContacts, useLeads } from "@/hooks/useLeads";
+import { useBulkSaveLeadsAsContacts, useBulkVerifyLeads, useLeads } from "@/hooks/useLeads";
 import { useLeadSearch } from "@/hooks/useLeadSearch";
 import { useSavedLeads } from "@/hooks/useSavedLeads";
 import { LEADS_PAGE_SIZE, toTitleCase } from "@/lib/leads/constants";
@@ -91,6 +91,7 @@ export function LeadsSearchView() {
   const [manualAuditOpen, setManualAuditOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const bulkSaveContacts = useBulkSaveLeadsAsContacts();
+  const bulkVerify = useBulkVerifyLeads();
   // Searches the *entire* current result set (name or website, across every
   // page) rather than just the rows on screen — debounced so it doesn't fire
   // a query on every keystroke.
@@ -233,6 +234,15 @@ export function LeadsSearchView() {
             <Button size="sm" variant="secondary" onClick={handleBulkSaveContacts} loading={bulkSaveContacts.isPending}>
               <UserPlus className="size-3.5" />
               Save as Contacts
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => bulkVerify.mutate(Array.from(selectedIds))}
+              loading={bulkVerify.isPending}
+            >
+              <ShieldCheck className="size-3.5" />
+              Verify Emails
             </Button>
             <button
               onClick={() => setSelectedIds(new Set())}

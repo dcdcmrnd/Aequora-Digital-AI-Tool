@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Plus, Upload } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, ShieldCheck, Upload } from "lucide-react";
 
 import { BulkActionsBar } from "@/components/contacts/BulkActionsBar";
 import { ContactFormModal } from "@/components/contacts/ContactFormModal";
@@ -18,7 +18,7 @@ import { usePipeline } from "@/hooks/usePipeline";
 const PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
 
 export function ContactsListView() {
-  const { contacts, isLoading } = useContacts();
+  const { contacts, isLoading, bulkVerify } = useContacts();
   const { opportunities } = useOpportunities();
   const { pipeline } = usePipeline();
   const canManage = usePermission("contacts.manage");
@@ -132,6 +132,10 @@ export function ContactsListView() {
         </div>
         {canManage && (
           <div className="flex items-center gap-2">
+            <Button variant="secondary" onClick={() => bulkVerify.mutate()} loading={bulkVerify.isPending}>
+              <ShieldCheck className="size-4" />
+              Verify All Emails
+            </Button>
             <Button variant="secondary" onClick={() => setImporting(true)}>
               <Upload className="size-4" />
               Import

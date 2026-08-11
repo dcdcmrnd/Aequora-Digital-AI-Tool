@@ -69,3 +69,23 @@ export function useBulkSaveLeadsAsContacts() {
     },
   });
 }
+
+/** Re-checks the MX record for a selection of leads' already-enriched emails. */
+export function useBulkVerifyLeads() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (leadIds: string[]) =>
+      apiFetch<{ checked: number; valid: number; invalid: number }>("/api/leads/bulk-verify", {
+        method: "POST",
+        body: JSON.stringify({ leadIds }),
+      }),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+      toast.success(`Checked ${result.checked} email${result.checked === 1 ? "" : "s"} — ${result.valid} valid, ${result.invalid} invalid`);
+    },
+    onError: (error) => {
+      toast.error(error instanceof ApiError ? error.message : "Couldn't verify emails.");
+    },
+  });
+}

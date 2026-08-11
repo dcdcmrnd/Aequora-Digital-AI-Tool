@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import { runAiPrompt } from "@/lib/ai";
+import { verifyAndCacheForContacts } from "@/lib/emailVerification";
 import { sendEmail } from "@/lib/gmail";
 import { createNotification } from "@/lib/activity";
 import { formatDailyTime, formatWeekdayTime, getNextTimeOccurrenceUtc, getNextWeekdayOccurrenceUtc } from "@/lib/utils/schedule";
@@ -341,6 +342,18 @@ async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string,
           if (!run.contactId) throw new Error("No contact for this run");
           const contact = await prisma.contact.findUnique({ where: { id: run.contactId } });
           if (!contact?.email) throw new Error("Contact has no email address");
+
+          if (contact.emailBounced) {
+            await logStep(run.id, node.id, node.type, "success", `Skipped — a previous email to ${contact.email} bounced`);
+            currentNodeId = nextNodeId(flow, node.id);
+            continue;
+          }
+          const verification = await verifyAndCacheForContacts(contact.email);
+          if (verification === "invalid") {
+            await logStep(run.id, node.id, node.type, "success", `Skipped — ${contact.email} failed verification`);
+            currentNodeId = nextNodeId(flow, node.id);
+            continue;
+          }
 
           const data = node.data as { subject?: string; body?: string; cc?: string; fromEmail?: string };
           const mergeValues = contactMergeValues(contact);
