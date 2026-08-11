@@ -19,6 +19,9 @@ function extractSenderName(from: string): string {
  * a personal account, everyone with inbox access for the shared agency
  * account. Not real-time, but the best available without a paid plan.
  */
+// See resume-automations/route.ts for why this is required on every cron route.
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
   if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
