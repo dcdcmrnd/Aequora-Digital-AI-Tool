@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { z } from "zod";
 
 import { authOptions } from "@/lib/auth";
-import { enrollContactInAutomation } from "@/lib/automation/engine";
+import { enrollContactInAutomation, runAutomationsForTrigger } from "@/lib/automation/engine";
 import { checkPermission } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 
@@ -28,6 +28,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     contact = await prisma.contact.create({
       data: { name: email, email, tags: "[]", createdById: session.user.id },
     });
+    await runAutomationsForTrigger({ triggerType: "contact_created", contactId: contact.id });
   }
 
   const enrolled = await enrollContactInAutomation(params.id, contact.id);

@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { z } from "zod";
 
+import { logActivity } from "@/lib/activity";
 import { authOptions } from "@/lib/auth";
+import { runAutomationsForTrigger } from "@/lib/automation/engine";
 import { leadContactNamePrefill } from "@/lib/leads/constants";
 import { checkPermission } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
@@ -45,7 +47,7 @@ export async function POST(req: NextRequest) {
 
     const { firstName, lastName } = leadContactNamePrefill(lead.name, lead.enrichedOwnerName);
 
-    await prisma.contact.create({
+    const contact = await prisma.contact.create({
       data: {
         name: [firstName, lastName].filter(Boolean).join(" "),
         firstName,
@@ -66,6 +68,19 @@ export async function POST(req: NextRequest) {
       },
     });
     created += 1;
+
+    await logActivity({
+      userId: session.user.id,
+      action: "created",
+      entityType: "contact",
+      entityId: contact.id,
+      entityName: contact.name,
+    });
+    // Every contact-creation path should enroll new contacts the same way,
+    // whether it's one at a time (POST /api/contacts) or a batch like this —
+    // this was previously skipped here, so bulk-saved leads silently never
+    // started their "new contact" automations.
+    await runAutomationsForTrigger({ triggerType: "contact_created", contactId: contact.id });
   }
 
   return NextResponse.json({ created, skipped });
