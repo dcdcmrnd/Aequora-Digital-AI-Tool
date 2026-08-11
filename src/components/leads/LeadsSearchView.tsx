@@ -2,14 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertCircle, Search } from "lucide-react";
+import { AlertCircle, Search, UserPlus, X } from "lucide-react";
 
 import type { LeadSortKey } from "@/components/leads/columns";
 import { LeadTable } from "@/components/leads/LeadTable";
 import { ManualAuditModal } from "@/components/leads/ManualAuditModal";
 import { SearchForm, type SearchFormValues } from "@/components/leads/SearchForm";
 import { Button } from "@/components/ui/Button";
-import { useLeads } from "@/hooks/useLeads";
+import { useBulkSaveLeadsAsContacts, useLeads } from "@/hooks/useLeads";
 import { useLeadSearch } from "@/hooks/useLeadSearch";
 import { useSavedLeads } from "@/hooks/useSavedLeads";
 import { LEADS_PAGE_SIZE, toTitleCase } from "@/lib/leads/constants";
@@ -89,6 +89,8 @@ export function LeadsSearchView() {
     () => (searchParams.get("sortDirection") === "asc" ? "asc" : "desc"),
   );
   const [manualAuditOpen, setManualAuditOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const bulkSaveContacts = useBulkSaveLeadsAsContacts();
   // Searches the *entire* current result set (name or website, across every
   // page) rather than just the rows on screen — debounced so it doesn't fire
   // a query on every keystroke.
@@ -147,10 +149,33 @@ export function LeadsSearchView() {
     router.replace(`/leads?${buildSearchParams(nextFilters, nextPage, nextSearchId, nextSortBy, nextSortDirection)}`, { scroll: false });
   }
 
+  function toggleLead(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAllOnPage(idsOnPage: string[]) {
+    setSelectedIds((prev) => {
+      const allSelected = idsOnPage.length > 0 && idsOnPage.every((id) => prev.has(id));
+      const next = new Set(prev);
+      idsOnPage.forEach((id) => (allSelected ? next.delete(id) : next.add(id)));
+      return next;
+    });
+  }
+
+  function handleBulkSaveContacts() {
+    bulkSaveContacts.mutate(Array.from(selectedIds), { onSuccess: () => setSelectedIds(new Set()) });
+  }
+
   function handleSubmit(values: SearchFormValues) {
     setFilters(values);
     setPage(1);
     setSearchId(null);
+    setSelectedIds(new Set());
     setSortBy(values.sortBy);
     setSortDirection("desc");
     updateUrl(values, 1, null, values.sortBy, "desc");
@@ -201,6 +226,25 @@ export function LeadsSearchView() {
 
       <ManualAuditModal open={manualAuditOpen} onClose={() => setManualAuditOpen(false)} />
 
+      {selectedIds.size > 0 && (
+        <div className="border-brand-primary bg-brand-primary/5 sticky top-0 z-10 flex items-center gap-3 rounded-card border px-4 py-2.5">
+          <span className="text-text-primary text-sm font-medium">{selectedIds.size} selected</span>
+          <div className="ml-auto flex items-center gap-2">
+            <Button size="sm" variant="secondary" onClick={handleBulkSaveContacts} loading={bulkSaveContacts.isPending}>
+              <UserPlus className="size-3.5" />
+              Save as Contacts
+            </Button>
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              className="text-text-muted hover:text-text-primary ml-1"
+              aria-label="Clear selection"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {leads.isError && (
         <div className="border-danger/40 rounded-card text-danger flex items-center gap-2 border bg-red-50 p-4 text-sm">
           <AlertCircle className="size-4" />
@@ -226,6 +270,9 @@ export function LeadsSearchView() {
           listParams={listParams}
           searchQuery={searchInput}
           onSearchChange={setSearchInput}
+          selectedIds={selectedIds}
+          onToggle={toggleLead}
+          onToggleAll={toggleAllOnPage}
         />
       ) : (
         <p className="text-text-muted text-sm">Search for a business category and location to get started.</p>

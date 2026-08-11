@@ -57,7 +57,14 @@ export interface LeadColumnsOptions {
   /** Query string carrying the current search/filter/sort context, appended to each
       lead's detail link so Previous/Next there can browse this same ordered list. */
   listParams?: string;
+  selectedIds: Set<string>;
+  /** Whether every row on the current page is selected — drives the header checkbox. */
+  allSelected: boolean;
+  onToggle: (id: string) => void;
+  onToggleAll: () => void;
 }
+
+const CHECKBOX_CLASS = "text-brand-primary focus:ring-brand-primary size-4 rounded border-border";
 
 export function createLeadColumns({
   savedLeadIds,
@@ -68,8 +75,33 @@ export function createLeadColumns({
   sortDirection,
   onSort,
   listParams,
+  selectedIds,
+  allSelected,
+  onToggle,
+  onToggleAll,
 }: LeadColumnsOptions): ColumnDef<Lead>[] {
   return [
+    {
+      id: "select",
+      header: () => (
+        <input
+          type="checkbox"
+          checked={allSelected}
+          onChange={onToggleAll}
+          className={CHECKBOX_CLASS}
+          aria-label="Select all leads on this page"
+        />
+      ),
+      cell: ({ row }) => (
+        <input
+          type="checkbox"
+          checked={selectedIds.has(row.original.id)}
+          onChange={() => onToggle(row.original.id)}
+          className={CHECKBOX_CLASS}
+          aria-label={`Select ${row.original.name}`}
+        />
+      ),
+    },
     {
       accessorKey: "name",
       header: "Business",

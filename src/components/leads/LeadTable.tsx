@@ -27,6 +27,9 @@ interface LeadTableProps {
   listParams?: string;
   searchQuery: string;
   onSearchChange: (value: string) => void;
+  selectedIds: Set<string>;
+  onToggle: (id: string) => void;
+  onToggleAll: (idsOnPage: string[]) => void;
 }
 
 export function LeadTable({
@@ -44,12 +47,30 @@ export function LeadTable({
   listParams,
   searchQuery,
   onSearchChange,
+  selectedIds,
+  onToggle,
+  onToggleAll,
 }: LeadTableProps) {
   const [contactPrefillLead, setContactPrefillLead] = useState<Lead | null>(null);
+  const allSelected = data.length > 0 && data.every((lead) => selectedIds.has(lead.id));
 
   const columns = useMemo(
-    () => createLeadColumns({ savedLeadIds, onSave, onSaveAsContact: setContactPrefillLead, searchedCategory, sortBy, sortDirection, onSort, listParams }),
-    [savedLeadIds, onSave, searchedCategory, sortBy, sortDirection, onSort, listParams],
+    () =>
+      createLeadColumns({
+        savedLeadIds,
+        onSave,
+        onSaveAsContact: setContactPrefillLead,
+        searchedCategory,
+        sortBy,
+        sortDirection,
+        onSort,
+        listParams,
+        selectedIds,
+        allSelected,
+        onToggle,
+        onToggleAll: () => onToggleAll(data.map((lead) => lead.id)),
+      }),
+    [savedLeadIds, onSave, searchedCategory, sortBy, sortDirection, onSort, listParams, selectedIds, allSelected, onToggle, onToggleAll, data],
   );
 
   // Sorting AND searching are both server-driven (see onSort/onSearchChange)

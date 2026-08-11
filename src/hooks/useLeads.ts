@@ -1,8 +1,9 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import toast from "react-hot-toast";
 
-import { apiFetch } from "@/lib/api-client";
+import { apiFetch, ApiError } from "@/lib/api-client";
 import type { Lead } from "@/types";
 
 export interface UseLeadsParams {
@@ -45,5 +46,26 @@ export function useLeads(params: UseLeadsParams = {}) {
   return useQuery({
     queryKey: ["leads", params],
     queryFn: () => apiFetch<ListLeadsResponse>(`/api/leads?${buildQueryString(params)}`),
+  });
+}
+
+/** Bulk "Save as Contact" for a selection of leads — skips any that already have a matching contact by email. */
+export function useBulkSaveLeadsAsContacts() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (leadIds: string[]) =>
+      apiFetch<{ created: number; skipped: number }>("/api/leads/bulk-save-as-contact", {
+        method: "POST",
+        body: JSON.stringify({ leadIds }),
+      }),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["contacts"] });
+      const skippedNote = result.skipped > 0 ? `, ${result.skipped} already had a contact` : "";
+      toast.success(`Saved ${result.created} contact${result.created === 1 ? "" : "s"}${skippedNote}`);
+    },
+    onError: (error) => {
+      toast.error(error instanceof ApiError ? error.message : "Couldn't save contacts.");
+    },
   });
 }
