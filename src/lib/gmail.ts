@@ -22,10 +22,24 @@ export function getAuthUrl(scope: "agency" | "personal" = "agency") {
   });
 }
 
-/** Connected accounts for the given owner (null = shared agency account), oldest-connected first. */
+/** Connected accounts for the given owner (null = shared agency account), primary first (if set), then oldest-connected. */
 export async function getConnectedEmails(ownerId: string | null): Promise<string[]> {
-  const tokens = await prisma.gmailToken.findMany({ where: { ownerId }, select: { email: true }, orderBy: { updatedAt: "asc" } });
+  const tokens = await prisma.gmailToken.findMany({
+    where: { ownerId },
+    select: { email: true },
+    orderBy: [{ isPrimary: "desc" }, { updatedAt: "asc" }],
+  });
   return tokens.map((t) => t.email);
+}
+
+/** Same ordering as getConnectedEmails, but also reports which one is primary — for the Settings UI. */
+export async function getConnectedEmailsWithPrimary(ownerId: string | null): Promise<{ email: string; isPrimary: boolean }[]> {
+  const tokens = await prisma.gmailToken.findMany({
+    where: { ownerId },
+    select: { email: true, isPrimary: true },
+    orderBy: [{ isPrimary: "desc" }, { updatedAt: "asc" }],
+  });
+  return tokens;
 }
 
 /** The default account for the given owner — the first one connected — used when a caller doesn't specify which. */

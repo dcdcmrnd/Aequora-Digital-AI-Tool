@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getConnectedEmails } from "@/lib/gmail";
+import { getConnectedEmailsWithPrimary } from "@/lib/gmail";
 import { redirect } from "next/navigation";
 import { AgencyEmailPanel } from "@/components/settings/AgencyEmailPanel";
 import { CategoryManager } from "@/components/settings/CategoryManager";
@@ -51,7 +51,7 @@ export default async function SettingsPage() {
       include: { uploadedBy: { select: { name: true } } },
       orderBy: { createdAt: "desc" },
     }),
-    getConnectedEmails(null),
+    getConnectedEmailsWithPrimary(null),
     prisma.user.findMany({
       select: {
         id: true,

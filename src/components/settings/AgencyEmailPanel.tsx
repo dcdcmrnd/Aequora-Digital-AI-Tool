@@ -2,19 +2,21 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Mail, Plus } from "lucide-react";
+import { Mail, Plus, Star } from "lucide-react";
 import toast from "react-hot-toast";
 
 import { Button } from "@/components/ui/Button";
+import { cn } from "@/lib/utils";
 
 interface AgencyEmailPanelProps {
-  emails: string[];
+  emails: { email: string; isPrimary: boolean }[];
 }
 
 export function AgencyEmailPanel({ emails }: AgencyEmailPanelProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [disconnecting, setDisconnecting] = useState<string | null>(null);
+  const [settingPrimary, setSettingPrimary] = useState<string | null>(null);
 
   useEffect(() => {
     if (searchParams.get("connected") === "agency") {
@@ -41,6 +43,24 @@ export function AgencyEmailPanel({ emails }: AgencyEmailPanelProps) {
     }
   }
 
+  async function handleSetPrimary(email: string) {
+    setSettingPrimary(email);
+    try {
+      const res = await fetch("/api/gmail/set-primary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success(`${email} is now the default in Conversations`);
+      router.refresh();
+    } catch {
+      toast.error("Failed to set default email");
+    } finally {
+      setSettingPrimary(null);
+    }
+  }
+
   return (
     <div className="rounded-card border border-border bg-white p-5 max-w-lg">
       <div className="flex items-start gap-3">
@@ -52,7 +72,8 @@ export function AgencyEmailPanel({ emails }: AgencyEmailPanelProps) {
           <p className="text-sm text-text-secondary mt-0.5">
             Connect the Gmail accounts your agency sends from. Used by Conversations, Contact
             messaging, and Automation email actions. For your own personal inbox, connect it
-            under Profile → My Email instead.
+            under Profile → My Email instead. When more than one is connected, mark one as
+            Default so Conversations opens there — the rest stay available to switch to.
           </p>
 
           <div className="mt-4 space-y-2">
@@ -61,20 +82,39 @@ export function AgencyEmailPanel({ emails }: AgencyEmailPanelProps) {
                 <span className="text-sm text-text-muted">Not connected</span>
               </div>
             )}
-            {emails.map((email) => (
+            {emails.map(({ email, isPrimary }) => (
               <div
                 key={email}
-                className="flex items-center justify-between gap-3 rounded-input border border-border bg-surface-secondary px-3 py-2"
+                className={cn(
+                  "flex items-center justify-between gap-3 rounded-input border px-3 py-2",
+                  isPrimary ? "border-brand-primary bg-brand-primary/5" : "border-border bg-surface-secondary",
+                )}
               >
-                <span className="text-sm text-text-primary truncate">{email}</span>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => handleDisconnect(email)}
-                  loading={disconnecting === email}
-                >
-                  Disconnect
-                </Button>
+                <div className="flex min-w-0 items-center gap-1.5">
+                  {isPrimary && <Star className="size-3.5 shrink-0 fill-brand-primary text-brand-primary" />}
+                  <span className="text-sm text-text-primary truncate">{email}</span>
+                  {isPrimary && <span className="text-brand-primary shrink-0 text-xs font-medium">Default</span>}
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  {!isPrimary && emails.length > 1 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleSetPrimary(email)}
+                      loading={settingPrimary === email}
+                    >
+                      Set as Default
+                    </Button>
+                  )}
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleDisconnect(email)}
+                    loading={disconnecting === email}
+                  >
+                    Disconnect
+                  </Button>
+                </div>
               </div>
             ))}
 

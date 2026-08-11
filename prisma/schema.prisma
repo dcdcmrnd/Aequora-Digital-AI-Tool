@@ -334,6 +334,10 @@ model GmailToken {
   // first run just sets this without notifying, to avoid flooding everyone
   // with notifications for an entire mailbox's history).
   lastCheckedAt DateTime?
+  // Which connected account (per ownerId group — agency accounts share
+  // ownerId: null) opens by default in Conversations/Inbox. At most one per
+  // owner group should be true; enforced in code, not the DB.
+  isPrimary Boolean @default(false)
 
   @@index([ownerId])
 }
@@ -463,6 +467,18 @@ model Contact {
   sourceLead   Lead?    @relation(fields: [sourceLeadId], references: [id], onDelete: SetNull)
   assignedToId String?
   assignedTo   User?    @relation("ContactAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  // Free syntax + MX-record check (no paid verification API) -- "valid" means
+  // well-formed and the domain has a mail server, not that the mailbox
+  // itself exists. Re-checked on demand via bulk-verify; cached otherwise so
+  // sends don't re-run DNS lookups every time.
+  emailVerificationStatus String? // valid | invalid | unknown
+  emailVerifiedAt         DateTime?
+  // Set by the daily bounce-scan (see cron/check-new-mail) matching a
+  // mailer-daemon/postmaster bounce-back to a previously tracked send.
+  // Bounced contacts are excluded from future sends automatically.
+  emailBounced       Boolean   @default(false)
+  emailBouncedAt      DateTime?
+  emailBounceReason   String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -566,6 +582,14 @@ model EmailTracking {
   gmailMessageId String?
   gmailThreadId  String?
   openedAt       DateTime?
+  // Set by the daily bounce-scan when a mailer-daemon/postmaster bounce-back
+  // is matched to this send's thread.
+  bounced        Boolean        @default(false)
+  bouncedAt      DateTime?
+  bounceReason   String?
+  // Set when an inbound message on this thread, from the original recipient
+  // and after this send, is seen during the daily inbox scan.
+  repliedAt      DateTime?
   createdAt      DateTime       @default(now())
 
   @@index([gmailThreadId])
