@@ -70,6 +70,27 @@ export function useBulkSaveLeadsAsContacts() {
   });
 }
 
+/** Bulk "Find People" — crawls each selected lead's website for decision-makers (capped lower than other bulk actions; each lead does several page fetches). */
+export function useBulkFindPeople() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (leadIds: string[]) =>
+      apiFetch<{ processed: number; peopleFound: number; failed: number }>("/api/leads/bulk-find-people", {
+        method: "POST",
+        body: JSON.stringify({ leadIds }),
+      }),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["people"] });
+      const failedNote = result.failed > 0 ? `, ${result.failed} failed` : "";
+      toast.success(`Found ${result.peopleFound} ${result.peopleFound === 1 ? "person" : "people"} across ${result.processed} businesses${failedNote}`);
+    },
+    onError: (error) => {
+      toast.error(error instanceof ApiError ? error.message : "Couldn't find people.");
+    },
+  });
+}
+
 /** Re-checks the MX record for a selection of leads' already-enriched emails. */
 export function useBulkVerifyLeads() {
   const queryClient = useQueryClient();

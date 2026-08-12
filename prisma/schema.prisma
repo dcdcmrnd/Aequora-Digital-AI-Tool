@@ -386,6 +386,40 @@ model Lead {
   audit        LeadAudit?
   savedByUsers SavedLead[]
   contacts     Contact[]
+  people       LeadPerson[]
+}
+
+// A decision-maker found at a Lead's business — via website crawl, email
+// pattern inference, or a country business registry. Kept separate from
+// Contact (mirrors Lead -> SavedLead -> Contact): this is prospect data, not
+// yet something the user has decided to reach out to.
+model LeadPerson {
+  id     String @id @default(cuid())
+  leadId String
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  name   String?
+  title  String?
+  // Case-insensitive substring match of `title` against the user's target
+  // title list (see DEFAULT_ICP_TITLES) -- lets the People tab prioritize
+  // decision-makers instead of every name found on a site.
+  matchesIcpTitle Boolean @default(false)
+  email           String?
+  emailSource     String? // scraped | pattern_guess | registry
+  // Best-effort MX lookup on email's domain, same semantics as
+  // Lead.enrichedEmailValid. Never implies the specific mailbox exists.
+  emailValid Boolean?
+  phone      String?
+  source     String // website_crawl | pattern_inference | registry_gb | registry_us | registry_au
+  // Reflects how the record was found, not the accuracy of any single field:
+  // high = name+email both found directly on a page; medium = name found
+  // directly but email is a verified-domain pattern guess; low = anything
+  // guessed further (unverified pattern guess, or name itself inferred).
+  confidence String  @default("low") // high | medium | low
+  foundOnUrl String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([leadId])
 }
 
 model LeadAudit {
@@ -465,6 +499,9 @@ model Contact {
   eventDate    DateTime? // set by the "Set Event Date" automation action; consumed by Wait's "before/after event date" mode
   sourceLeadId String?
   sourceLead   Lead?    @relation(fields: [sourceLeadId], references: [id], onDelete: SetNull)
+  // Role at the time this Contact was saved, e.g. from LeadPerson.title when
+  // saved via the People tab. Not synced afterward.
+  title        String?
   assignedToId String?
   assignedTo   User?    @relation("ContactAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   // Free syntax + MX-record check (no paid verification API) -- "valid" means

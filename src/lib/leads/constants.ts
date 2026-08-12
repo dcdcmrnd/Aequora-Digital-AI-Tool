@@ -1,6 +1,22 @@
 /** Shared between the client search view and the server-rendered lead detail page (for Previous/Next page math). */
 export const LEADS_PAGE_SIZE = 10;
 
+/**
+ * Default target-title list for the People tab's "on ICP" match badge/filter
+ * — a person found on a company's site whose title contains one of these
+ * (case-insensitively) is flagged as matchesIcpTitle. Editable per-search
+ * from the People tab's filter bar, not fixed forever.
+ */
+export const DEFAULT_ICP_TITLES = [
+  "Director",
+  "Managing Director",
+  "Founder",
+  "Co-Founder",
+  "Head of Operations",
+  "Operations Manager",
+  "CEO",
+];
+
 /** Matches Google's own title-cased category display (e.g. "plumbers" -> "Plumbers"). */
 export function toTitleCase(value: string): string {
   return value

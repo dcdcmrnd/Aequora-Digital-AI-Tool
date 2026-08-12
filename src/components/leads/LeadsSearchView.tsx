@@ -2,14 +2,16 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertCircle, Search, ShieldCheck, UserPlus, X } from "lucide-react";
+import { AlertCircle, Search, ShieldCheck, UserPlus, UsersRound, X } from "lucide-react";
 
 import type { LeadSortKey } from "@/components/leads/columns";
 import { LeadTable } from "@/components/leads/LeadTable";
 import { ManualAuditModal } from "@/components/leads/ManualAuditModal";
+import { PeopleView } from "@/components/leads/PeopleView";
 import { SearchForm, type SearchFormValues } from "@/components/leads/SearchForm";
 import { Button } from "@/components/ui/Button";
-import { useBulkSaveLeadsAsContacts, useBulkVerifyLeads, useLeads } from "@/hooks/useLeads";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/Tabs";
+import { useBulkFindPeople, useBulkSaveLeadsAsContacts, useBulkVerifyLeads, useLeads } from "@/hooks/useLeads";
 import { useLeadSearch } from "@/hooks/useLeadSearch";
 import { useSavedLeads } from "@/hooks/useSavedLeads";
 import { LEADS_PAGE_SIZE, toTitleCase } from "@/lib/leads/constants";
@@ -92,6 +94,7 @@ export function LeadsSearchView() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const bulkSaveContacts = useBulkSaveLeadsAsContacts();
   const bulkVerify = useBulkVerifyLeads();
+  const bulkFindPeople = useBulkFindPeople();
   // Searches the *entire* current result set (name or website, across every
   // page) rather than just the rows on screen — debounced so it doesn't fire
   // a query on every keystroke.
@@ -223,70 +226,93 @@ export function LeadsSearchView() {
         </Button>
       </div>
 
-      <SearchForm onSubmit={handleSubmit} isSearching={search.isPending} defaultValues={filters ?? undefined} />
+      <Tabs defaultValue="company">
+        <TabsList>
+          <TabsTrigger value="company">Company</TabsTrigger>
+          <TabsTrigger value="people">People</TabsTrigger>
+        </TabsList>
 
-      <ManualAuditModal open={manualAuditOpen} onClose={() => setManualAuditOpen(false)} />
+        <TabsContent value="company" className="space-y-6">
+          <SearchForm onSubmit={handleSubmit} isSearching={search.isPending} defaultValues={filters ?? undefined} />
 
-      {selectedIds.size > 0 && (
-        <div className="border-brand-primary bg-brand-primary/5 sticky top-0 z-10 flex items-center gap-3 rounded-card border px-4 py-2.5">
-          <span className="text-text-primary text-sm font-medium">{selectedIds.size} selected</span>
-          <div className="ml-auto flex items-center gap-2">
-            <Button size="sm" variant="secondary" onClick={handleBulkSaveContacts} loading={bulkSaveContacts.isPending}>
-              <UserPlus className="size-3.5" />
-              Save as Contacts
-            </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => bulkVerify.mutate(Array.from(selectedIds))}
-              loading={bulkVerify.isPending}
-            >
-              <ShieldCheck className="size-3.5" />
-              Verify Emails
-            </Button>
-            <button
-              onClick={() => setSelectedIds(new Set())}
-              className="text-text-muted hover:text-text-primary ml-1"
-              aria-label="Clear selection"
-            >
-              <X className="size-4" />
-            </button>
-          </div>
-        </div>
-      )}
+          <ManualAuditModal open={manualAuditOpen} onClose={() => setManualAuditOpen(false)} />
 
-      {leads.isError && (
-        <div className="border-danger/40 rounded-card text-danger flex items-center gap-2 border bg-red-50 p-4 text-sm">
-          <AlertCircle className="size-4" />
-          Couldn&apos;t load leads. Please try again.
-        </div>
-      )}
+          {selectedIds.size > 0 && (
+            <div className="border-brand-primary bg-brand-primary/5 sticky top-0 z-10 flex items-center gap-3 rounded-card border px-4 py-2.5">
+              <span className="text-text-primary text-sm font-medium">{selectedIds.size} selected</span>
+              <div className="ml-auto flex items-center gap-2">
+                <Button size="sm" variant="secondary" onClick={handleBulkSaveContacts} loading={bulkSaveContacts.isPending}>
+                  <UserPlus className="size-3.5" />
+                  Save as Contacts
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => bulkVerify.mutate(Array.from(selectedIds))}
+                  loading={bulkVerify.isPending}
+                >
+                  <ShieldCheck className="size-3.5" />
+                  Verify Emails
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => bulkFindPeople.mutate(Array.from(selectedIds))}
+                  loading={bulkFindPeople.isPending}
+                  title="Crawls each selected business's website for named decision-makers (max 20 at a time)"
+                >
+                  <UsersRound className="size-3.5" />
+                  Find People
+                </Button>
+                <button
+                  onClick={() => setSelectedIds(new Set())}
+                  className="text-text-muted hover:text-text-primary ml-1"
+                  aria-label="Clear selection"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+            </div>
+          )}
 
-      {leads.isLoading ? (
-        <p className="text-text-muted text-sm">Loading...</p>
-      ) : leads.data ? (
-        <LeadTable
-          data={leads.data.leads}
-          savedLeadIds={savedLeadIds}
-          onSave={handleSave}
-          page={leads.data.page}
-          pageSize={leads.data.pageSize}
-          total={leads.data.total}
-          onPageChange={handlePageChange}
-          searchedCategory={filters?.keyword ? toTitleCase(filters.keyword) : undefined}
-          sortBy={sortBy}
-          sortDirection={sortDirection}
-          onSort={handleSort}
-          listParams={listParams}
-          searchQuery={searchInput}
-          onSearchChange={setSearchInput}
-          selectedIds={selectedIds}
-          onToggle={toggleLead}
-          onToggleAll={toggleAllOnPage}
-        />
-      ) : (
-        <p className="text-text-muted text-sm">Search for a business category and location to get started.</p>
-      )}
+          {leads.isError && (
+            <div className="border-danger/40 rounded-card text-danger flex items-center gap-2 border bg-red-50 p-4 text-sm">
+              <AlertCircle className="size-4" />
+              Couldn&apos;t load leads. Please try again.
+            </div>
+          )}
+
+          {leads.isLoading ? (
+            <p className="text-text-muted text-sm">Loading...</p>
+          ) : leads.data ? (
+            <LeadTable
+              data={leads.data.leads}
+              savedLeadIds={savedLeadIds}
+              onSave={handleSave}
+              page={leads.data.page}
+              pageSize={leads.data.pageSize}
+              total={leads.data.total}
+              onPageChange={handlePageChange}
+              searchedCategory={filters?.keyword ? toTitleCase(filters.keyword) : undefined}
+              sortBy={sortBy}
+              sortDirection={sortDirection}
+              onSort={handleSort}
+              listParams={listParams}
+              searchQuery={searchInput}
+              onSearchChange={setSearchInput}
+              selectedIds={selectedIds}
+              onToggle={toggleLead}
+              onToggleAll={toggleAllOnPage}
+            />
+          ) : (
+            <p className="text-text-muted text-sm">Search for a business category and location to get started.</p>
+          )}
+        </TabsContent>
+
+        <TabsContent value="people">
+          <PeopleView />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

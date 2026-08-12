@@ -17,6 +17,7 @@ import {
   RefreshCw,
   Search,
   User,
+  UsersRound,
 } from "lucide-react";
 
 import { AuditCard } from "@/components/leads/AuditCard";
@@ -25,13 +26,17 @@ import { OpportunityBadge } from "@/components/leads/OpportunityBadge";
 import { WebsiteStatus } from "@/components/leads/WebsiteStatus";
 import { CallButton } from "@/components/calls/CallWidget";
 import { ContactFormModal } from "@/components/contacts/ContactFormModal";
+import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { CopyButton } from "@/components/ui/CopyButton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/Select";
 import { useAuditRecommendations } from "@/hooks/useAuditRecommendations";
 import { useLeadAudit } from "@/hooks/useLeadAudit";
 import { useLeadEnrich } from "@/hooks/useLeadEnrich";
+import { useLeadFindPeople, useLeadFindPeopleFromRegistry, useLeadPeople } from "@/hooks/useLeadFindPeople";
+import { useBulkSavePeopleAsContacts } from "@/hooks/usePeople";
 import { useSavedLeads } from "@/hooks/useSavedLeads";
+import { ApiError } from "@/lib/api-client";
 import { leadContactNamePrefill } from "@/lib/leads/constants";
 import { cn, formatDate } from "@/lib/utils";
 import { LEAD_STATUSES, type Lead, type LeadStatus, type SavedLead } from "@/types";
@@ -54,6 +59,32 @@ export function LeadDetailsView({ lead: initialLead, initialSavedLead, prevId, n
   const [lead, setLead] = useState(initialLead);
   const [savedLead, setSavedLead] = useState(initialSavedLead);
   const [savingContact, setSavingContact] = useState(false);
+
+  const people = useLeadPeople(lead.id);
+  const findPeople = useLeadFindPeople(lead.id);
+  const findPeopleRegistry = useLeadFindPeopleFromRegistry(lead.id);
+  const savePersonAsContact = useBulkSavePeopleAsContacts();
+  const [registryCountry, setRegistryCountry] = useState<"GB" | "US" | "AU">("GB");
+  const [confirmingRegistryCost, setConfirmingRegistryCost] = useState<string | null>(null);
+
+  function handleRegistryLookup() {
+    findPeopleRegistry.mutate(
+      { country: registryCountry },
+      {
+        onSuccess: () => setConfirmingRegistryCost(null),
+        onError: (error) => {
+          // 402 means the provider isn't free and hasn't been acknowledged yet
+          // — the error message already states the price, so surface it as a
+          // confirm step rather than a dead-end failure.
+          if (error instanceof ApiError && error.status === 402) setConfirmingRegistryCost(error.message);
+        },
+      },
+    );
+  }
+
+  function handleConfirmRegistryLookup() {
+    findPeopleRegistry.mutate({ country: registryCountry, acknowledgeCost: true }, { onSuccess: () => setConfirmingRegistryCost(null) });
+  }
 
   const mapHref =
     lead.lat !== null && lead.lng !== null
@@ -242,6 +273,82 @@ export function LeadDetailsView({ lead: initialLead, initialSavedLead, prevId, n
                 <Search className={cn("size-3.5", enrich.isPending && "animate-spin")} />
                 {enrich.isPending ? "Checking website..." : lead.enrichedAt ? "Re-check Website" : "Find Email & Social Links"}
               </Button>
+            )}
+          </div>
+
+          <div className="rounded-card border-border border bg-white p-4">
+            <h3 className="text-text-primary mb-3 text-sm font-semibold">People at this business</h3>
+
+            {people.data && people.data.people.length > 0 ? (
+              <ul className="mb-4 space-y-3">
+                {people.data.people.map((person) => (
+                  <li key={person.id} className="flex items-start justify-between gap-3 text-sm">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-text-primary font-medium">{person.name ?? "Unknown"}</span>
+                        {person.title && <span className="text-text-muted">· {person.title}</span>}
+                        {person.matchesIcpTitle && <Badge variant="success">ICP</Badge>}
+                      </div>
+                      {person.email && (
+                        <div className="text-text-muted flex items-center gap-1 text-xs">
+                          <a href={`mailto:${person.email}`} className="text-brand-primary hover:underline">
+                            {person.email}
+                          </a>
+                          <span>({person.confidence})</span>
+                        </div>
+                      )}
+                      {person.phone && <p className="text-text-muted text-xs">{person.phone}</p>}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      title="Save as Contact"
+                      aria-label="Save as Contact"
+                      disabled={savePersonAsContact.isPending}
+                      onClick={() => savePersonAsContact.mutate([person.id])}
+                    >
+                      <BookUser className="size-3.5" />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-text-muted mb-4 text-sm">No decision-makers found yet.</p>
+            )}
+
+            <div className="flex flex-wrap items-center gap-2">
+              {lead.website && (
+                <Button variant="outline" size="sm" onClick={() => findPeople.mutate()} disabled={findPeople.isPending}>
+                  <UsersRound className={cn("size-3.5", findPeople.isPending && "animate-spin")} />
+                  {findPeople.isPending ? "Crawling website..." : "Find People"}
+                </Button>
+              )}
+
+              <Select value={registryCountry} onValueChange={(v) => setRegistryCountry(v as "GB" | "US" | "AU")}>
+                <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="GB">UK</SelectItem>
+                  <SelectItem value="US">US</SelectItem>
+                  <SelectItem value="AU">AU</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button variant="outline" size="sm" onClick={handleRegistryLookup} disabled={findPeopleRegistry.isPending}>
+                Look up registry
+              </Button>
+            </div>
+
+            {confirmingRegistryCost && (
+              <div className="border-amber-300 bg-amber-50 mt-3 rounded-btn border p-3 text-sm">
+                <p className="text-text-primary mb-2">{confirmingRegistryCost}</p>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={handleConfirmRegistryLookup} disabled={findPeopleRegistry.isPending}>
+                    Confirm paid lookup
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setConfirmingRegistryCost(null)}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
             )}
           </div>
 

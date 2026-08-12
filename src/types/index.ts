@@ -283,6 +283,24 @@ export interface Lead {
   audit?: LeadAudit | null;
 }
 
+export interface LeadPerson {
+  id: string;
+  leadId: string;
+  lead?: { id: string; name: string; city: string | null; state: string | null; website: string | null };
+  name: string | null;
+  title: string | null;
+  matchesIcpTitle: boolean;
+  email: string | null;
+  emailSource: string | null;
+  emailValid: boolean | null;
+  phone: string | null;
+  source: string;
+  confidence: string;
+  foundOnUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface SavedLead {
   id: string;
   userId: string;
@@ -326,6 +344,7 @@ export interface Contact {
   notes: string | null;
   tags: string[];
   sourceLeadId: string | null;
+  title: string | null;
   assignedToId: string | null;
   assignedTo?: { id: string; name: string } | null;
   createdAt: string;
