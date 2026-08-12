@@ -1,14 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { Briefcase, Mail, Pencil, Phone, PhoneCall, Workflow, X } from "lucide-react";
+import { Briefcase, Mail, MessageSquare, Pencil, Phone, PhoneCall, Workflow, X } from "lucide-react";
 
 import { BulkWorkflowModal } from "@/components/contacts/BulkActionsBar";
+import { ContactConversationModal } from "@/components/contacts/ContactConversationModal";
 import { ContactFormModal } from "@/components/contacts/ContactFormModal";
 import { CallButton } from "@/components/calls/CallWidget";
 import { Button } from "@/components/ui/Button";
 import { TagInput } from "@/components/ui/TagInput";
 import { useContact, useContactCalls, useContactTags, useContacts } from "@/hooks/useContacts";
+import { usePermission } from "@/hooks/usePermission";
 import { formatRelativeTime } from "@/lib/utils";
 
 const CALL_STATUS_LABEL: Record<string, string> = {
@@ -44,8 +46,10 @@ export function ContactQuickView({ contactId, onClose }: ContactQuickViewProps) 
   const { calls } = useContactCalls(contactId);
   const { updateContact } = useContacts();
   const { tags: tagSuggestions } = useContactTags();
+  const canAccessInbox = usePermission("company.email");
   const [editOpen, setEditOpen] = useState(false);
   const [workflowOpen, setWorkflowOpen] = useState(false);
+  const [conversationOpen, setConversationOpen] = useState(false);
 
   function handleTagsChange(tags: string[]) {
     updateContact.mutate({ id: contactId, tags });
@@ -77,6 +81,16 @@ export function ContactQuickView({ contactId, onClose }: ContactQuickViewProps) 
                 <div className="flex items-center gap-2 text-text-secondary">
                   <Mail className="size-3.5 shrink-0" />
                   <span className="truncate">{contact.email}</span>
+                  {canAccessInbox && (
+                    <button
+                      type="button"
+                      onClick={() => setConversationOpen(true)}
+                      title="View conversation / send email"
+                      className="text-text-muted hover:text-brand-primary shrink-0"
+                    >
+                      <MessageSquare className="size-3.5" />
+                    </button>
+                  )}
                 </div>
               )}
               {contact.phone && (
@@ -147,6 +161,14 @@ export function ContactQuickView({ contactId, onClose }: ContactQuickViewProps) 
       </div>
 
       {contact && editOpen && <ContactFormModal open={editOpen} onClose={() => setEditOpen(false)} contact={contact} />}
+      {contact?.email && conversationOpen && (
+        <ContactConversationModal
+          open={conversationOpen}
+          onClose={() => setConversationOpen(false)}
+          contactEmail={contact.email}
+          contactName={contact.name}
+        />
+      )}
       {contact && workflowOpen && (
         <BulkWorkflowModal
           selectedIds={[contact.id]}

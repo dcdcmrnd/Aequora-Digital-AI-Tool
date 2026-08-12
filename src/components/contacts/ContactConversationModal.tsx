@@ -53,9 +53,9 @@ export function ContactConversationModal({ open, onClose, contactEmail, contactN
   const [loadingThread, setLoadingThread] = useState(false);
   const [notConnected, setNotConnected] = useState(false);
   const [replyOpen, setReplyOpen] = useState(false);
+  const [composeOpen, setComposeOpen] = useState(false);
 
-  useEffect(() => {
-    if (!open) return;
+  function loadThreads() {
     setSelected(null);
     setThreads(null);
     setNotConnected(false);
@@ -74,6 +74,12 @@ export function ContactConversationModal({ open, onClose, contactEmail, contactN
       })
       .catch(() => toast.error("Couldn't load this conversation."))
       .finally(() => setLoadingList(false));
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    loadThreads();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, contactEmail]);
 
   async function openThread(thread: ThreadSummary) {
@@ -98,7 +104,7 @@ export function ContactConversationModal({ open, onClose, contactEmail, contactN
   return (
     <>
       <Modal
-        open={open && !replyOpen}
+        open={open && !replyOpen && !composeOpen}
         onClose={onClose}
         title={selected ? selected.subject || "(no subject)" : `Conversation with ${contactName}`}
         size="xl"
@@ -165,9 +171,15 @@ export function ContactConversationModal({ open, onClose, contactEmail, contactN
               ) : loadingList ? (
                 <p className="text-text-muted p-6 text-center text-sm">Loading...</p>
               ) : !threads || threads.length === 0 ? (
-                <p className="text-text-muted p-6 text-center text-sm">
-                  No email conversation found with {contactEmail} yet.
-                </p>
+                <div className="p-6 text-center">
+                  <p className="text-text-muted text-sm">No email conversation found with {contactEmail} yet.</p>
+                  <button
+                    onClick={() => setComposeOpen(true)}
+                    className="text-brand-primary mt-2 text-sm font-medium hover:underline"
+                  >
+                    Send an email
+                  </button>
+                </div>
               ) : (
                 threads.map((thread) => (
                   <button
@@ -201,6 +213,22 @@ export function ContactConversationModal({ open, onClose, contactEmail, contactN
           threadId={selected.id}
           inReplyTo={lastMessage.id}
           references={lastMessage.id}
+        />
+      )}
+
+      {composeOpen && (
+        <ComposeModal
+          open={composeOpen}
+          onClose={() => {
+            setComposeOpen(false);
+            // Whether they sent or cancelled, re-check for a thread now — a
+            // successful send should turn this from "no conversation yet"
+            // into a real one instead of staying stuck on the empty state.
+            loadThreads();
+          }}
+          mode="compose"
+          scope="agency"
+          defaultTo={contactEmail}
         />
       )}
     </>
