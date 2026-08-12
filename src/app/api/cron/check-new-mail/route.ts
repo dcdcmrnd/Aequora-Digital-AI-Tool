@@ -4,7 +4,17 @@ import { createNotification } from "@/lib/activity";
 import { extractBody, getGmailClient, getHeader } from "@/lib/gmail";
 import { prisma } from "@/lib/prisma";
 
-const MAX_CANDIDATES_PER_ACCOUNT = 25;
+// Safety ceiling on one run's execution time, not the normal case -- the
+// listing below is now scoped server-side to messages received after the
+// last check (via `after:`) and paginated, so this only bites on an
+// unusually high-volume day. Previously this was a flat 25-message
+// maxResults with no `after:` filter and no pagination, which listed only
+// the 25 most-recent messages in the *entire* inbox: on any day with more
+// than 25 total messages (not just bounces), older-but-still-new messages
+// beyond that top 25 were silently skipped and the watermark still advanced
+// past them, permanently losing bounce/reply detection for those messages.
+const MAX_MESSAGES_PER_ACCOUNT = 200;
+const LIST_PAGE_SIZE = 100;
 const MAX_NOTIFICATIONS_PER_ACCOUNT = 10;
 
 // How far back to look for an outbound send this inbound message might be a
@@ -41,6 +51,10 @@ function extractBounceReason(bodyText: string, subject: string): string {
  */
 // See resume-automations/route.ts for why this is required on every cron route.
 export const dynamic = "force-dynamic";
+// Vercel Hobby's actual ceiling regardless of a higher value here (see
+// bulk-verify's own maxDuration=60) -- explicit since this route can now
+// process well beyond the old 25-message cap per run.
+export const maxDuration = 60;
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
@@ -71,12 +85,24 @@ export async function GET(req: NextRequest) {
       }
 
       const gmail = await getGmailClient(token.ownerId, token.email);
-      const listRes = await gmail.users.messages.list({
-        userId: "me",
-        labelIds: ["INBOX"],
-        maxResults: MAX_CANDIDATES_PER_ACCOUNT,
-      });
-      const candidates = listRes.data.messages ?? [];
+
+      // Scoped to messages after the last check and paginated (instead of a
+      // single unfiltered, uncapped-window fetch) so a busy inbox's older,
+      // already-seen mail doesn't crowd out newer messages within the
+      // MAX_MESSAGES_PER_ACCOUNT ceiling.
+      const candidates: { id?: string | null }[] = [];
+      let pageToken: string | undefined;
+      do {
+        const listRes = await gmail.users.messages.list({
+          userId: "me",
+          labelIds: ["INBOX"],
+          q: `after:${Math.floor(since.getTime() / 1000)}`,
+          maxResults: LIST_PAGE_SIZE,
+          pageToken,
+        });
+        candidates.push(...(listRes.data.messages ?? []));
+        pageToken = listRes.data.nextPageToken ?? undefined;
+      } while (pageToken && candidates.length < MAX_MESSAGES_PER_ACCOUNT);
 
       const recipients = token.ownerId ? [token.ownerId] : agencyRecipientIds;
       const entityType = token.ownerId ? "inbox" : "conversations";
