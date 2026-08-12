@@ -9,7 +9,11 @@ const SUBPAGE_FETCH_CONCURRENCY = 3;
 // Anchors the name+title extraction below to a known vocabulary rather than
 // matching any capitalized phrase near a name -- without a DOM parser to
 // isolate actual team-member cards, unconstrained matching against a page's
-// flowing marketing copy produces mostly noise.
+// flowing marketing copy produces mostly noise. This is the always-included
+// base; buildTitlePatterns() below unions it with whatever extra title terms
+// a given call cares about (e.g. a People Search's searched Position), since
+// a term outside this list would otherwise never even get extracted from a
+// page, regardless of any later match-flagging logic.
 const TITLE_VOCABULARY = [
   "Managing Director", "Executive Director", "Operations Director", "Operations Manager",
   "Head of Operations", "Office Manager", "General Manager", "Business Owner",
@@ -17,23 +21,51 @@ const TITLE_VOCABULARY = [
   "Owner", "Proprietor", "Partner", "Principal", "Chairman", "Chairwoman", "Chair",
   "CEO", "CFO", "COO", "CTO",
 ];
-// Non-capturing group: TITLE_PATTERN.source gets embedded inside another
-// capturing group below (once for NAME_THEN_TITLE, once for TITLE_THEN_NAME)
-// -- if this alternation captured too, it would shift every group index
-// after it, silently misassigning which match[] slot is the name.
-const TITLE_PATTERN = new RegExp(`\\b(?:${TITLE_VOCABULARY.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})\\b`, "i");
 const NAME_TOKEN = "[A-Z][a-z]+(?:\\s+[A-Z][a-z]+){1,2}";
-// No "i" flag here: NAME_TOKEN's [A-Z][a-z]+ shape is exactly what tells a
-// real name apart from ordinary lowercase prose, and the "i" flag makes
-// [A-Z] match lowercase too -- an earlier version of this file had it, which
-// let plain sentence text after a title (e.g. "Founder: John Smith runs
-// daily operations") get swept up as part of the "name". Real team-page
-// titles are essentially always Title Case anyway, so TITLE_VOCABULARY still
-// matches the common case without needing case-insensitivity either.
-// "Jane Doe, Founder" / "Jane Doe - Founder" / "Jane Doe | Founder"
-const NAME_THEN_TITLE = new RegExp(`(${NAME_TOKEN})\\s*[,\\-\\u2013\\u2014|]\\s*(${TITLE_PATTERN.source})`, "g");
-// "Founder: Jane Doe" / "Founder - Jane Doe" (title-first card layouts)
-const TITLE_THEN_NAME = new RegExp(`(${TITLE_PATTERN.source})\\s*[:\\-\\u2013\\u2014|]\\s*(${NAME_TOKEN})`, "g");
+
+interface TitlePatterns {
+  nameThenTitle: RegExp;
+  titleThenName: RegExp;
+}
+
+/**
+ * Builds the name+title extraction regexes for one crawl call, unioning the
+ * base TITLE_VOCABULARY with any extra terms (escaped, deduped, empty
+ * entries dropped -- an empty alternation branch would match everywhere).
+ *
+ * No "i" flag on the combined regexes: NAME_TOKEN's [A-Z][a-z]+ shape is
+ * exactly what tells a real name apart from ordinary lowercase prose, and
+ * the "i" flag makes [A-Z] match lowercase too -- an earlier version of this
+ * file had it, which let plain sentence text after a title (e.g. "Founder:
+ * John Smith runs daily operations") get swept up as part of the "name".
+ * Real team-page titles are essentially always Title Case anyway, so the
+ * title vocabulary still matches the common case without case-insensitivity.
+ */
+function buildTitlePatterns(extraTitles: string[]): TitlePatterns {
+  const seen = new Set<string>();
+  const terms: string[] = [];
+  for (const raw of [...TITLE_VOCABULARY, ...extraTitles]) {
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    terms.push(trimmed.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  }
+
+  // Non-capturing group: this gets embedded inside another capturing group
+  // below (once for nameThenTitle, once for titleThenName) -- if this
+  // alternation captured too, it would shift every group index after it,
+  // silently misassigning which match[] slot is the name.
+  const titlePattern = `\\b(?:${terms.join("|")})\\b`;
+
+  return {
+    // "Jane Doe, Founder" / "Jane Doe - Founder" / "Jane Doe | Founder"
+    nameThenTitle: new RegExp(`(${NAME_TOKEN})\\s*[,\\-\\u2013\\u2014|]\\s*(${titlePattern})`, "g"),
+    // "Founder: Jane Doe" / "Founder - Jane Doe" (title-first card layouts)
+    titleThenName: new RegExp(`(${titlePattern})\\s*[:\\-\\u2013\\u2014|]\\s*(${NAME_TOKEN})`, "g"),
+  };
+}
 
 const GENERIC_EMAIL_LOCAL_PARTS = new Set([
   "info", "contact", "support", "sales", "admin", "hello", "help", "office",
@@ -117,11 +149,11 @@ function findNearbyLink(html: string, index: number, protocol: "mailto" | "tel")
   return protocol === "mailto" ? value.toLowerCase() : value;
 }
 
-function extractTextPatternPeople(html: string, pageUrl: string): RawCandidate[] {
+function extractTextPatternPeople(html: string, pageUrl: string, patterns: TitlePatterns): RawCandidate[] {
   const text = html.replace(/<[^>]+>/g, " ");
   const found: RawCandidate[] = [];
 
-  for (const match of Array.from(text.matchAll(NAME_THEN_TITLE))) {
+  for (const match of Array.from(text.matchAll(patterns.nameThenTitle))) {
     if (match.index === undefined) continue;
     found.push({
       name: match[1].trim(),
@@ -131,7 +163,7 @@ function extractTextPatternPeople(html: string, pageUrl: string): RawCandidate[]
       foundOnUrl: pageUrl,
     });
   }
-  for (const match of Array.from(text.matchAll(TITLE_THEN_NAME))) {
+  for (const match of Array.from(text.matchAll(patterns.titleThenName))) {
     if (match.index === undefined) continue;
     found.push({
       name: match[2].trim(),
@@ -256,9 +288,14 @@ export async function findPeopleFromWebsite(websiteUrl: string, icpTitles: strin
 
   const pages = [{ url: baseUrl, html: homeHtml }, ...subpageResults.filter((r): r is { url: URL; html: string } => r !== null)];
 
+  // icpTitles also drives extraction here (not just the matchesIcpTitle flag
+  // below) -- a title outside the base TITLE_VOCABULARY, like a People
+  // Search's searched Position, would otherwise never be recognized on the
+  // page at all.
+  const titlePatterns = buildTitlePatterns(icpTitles);
   const allCandidates = pages.flatMap(({ url, html }) => [
     ...extractJsonLdPeople(html, url.toString()),
-    ...extractTextPatternPeople(html, url.toString()),
+    ...extractTextPatternPeople(html, url.toString(), titlePatterns),
   ]);
   const merged = mergeCandidates(allCandidates);
   const patternFn = detectEmailPatternFn(allCandidates);

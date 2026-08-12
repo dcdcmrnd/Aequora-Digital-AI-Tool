@@ -42,6 +42,7 @@ model User {
   chatMessages     ChatMessage[]
   savedLeads       SavedLead[]    @relation("SavedLeadOwner")
   leadSearches     LeadSearch[]   @relation("LeadSearchOwner")
+  peopleSearches   PeopleSearch[] @relation("PeopleSearchOwner")
   contactsCreated  Contact[]      @relation("ContactCreator")
   opportunitiesCreated Opportunity[] @relation("OpportunityCreator")
   automationsCreated   Automation[]  @relation("AutomationCreator")
@@ -419,7 +420,33 @@ model LeadPerson {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
+  // Which auto-discovery search (Position + Industry + Location) produced
+  // this row, if any -- null means found manually via "Find People" on a
+  // business in the Company tab. This is what keeps the People tab's "Found
+  // People" and "People Search" results genuinely separate instead of just
+  // visually distinguished.
+  peopleSearchId String?
+  peopleSearch   PeopleSearch? @relation(fields: [peopleSearchId], references: [id], onDelete: SetNull)
+
   @@index([leadId])
+}
+
+// A Position + Industry + Location search that auto-discovers companies
+// (via the same Google Places search as the Company tab, tagged as a normal
+// LeadSearch) and crawls a capped first batch of them for people -- distinct
+// from manually clicking "Find People" on businesses you've already chosen.
+model PeopleSearch {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation("PeopleSearchOwner", fields: [userId], references: [id], onDelete: Cascade)
+  position         String
+  industry         String
+  location         String
+  companiesFound   Int      @default(0) // total businesses the Places search returned
+  companiesCrawled Int      @default(0) // how many were actually crawled (capped)
+  createdAt        DateTime @default(now())
+
+  people LeadPerson[]
 }
 
 model LeadAudit {

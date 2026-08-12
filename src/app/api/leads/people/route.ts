@@ -23,12 +23,18 @@ export async function GET(req: NextRequest) {
   const sortByParam = params.get("sortBy");
   const sortBy: PeopleSortColumn = sortByParam === "name" ? "name" : "createdAt";
 
+  // foundManually=true scopes to people found via the Company tab's "Find
+  // People" (peopleSearchId null); peopleSearchId scopes to one specific
+  // People Search's results. Neither given = no filter (everyone).
+  const peopleSearchId = params.get("foundManually") === "true" ? null : (params.get("peopleSearchId") ?? undefined);
+
   const result = await listPeople({
     search: params.get("search") ?? undefined,
     matchesIcpTitle: parseBool(params.get("matchesIcpTitle")),
     hasEmail: parseBool(params.get("hasEmail")),
     confidence: params.get("confidence") ?? undefined,
     source: params.get("source") ?? undefined,
+    peopleSearchId,
     sortBy,
     sortDirection: params.get("sortDirection") === "asc" ? "asc" : "desc",
     page: Number(params.get("page") ?? 1),

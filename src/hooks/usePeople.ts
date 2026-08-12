@@ -12,6 +12,10 @@ export interface UsePeopleParams {
   hasEmail?: boolean;
   confidence?: string;
   source?: string;
+  /** true = only people found manually via the Company tab's "Find People" (excludes People Search results). */
+  foundManually?: boolean;
+  /** Scope to one specific People Search's results. */
+  peopleSearchId?: string;
   sortBy?: "createdAt" | "name";
   sortDirection?: "asc" | "desc";
   page?: number;

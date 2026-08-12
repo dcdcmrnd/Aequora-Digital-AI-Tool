@@ -301,6 +301,17 @@ export interface LeadPerson {
   updatedAt: string;
 }
 
+export interface PeopleSearch {
+  id: string;
+  userId: string;
+  position: string;
+  industry: string;
+  location: string;
+  companiesFound: number;
+  companiesCrawled: number;
+  createdAt: string;
+}
+
 export interface SavedLead {
   id: string;
   userId: string;
