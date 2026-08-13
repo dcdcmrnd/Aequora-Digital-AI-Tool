@@ -14,10 +14,19 @@ interface AvailableNumber {
   region: string | null;
 }
 
+interface OwnedNumber {
+  sid: string;
+  phoneNumber: string;
+  friendlyName: string;
+}
+
 export function PhoneSettingsPanel() {
   const [currentNumber, setCurrentNumber] = useState<string | null>(null);
   const [configured, setConfigured] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [ownedNumbers, setOwnedNumbers] = useState<OwnedNumber[] | null>(null);
+  const [loadingOwned, setLoadingOwned] = useState(false);
+  const [adopting, setAdopting] = useState<string | null>(null);
   const [areaCode, setAreaCode] = useState("");
   const [results, setResults] = useState<AvailableNumber[] | null>(null);
   const [searching, setSearching] = useState(false);
@@ -35,6 +44,17 @@ export function PhoneSettingsPanel() {
       const data = await res.json();
       setCurrentNumber(data.phoneNumber ?? null);
       setConfigured(data.twilioConfigured ?? false);
+
+      if (data.twilioConfigured && !data.phoneNumber) {
+        setLoadingOwned(true);
+        try {
+          const ownedRes = await fetch("/api/twilio/numbers/owned");
+          const ownedData = await ownedRes.json();
+          if (ownedRes.ok) setOwnedNumbers(ownedData.numbers);
+        } finally {
+          setLoadingOwned(false);
+        }
+      }
     } catch {
       toast.error("Couldn't load calling settings.");
     } finally {
@@ -45,6 +65,25 @@ export function PhoneSettingsPanel() {
   useEffect(() => {
     loadStatus();
   }, []);
+
+  async function handleAdopt(sid: string, phoneNumber: string) {
+    setAdopting(sid);
+    try {
+      const res = await fetch("/api/twilio/numbers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phoneNumberSid: sid }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Couldn't set up this number.");
+      toast.success(`${phoneNumber} is now your calling number`);
+      await loadStatus();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't set up this number.");
+    } finally {
+      setAdopting(null);
+    }
+  }
 
   async function handleSearch() {
     setSearching(true);
@@ -220,6 +259,38 @@ export function PhoneSettingsPanel() {
             </div>
           ) : (
             <div className="mt-4 space-y-3">
+              {loadingOwned ? (
+                <p className="text-text-muted text-sm">Checking your Twilio account for existing numbers...</p>
+              ) : ownedNumbers && ownedNumbers.length > 0 ? (
+                <div className="space-y-2">
+                  <p className="text-text-secondary text-xs font-medium">
+                    Already on your Twilio account — use one of these instead of buying a new one:
+                  </p>
+                  {ownedNumbers.map((n) => (
+                    <div
+                      key={n.sid}
+                      className="rounded-input border-border flex items-center justify-between gap-3 border px-3 py-2"
+                    >
+                      <div>
+                        <p className="text-text-primary text-sm">{n.phoneNumber}</p>
+                        {n.friendlyName && n.friendlyName !== n.phoneNumber && (
+                          <p className="text-text-muted text-xs">{n.friendlyName}</p>
+                        )}
+                      </div>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => handleAdopt(n.sid, n.phoneNumber)}
+                        loading={adopting === n.sid}
+                      >
+                        Use This Number
+                      </Button>
+                    </div>
+                  ))}
+                  <p className="text-text-muted text-xs">Or search for a new one to buy below.</p>
+                </div>
+              ) : null}
+
               <div className="flex gap-2">
                 <Input
                   placeholder="Area code (optional), e.g. 415"

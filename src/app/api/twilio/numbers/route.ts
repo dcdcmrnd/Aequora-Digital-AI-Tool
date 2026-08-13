@@ -18,9 +18,16 @@ export async function GET() {
   });
 }
 
-const purchaseSchema = z.object({ phoneNumber: z.string().min(1) });
+const purchaseSchema = z
+  .object({ phoneNumber: z.string().min(1).optional(), phoneNumberSid: z.string().min(1).optional() })
+  .refine((d) => d.phoneNumber || d.phoneNumberSid, { message: "Provide a phoneNumber or phoneNumberSid." });
 
-/** Admin-only: buys the given available number from Twilio and sets it as the agency's calling number. Real recurring cost — confirmed client-side before this is called. */
+/**
+ * Admin-only. Two modes:
+ * - phoneNumber: buys that available number from Twilio (real recurring cost — confirmed client-side before this is called).
+ * - phoneNumberSid: adopts a number already owned on the connected Twilio account (e.g. bought directly in the
+ *   Twilio Console) as the agency's calling number — no purchase call, just registers it here.
+ */
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -36,25 +43,28 @@ export async function POST(req: NextRequest) {
   const existing = await prisma.twilioSettings.findUnique({ where: { id: "singleton" } });
   if (existing?.phoneNumber) {
     return NextResponse.json(
-      { error: "A calling number is already set up. Release it before purchasing another." },
+      { error: "A calling number is already set up. Release it before adding another." },
       { status: 400 },
     );
   }
 
   try {
     const client = await createTwilioClient();
-    const purchased = await client.incomingPhoneNumbers.create({ phoneNumber: parsed.data.phoneNumber });
+
+    const { sid, phoneNumber } = parsed.data.phoneNumberSid
+      ? await client.incomingPhoneNumbers(parsed.data.phoneNumberSid).fetch()
+      : await client.incomingPhoneNumbers.create({ phoneNumber: parsed.data.phoneNumber! });
 
     await prisma.twilioSettings.upsert({
       where: { id: "singleton" },
-      update: { phoneNumberSid: purchased.sid, phoneNumber: purchased.phoneNumber },
-      create: { id: "singleton", phoneNumberSid: purchased.sid, phoneNumber: purchased.phoneNumber },
+      update: { phoneNumberSid: sid, phoneNumber },
+      create: { id: "singleton", phoneNumberSid: sid, phoneNumber },
     });
 
-    return NextResponse.json({ phoneNumber: purchased.phoneNumber }, { status: 201 });
+    return NextResponse.json({ phoneNumber }, { status: 201 });
   } catch (err) {
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Couldn't purchase this number." },
+      { error: err instanceof Error ? err.message : "Couldn't set up this number." },
       { status: 502 },
     );
   }
