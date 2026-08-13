@@ -698,6 +698,12 @@ model Call {
   recordingSid         String? @unique
   recordingUrl         String?
   recordingDurationSec Int?
+  // Twilio's Answering Machine Detection result: human | machine_start |
+  // machine_end_beep | machine_end_silence | machine_end_other | fax |
+  // unknown | null (not yet reported, or AMD off). Purely informational --
+  // doesn't change how the call is handled, just lets the UI flag "this
+  // reached voicemail."
+  answeredBy    String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

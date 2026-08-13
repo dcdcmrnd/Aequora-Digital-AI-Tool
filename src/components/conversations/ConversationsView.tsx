@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/Button";
 import { TagInput } from "@/components/ui/TagInput";
 import { useContact, useContactTags, useContacts } from "@/hooks/useContacts";
 import { useContactAutomationRuns, useContactTimeline, type TimelineItem } from "@/hooks/useConversations";
-import { CALL_STATUS_LABEL, formatCallDuration } from "@/lib/calls";
+import { CALL_STATUS_LABEL, formatCallDuration, isVoicemail } from "@/lib/calls";
 import { cn, formatRelativeTime } from "@/lib/utils";
 
 interface ThreadContact {
@@ -215,6 +215,11 @@ export function ConversationsView() {
                           {CALL_STATUS_LABEL[item.status] ?? item.status}
                           {item.durationSec !== null && ` · ${formatCallDuration(item.durationSec)}`} · {item.userName}
                         </span>
+                        {isVoicemail(item.answeredBy) && (
+                          <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                            Voicemail
+                          </span>
+                        )}
                         {item.recordingSid && (
                           <audio controls preload="none" className="h-6 w-40" src={`/api/calls/${item.id}/recording`} />
                         )}

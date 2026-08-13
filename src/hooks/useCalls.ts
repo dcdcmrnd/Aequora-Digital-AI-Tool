@@ -12,6 +12,7 @@ export interface CallListItem {
   durationSec: number | null;
   recordingSid: string | null;
   recordingDurationSec: number | null;
+  answeredBy: string | null;
   createdAt: string;
   contact: { id: string; name: string; company: string | null } | null;
   user: { id: string; name: string };

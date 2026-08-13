@@ -44,6 +44,8 @@ export async function POST(req: NextRequest) {
   statusCallbackUrl.searchParams.set("callId", call.id);
   const recordingStatusCallbackUrl = new URL("/api/twilio/voice/recording", req.url);
   const announceUrl = new URL("/api/twilio/voice/announce", req.url);
+  const amdStatusCallbackUrl = new URL("/api/twilio/voice/amd", req.url);
+  amdStatusCallbackUrl.searchParams.set("callId", call.id);
 
   const dial = twiml.dial({
     callerId: call.fromNumber,
@@ -64,6 +66,15 @@ export async function POST(req: NextRequest) {
       statusCallback: statusCallbackUrl.toString(),
       statusCallbackEvent: ["initiated", "ringing", "answered", "completed"],
       statusCallbackMethod: "POST",
+      // Answering Machine Detection: Twilio listens right after answer and
+      // reports whether a human or voicemail greeting picked up. Reported
+      // asynchronously to amdStatusCallback rather than in this response,
+      // since detection takes a beat after answer. "DetectMessageEnd" also
+      // waits for the greeting to finish so recording (which starts on
+      // answer, after the consent announcement) isn't affected.
+      machineDetection: "DetectMessageEnd",
+      amdStatusCallback: amdStatusCallbackUrl.toString(),
+      amdStatusCallbackMethod: "POST",
     },
     to,
   );

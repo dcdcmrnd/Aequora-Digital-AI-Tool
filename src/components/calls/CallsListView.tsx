@@ -4,9 +4,10 @@ import { useState } from "react";
 import { ChevronLeft, ChevronRight, PhoneCall } from "lucide-react";
 
 import { ContactQuickView } from "@/components/inbox/ContactQuickView";
+import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { useCalls } from "@/hooks/useCalls";
-import { CALL_STATUS_LABEL, formatCallDuration } from "@/lib/calls";
+import { CALL_STATUS_LABEL, formatCallDuration, isVoicemail } from "@/lib/calls";
 import { formatRelativeTime } from "@/lib/utils";
 
 export function CallsListView() {
@@ -52,7 +53,10 @@ export function CallsListView() {
                       {call.durationSec !== null && ` · ${formatCallDuration(call.durationSec)}`}
                     </p>
                   </div>
-                  <span className="text-text-muted shrink-0 text-xs">{CALL_STATUS_LABEL[call.status] ?? call.status}</span>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    {isVoicemail(call.answeredBy) && <Badge variant="warning">Voicemail</Badge>}
+                    <span className="text-text-muted text-xs">{CALL_STATUS_LABEL[call.status] ?? call.status}</span>
+                  </div>
                 </div>
 
                 {call.recordingSid ? (

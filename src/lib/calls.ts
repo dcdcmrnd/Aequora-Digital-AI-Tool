@@ -15,3 +15,8 @@ export function formatCallDuration(seconds: number | null): string {
   const s = seconds % 60;
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
+
+/** True when Twilio's Answering Machine Detection reported a voicemail greeting (any machine_* value) rather than a human pickup. */
+export function isVoicemail(answeredBy: string | null | undefined): boolean {
+  return !!answeredBy?.startsWith("machine_");
+}

@@ -24,6 +24,7 @@ export interface CallTimelineItem {
   status: string;
   durationSec: number | null;
   recordingSid: string | null;
+  answeredBy: string | null;
   userName: string;
 }
 
