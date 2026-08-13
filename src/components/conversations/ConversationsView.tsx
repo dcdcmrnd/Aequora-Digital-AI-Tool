@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Paperclip, Pencil, PhoneCall, Reply, Search, Workflow } from "lucide-react";
+import { ArrowLeft, Paperclip, Pencil, PhoneCall, Search, Workflow } from "lucide-react";
 import toast from "react-hot-toast";
 
 import { BulkWorkflowModal } from "@/components/contacts/BulkActionsBar";
@@ -22,16 +22,6 @@ interface ThreadContact {
   id: string;
   name: string;
   email: string;
-}
-
-function getInitials(name: string): string {
-  return name
-    .split(" ")
-    .map((p) => p[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
 }
 
 function stripHtml(html: string): string {
@@ -63,9 +53,14 @@ export function ConversationsView() {
   // conversation first (Gmail's own thread order). A brand-new contact with
   // no messages yet still opens fine via the URL -- it just won't be in
   // this list until a conversation actually starts.
+  //
+  // Uses a `q` search (not `label: "INBOX"`) specifically so outbound-only
+  // threads show up too -- a thread only carries the INBOX label once
+  // something has landed there, so a contact we've emailed but who hasn't
+  // replied yet lives entirely under SENT and was invisible here before.
   useEffect(() => {
     setLoadingContacts(true);
-    fetch(`/api/gmail/threads?${new URLSearchParams({ scope: "agency", label: "INBOX" })}`)
+    fetch(`/api/gmail/threads?${new URLSearchParams({ scope: "agency", q: "in:inbox OR in:sent" })}`)
       .then((res) => res.json())
       .then((data) => {
         const threads = Array.isArray(data.threads) ? data.threads : [];
