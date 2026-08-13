@@ -11,25 +11,8 @@ import { Button } from "@/components/ui/Button";
 import { TagInput } from "@/components/ui/TagInput";
 import { useContact, useContactCalls, useContactTags, useContacts } from "@/hooks/useContacts";
 import { usePermission } from "@/hooks/usePermission";
+import { CALL_STATUS_LABEL, formatCallDuration } from "@/lib/calls";
 import { formatRelativeTime } from "@/lib/utils";
-
-const CALL_STATUS_LABEL: Record<string, string> = {
-  "queued": "Queued",
-  "ringing": "Ringing",
-  "in-progress": "In progress",
-  "completed": "Completed",
-  "failed": "Failed",
-  "busy": "Busy",
-  "no-answer": "No answer",
-  "canceled": "Canceled",
-};
-
-function formatCallDuration(seconds: number | null): string {
-  if (!seconds) return "";
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
 
 interface ContactQuickViewProps {
   contactId: string;

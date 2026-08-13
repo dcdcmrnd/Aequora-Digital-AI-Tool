@@ -1,6 +1,7 @@
 import crypto from "crypto";
 
 import { logActivity } from "@/lib/activity";
+import { escapeLikePattern } from "@/lib/db";
 import { prisma } from "@/lib/prisma";
 import { mapWithConcurrency } from "@/lib/utils/concurrency";
 import { auditLead } from "@/services/audit";
@@ -133,7 +134,7 @@ export async function runManualLeadAudit(params: ManualLeadParams): Promise<Lead
 
   const existing = website
     ? await prisma.lead.findFirst({
-        where: { website: { equals: website, mode: "insensitive" }, googlePlaceId: { startsWith: "manual-" } },
+        where: { website: { equals: escapeLikePattern(website), mode: "insensitive" }, googlePlaceId: { startsWith: "manual-" } },
       })
     : null;
 

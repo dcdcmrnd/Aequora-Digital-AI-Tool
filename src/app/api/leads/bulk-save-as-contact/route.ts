@@ -5,6 +5,7 @@ import { z } from "zod";
 import { logActivity } from "@/lib/activity";
 import { authOptions } from "@/lib/auth";
 import { runAutomationsForTrigger } from "@/lib/automation/engine";
+import { escapeLikePattern } from "@/lib/db";
 import { leadContactNamePrefill } from "@/lib/leads/constants";
 import { checkPermission } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
@@ -36,7 +37,7 @@ export async function POST(req: NextRequest) {
   for (const lead of leads) {
     if (lead.enrichedEmail) {
       const existing = await prisma.contact.findFirst({
-        where: { email: { equals: lead.enrichedEmail, mode: "insensitive" } },
+        where: { email: { equals: escapeLikePattern(lead.enrichedEmail), mode: "insensitive" } },
         select: { id: true },
       });
       if (existing) {

@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { escapeLikePattern } from "@/lib/db";
 import { verifyAndCacheForContacts } from "@/lib/emailVerification";
 import { sendEmail } from "@/lib/gmail";
 import { checkPermission } from "@/lib/permissions";
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
   try {
     const firstRecipient = (to as string).split(",")[0]?.trim();
     const contact = firstRecipient
-      ? await prisma.contact.findFirst({ where: { email: { equals: firstRecipient, mode: "insensitive" } } })
+      ? await prisma.contact.findFirst({ where: { email: { equals: escapeLikePattern(firstRecipient), mode: "insensitive" } } })
       : null;
 
     if (contact?.emailBounced) {

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { logActivity } from "@/lib/activity";
 import { authOptions } from "@/lib/auth";
 import { runAutomationsForTrigger } from "@/lib/automation/engine";
+import { escapeLikePattern } from "@/lib/db";
 import { checkPermission } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest) {
   for (const person of people) {
     if (person.email) {
       const existing = await prisma.contact.findFirst({
-        where: { email: { equals: person.email, mode: "insensitive" } },
+        where: { email: { equals: escapeLikePattern(person.email), mode: "insensitive" } },
         select: { id: true },
       });
       if (existing) {

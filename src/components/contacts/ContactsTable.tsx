@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ExternalLink, MessageSquare, Pencil, Trash2 } from "lucide-react";
+import { ExternalLink, MessageSquare, Pencil, Trash2, UserRound } from "lucide-react";
 
 import { Badge } from "@/components/ui/Badge";
 import { CopyButton } from "@/components/ui/CopyButton";
@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { CallButton } from "@/components/calls/CallWidget";
 import { ContactConversationModal } from "@/components/contacts/ContactConversationModal";
 import { ContactFormModal } from "@/components/contacts/ContactFormModal";
+import { ContactQuickView } from "@/components/inbox/ContactQuickView";
 import { useContacts } from "@/hooks/useContacts";
 import { usePermission } from "@/hooks/usePermission";
 import type { Contact } from "@/types";
@@ -25,6 +26,7 @@ export function ContactsTable({ contacts, canManage, selectedIds, onToggle, onTo
   const { deleteContact } = useContacts();
   const [editing, setEditing] = useState<Contact | null>(null);
   const [conversationContact, setConversationContact] = useState<Contact | null>(null);
+  const [viewingContactId, setViewingContactId] = useState<string | null>(null);
   const canAccessInbox = usePermission("company.email");
   const allSelected = contacts.length > 0 && contacts.every((c) => selectedIds.has(c.id));
 
@@ -150,6 +152,14 @@ export function ContactsTable({ contacts, canManage, selectedIds, onToggle, onTo
                 {canManage && (
                   <TableCell>
                     <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => setViewingContactId(contact.id)}
+                        className="text-text-muted hover:text-brand-primary"
+                        aria-label="View contact"
+                        title="View contact (profile, tags, call history)"
+                      >
+                        <UserRound className="size-3.5" />
+                      </button>
                       {contact.email && canAccessInbox && (
                         <button
                           onClick={() => setConversationContact(contact)}
@@ -184,6 +194,7 @@ export function ContactsTable({ contacts, canManage, selectedIds, onToggle, onTo
       </Table>
 
       {editing && <ContactFormModal open={!!editing} onClose={() => setEditing(null)} contact={editing} />}
+      {viewingContactId && <ContactQuickView contactId={viewingContactId} onClose={() => setViewingContactId(null)} />}
       {conversationContact?.email && (
         <ContactConversationModal
           open={!!conversationContact}

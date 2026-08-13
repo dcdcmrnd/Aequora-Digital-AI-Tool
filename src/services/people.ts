@@ -1,5 +1,6 @@
 import type { LeadPerson, Prisma } from "@prisma/client";
 
+import { escapeLikePattern } from "@/lib/db";
 import type { FoundPerson } from "@/lib/leads/personFinder";
 import { normalizeName } from "@/lib/leads/personFinder";
 import { prisma } from "@/lib/prisma";
@@ -126,10 +127,11 @@ function buildPeopleWhere(params: ListPeopleParams): Prisma.LeadPersonWhereInput
   if (source) where.source = source;
   if (peopleSearchId !== undefined) where.peopleSearchId = peopleSearchId;
   if (search) {
+    const pattern = escapeLikePattern(search);
     where.OR = [
-      { name: { contains: search, mode: "insensitive" } },
-      { title: { contains: search, mode: "insensitive" } },
-      { lead: { name: { contains: search, mode: "insensitive" } } },
+      { name: { contains: pattern, mode: "insensitive" } },
+      { title: { contains: pattern, mode: "insensitive" } },
+      { lead: { name: { contains: pattern, mode: "insensitive" } } },
     ];
   }
 

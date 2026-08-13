@@ -1,3 +1,4 @@
+import { escapeLikePattern } from "@/lib/db";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -15,7 +16,7 @@ export async function findContactByEmail(email: string): Promise<string | null> 
   if (!trimmedEmail || !trimmedEmail.includes("@")) return null;
 
   const existing = await prisma.contact.findFirst({
-    where: { email: { equals: trimmedEmail, mode: "insensitive" } },
+    where: { email: { equals: escapeLikePattern(trimmedEmail), mode: "insensitive" } },
     select: { id: true },
   });
   return existing?.id ?? null;

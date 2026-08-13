@@ -1,5 +1,6 @@
 import type { Lead, LeadAudit, Prisma } from "@prisma/client";
 
+import { escapeLikePattern } from "@/lib/db";
 import type { MappedBusiness } from "@/lib/google";
 import { prisma } from "@/lib/prisma";
 
@@ -74,7 +75,7 @@ function buildLeadWhere(params: Omit<ListLeadsParams, "sortBy" | "sortDirection"
   } else {
     if (category) {
       where.OR = categoryMatchCandidates(category).map((c) => ({
-        category: { contains: c, mode: "insensitive" as const },
+        category: { contains: escapeLikePattern(c), mode: "insensitive" as const },
       }));
     }
     if (location) {
@@ -83,11 +84,12 @@ function buildLeadWhere(params: Omit<ListLeadsParams, "sortBy" | "sortDirection"
       // correctly instead of a single token (e.g. a stray "TX") over-matching.
       const tokens = location.split(",").map((t) => t.trim()).filter(Boolean);
       for (const token of tokens) {
+        const pattern = escapeLikePattern(token);
         andConditions.push({
           OR: [
-            { city: { contains: token, mode: "insensitive" as const } },
-            { state: { contains: token, mode: "insensitive" as const } },
-            { country: { contains: token, mode: "insensitive" as const } },
+            { city: { contains: pattern, mode: "insensitive" as const } },
+            { state: { contains: pattern, mode: "insensitive" as const } },
+            { country: { contains: pattern, mode: "insensitive" as const } },
           ],
         });
       }
@@ -103,10 +105,11 @@ function buildLeadWhere(params: Omit<ListLeadsParams, "sortBy" | "sortDirection"
   if (search) {
     // Matches by name OR website — someone pasting in a URL should find the
     // business by it, not just by typing its name.
+    const pattern = escapeLikePattern(search);
     andConditions.push({
       OR: [
-        { name: { contains: search, mode: "insensitive" as const } },
-        { website: { contains: search, mode: "insensitive" as const } },
+        { name: { contains: pattern, mode: "insensitive" as const } },
+        { website: { contains: pattern, mode: "insensitive" as const } },
       ],
     });
   }

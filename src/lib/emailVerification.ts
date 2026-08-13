@@ -1,5 +1,6 @@
 import { promises as dns } from "dns";
 
+import { escapeLikePattern } from "@/lib/db";
 import { prisma } from "@/lib/prisma";
 
 export type EmailVerificationStatus = "valid" | "invalid" | "unknown";
@@ -63,8 +64,9 @@ function isStale(checkedAt: Date | null): boolean {
  */
 export async function verifyAndCacheForContacts(email: string): Promise<EmailVerificationStatus> {
   const trimmed = email.trim();
+  const pattern = escapeLikePattern(trimmed);
   const existing = await prisma.contact.findFirst({
-    where: { email: { equals: trimmed, mode: "insensitive" } },
+    where: { email: { equals: pattern, mode: "insensitive" } },
     select: { emailVerificationStatus: true, emailVerifiedAt: true },
   });
 
@@ -74,7 +76,7 @@ export async function verifyAndCacheForContacts(email: string): Promise<EmailVer
 
   const status = await verifyEmail(trimmed);
   await prisma.contact.updateMany({
-    where: { email: { equals: trimmed, mode: "insensitive" } },
+    where: { email: { equals: pattern, mode: "insensitive" } },
     data: { emailVerificationStatus: status, emailVerifiedAt: new Date() },
   });
   return status;
