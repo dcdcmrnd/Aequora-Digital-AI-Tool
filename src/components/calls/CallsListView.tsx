@@ -5,7 +5,6 @@ import { ChevronLeft, ChevronRight, PhoneCall } from "lucide-react";
 
 import { ContactQuickView } from "@/components/inbox/ContactQuickView";
 import { Button } from "@/components/ui/Button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/Table";
 import { useCalls } from "@/hooks/useCalls";
 import { CALL_STATUS_LABEL, formatCallDuration } from "@/lib/calls";
 import { formatRelativeTime } from "@/lib/utils";
@@ -18,10 +17,10 @@ export function CallsListView() {
   const pageCount = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
 
   return (
-    <div className="space-y-4">
+    <div className="mx-auto max-w-2xl space-y-4">
       <div>
         <h1 className="text-text-primary text-2xl font-semibold tracking-tight">Calls</h1>
-        <p className="text-text-muted text-sm">Every outbound call across all contacts, most recent first.</p>
+        <p className="text-text-muted text-sm">Recordings from every call, most recent first.</p>
       </div>
 
       {isLoading ? (
@@ -33,50 +32,36 @@ export function CallsListView() {
         </p>
       ) : (
         <>
-          <div className="rounded-card border-border overflow-x-auto border bg-white">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>Number</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Duration</TableHead>
-                  <TableHead>Caller</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Recording</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.calls.map((call) => (
-                  <TableRow key={call.id}>
-                    <TableCell>
-                      {call.contact ? (
-                        <button
-                          onClick={() => setViewingContactId(call.contact!.id)}
-                          className="text-brand-primary text-left font-medium hover:underline"
-                        >
-                          {call.contact.name}
-                        </button>
-                      ) : (
-                        <span className="text-text-muted">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap">{call.toNumber}</TableCell>
-                    <TableCell>{CALL_STATUS_LABEL[call.status] ?? call.status}</TableCell>
-                    <TableCell>{formatCallDuration(call.durationSec) || "—"}</TableCell>
-                    <TableCell>{call.user.name}</TableCell>
-                    <TableCell className="whitespace-nowrap">{formatRelativeTime(call.createdAt)}</TableCell>
-                    <TableCell>
-                      {call.recordingSid ? (
-                        <audio controls preload="none" className="h-8 w-56" src={`/api/calls/${call.id}/recording`} />
-                      ) : (
-                        <span className="text-text-muted">—</span>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+          <div className="space-y-2">
+            {data.calls.map((call) => (
+              <div key={call.id} className="rounded-card border-border border bg-white p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    {call.contact ? (
+                      <button
+                        onClick={() => setViewingContactId(call.contact!.id)}
+                        className="text-text-primary text-sm font-medium hover:underline"
+                      >
+                        {call.contact.name}
+                      </button>
+                    ) : (
+                      <p className="text-text-primary text-sm font-medium">{call.toNumber}</p>
+                    )}
+                    <p className="text-text-muted text-xs">
+                      {call.user.name} · {formatRelativeTime(call.createdAt)}
+                      {call.durationSec !== null && ` · ${formatCallDuration(call.durationSec)}`}
+                    </p>
+                  </div>
+                  <span className="text-text-muted shrink-0 text-xs">{CALL_STATUS_LABEL[call.status] ?? call.status}</span>
+                </div>
+
+                {call.recordingSid ? (
+                  <audio controls preload="none" className="mt-3 h-9 w-full" src={`/api/calls/${call.id}/recording`} />
+                ) : (
+                  <p className="text-text-muted mt-2 text-xs">No recording for this call.</p>
+                )}
+              </div>
+            ))}
           </div>
 
           <div className="flex items-center justify-between">
