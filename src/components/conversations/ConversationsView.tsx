@@ -24,10 +24,6 @@ interface ThreadContact {
   email: string;
 }
 
-function stripHtml(html: string): string {
-  return html.replace(/<style[\s\S]*?<\/style>/gi, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-}
-
 const RUN_STATUS_LABEL: Record<string, string> = {
   running: "Running",
   waiting: "Waiting",
@@ -177,19 +173,38 @@ export function ConversationsView() {
                     <div key={item.id} className={cn("flex", item.isOutgoing ? "justify-end" : "justify-start")}>
                       <div
                         className={cn(
-                          "max-w-[75%] rounded-card px-3.5 py-2.5 text-sm shadow-sm",
-                          item.isOutgoing ? "bg-brand-primary text-white" : "border border-border bg-white text-text-primary",
+                          "max-w-[85%] min-w-[280px] overflow-hidden rounded-card border shadow-sm",
+                          item.isOutgoing ? "border-brand-primary/30" : "border-border",
                         )}
                       >
-                        {item.subject && (
-                          <p className={cn("mb-1 text-xs font-semibold", item.isOutgoing ? "text-white/80" : "text-text-muted")}>
-                            {item.subject}
-                          </p>
+                        <div
+                          className={cn(
+                            "flex items-center justify-between gap-3 border-b px-3.5 py-2",
+                            item.isOutgoing ? "border-brand-primary/20 bg-brand-primary/5" : "border-border bg-surface-secondary",
+                          )}
+                        >
+                          <p className="text-text-primary truncate text-xs font-semibold">{item.subject || "(no subject)"}</p>
+                          <span className="text-text-muted shrink-0 text-[11px]">{formatRelativeTime(item.date)}</span>
+                        </div>
+                        {/* Automated/manual emails are HTML-designed templates -- rendered as-is
+                            in a sandboxed, auto-sized iframe (same technique as the old
+                            conversation modal) instead of stripped to plain text, which would
+                            have thrown away the actual design. */}
+                        {item.html ? (
+                          <iframe
+                            srcDoc={item.html}
+                            className="w-full border-none bg-white"
+                            style={{ minHeight: "60px" }}
+                            sandbox="allow-same-origin"
+                            title={item.subject || "Email content"}
+                            onLoad={(e) => {
+                              const iframe = e.currentTarget;
+                              iframe.style.height = (iframe.contentDocument?.body?.scrollHeight ?? 60) + "px";
+                            }}
+                          />
+                        ) : (
+                          <p className="text-text-primary whitespace-pre-wrap bg-white p-3.5 text-sm">{item.text}</p>
                         )}
-                        <p className="whitespace-pre-wrap">{stripHtml(item.html) || item.text}</p>
-                        <p className={cn("mt-1.5 text-[11px]", item.isOutgoing ? "text-white/70" : "text-text-muted")}>
-                          {formatRelativeTime(item.date)}
-                        </p>
                       </div>
                     </div>
                   ) : (
