@@ -11,13 +11,13 @@ import { prisma } from "@/lib/prisma";
  * conversation view) rather than automatic. Not used for each team member's
  * own personal Inbox — that's their individual mail, not agency contacts.
  */
-export async function findContactByEmail(email: string): Promise<string | null> {
+export async function findContactByEmail(email: string): Promise<{ id: string; name: string } | null> {
   const trimmedEmail = email.trim();
   if (!trimmedEmail || !trimmedEmail.includes("@")) return null;
 
   const existing = await prisma.contact.findFirst({
     where: { email: { equals: escapeLikePattern(trimmedEmail), mode: "insensitive" } },
-    select: { id: true },
+    select: { id: true, name: true },
   });
-  return existing?.id ?? null;
+  return existing;
 }

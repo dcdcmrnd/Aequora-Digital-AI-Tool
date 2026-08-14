@@ -84,8 +84,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       const lastMessage = messages[messages.length - 1];
       if (lastMessage) {
         const contact = extractContact(lastMessage.from, lastMessage.to, lastMessage.isOutgoing);
-        contactId = await findContactByEmail(contact.email);
-        contactName = contact.name;
+        const match = await findContactByEmail(contact.email);
+        contactId = match?.id ?? null;
+        contactName = match?.name ?? contact.name;
         contactEmail = contact.email;
       }
     }

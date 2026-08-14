@@ -67,7 +67,11 @@ export async function GET(req: NextRequest) {
         // Link to an existing CRM contact if this sender is already one —
         // deliberately not done for scope="own" (personal inboxes), and
         // deliberately doesn't create a new contact (see findContactByEmail).
-        const contactId = scopeParam === "agency" ? await findContactByEmail(contact.email) : null;
+        // When matched, show the CRM contact's saved name rather than
+        // whatever (if anything) was in the email's From/To header --
+        // the raw email address is only shown as a last resort, for
+        // senders we haven't saved as a contact yet.
+        const match = scopeParam === "agency" ? await findContactByEmail(contact.email) : null;
 
         return {
           id: t.id!,
@@ -77,9 +81,9 @@ export async function GET(req: NextRequest) {
           isUnread,
           status: isUnread ? "unread" : "read",
           messageCount: messages.length,
-          contactName: contact.name,
+          contactName: match?.name ?? contact.name,
           contactEmail: contact.email,
-          contactId,
+          contactId: match?.id ?? null,
         };
       })
     );
