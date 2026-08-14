@@ -42,16 +42,16 @@ export async function getConnectedEmailsWithPrimary(ownerId: string | null): Pro
   return tokens;
 }
 
-/** The default account for the given owner — the first one connected — used when a caller doesn't specify which. */
+/** The default account for the given owner — the one marked primary, falling back to the first connected — used when a caller doesn't specify which. */
 export async function getConnectedEmail(ownerId: string | null): Promise<string | null> {
-  const token = await prisma.gmailToken.findFirst({ where: { ownerId }, orderBy: { updatedAt: "asc" } });
+  const token = await prisma.gmailToken.findFirst({ where: { ownerId }, orderBy: [{ isPrimary: "desc" }, { updatedAt: "asc" }] });
   return token?.email ?? null;
 }
 
 export async function getGmailClient(ownerId: string | null, email?: string) {
   const token = email
     ? await prisma.gmailToken.findUnique({ where: { email } })
-    : await prisma.gmailToken.findFirst({ where: { ownerId }, orderBy: { updatedAt: "asc" } });
+    : await prisma.gmailToken.findFirst({ where: { ownerId }, orderBy: [{ isPrimary: "desc" }, { updatedAt: "asc" }] });
 
   if (!token) throw new Error("Gmail not connected. Visit /api/gmail/auth to connect.");
   if (email && token.ownerId !== ownerId) throw new Error("Gmail account not accessible.");
