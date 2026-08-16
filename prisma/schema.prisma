@@ -603,9 +603,14 @@ model Automation {
   // Bearer secret for the inbound "Webhook Received" trigger -- the URL
   // /api/automations/webhook/[webhookSecret] is unauthenticated by design (external
   // senders can't do OAuth), so this value alone gates who can fire the automation.
-  // @default(cuid()) only backfills existing rows; new/regenerated secrets use a
-  // crypto.randomBytes value from application code, which is not guessable like a cuid.
-  webhookSecret String        @unique @default(cuid())
+  // Uses a dbgenerated (database-computed) default rather than @default(cuid()) --
+  // `prisma db push` can only backfill a NOT NULL column on existing rows when the
+  // database itself can compute the value; cuid() is generated in the Prisma client,
+  // not SQL, so it can't be applied by an ALTER TABLE against live data. This only
+  // matters for the one-time backfill of rows that predate this column -- every
+  // new/regenerated secret is overwritten with a crypto.randomBytes value from
+  // application code, which is not guessable like this fallback.
+  webhookSecret String        @unique @default(dbgenerated("md5((random())::text || (clock_timestamp())::text)"))
   flow        String          @default("{\"nodes\":[],\"edges\":[]}") // React Flow nodes+edges, JSON string
   createdById String
   createdBy   User            @relation("AutomationCreator", fields: [createdById], references: [id], onDelete: Cascade)
