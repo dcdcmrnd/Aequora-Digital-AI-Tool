@@ -21,6 +21,43 @@
   }
 }
 
+@layer components {
+  /* Base typography for published site content and the editor's live canvas preview --
+     deliberately NOT the app's 14px CRM density (body above), since a marketing page needs a
+     normal web type scale. Element-level rules give TipTap-authored HTML (Text blocks) sensible
+     default heading/paragraph sizing WITHOUT Tailwind Typography's opinionated "prose" scale,
+     which would otherwise override a block's own Style-tab font-size (see TextBlock.tsx). */
+  .site-content {
+    font-size: 16px;
+    line-height: 1.6;
+    color: #1f2937;
+  }
+  .site-content h1 {
+    @apply mb-4 text-4xl font-bold leading-tight;
+  }
+  .site-content h2 {
+    @apply mb-4 text-3xl font-bold leading-tight;
+  }
+  .site-content h3 {
+    @apply mb-3 text-2xl font-semibold leading-snug;
+  }
+  .site-content p {
+    @apply mb-4 last:mb-0;
+  }
+  .site-content ul {
+    @apply mb-4 list-disc pl-6;
+  }
+  .site-content ol {
+    @apply mb-4 list-decimal pl-6;
+  }
+  .site-content a {
+    @apply text-brand-primary underline;
+  }
+  .site-content img {
+    @apply h-auto max-w-full rounded-md;
+  }
+}
+
 @layer utilities {
   .scrollbar-thin::-webkit-scrollbar {
     width: 4px;

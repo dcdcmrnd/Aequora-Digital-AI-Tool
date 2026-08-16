@@ -6,5 +6,5 @@ import type { BlockNode } from "@/lib/site-builder/types";
 // opened up beyond trusted internal staff, this needs sanitizing (e.g. DOMPurify) first.
 export function TextBlock({ block }: { block: BlockNode }) {
   const html = typeof block.props.html === "string" ? block.props.html : "";
-  return <div style={block.style} className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: html }} />;
+  return <div style={block.style} className="site-content" dangerouslySetInnerHTML={{ __html: html }} />;
 }

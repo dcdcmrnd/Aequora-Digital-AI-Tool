@@ -48,7 +48,7 @@ export function SortableBlockItem({ block, selected, onSelect, children }: Sorta
       >
         <div
           className={cn(
-            "absolute -top-6 left-0 z-10 flex items-center gap-1 rounded-t bg-brand-primary px-1.5 py-0.5 text-[10px] font-medium text-white opacity-0 group-hover:opacity-100",
+            "absolute -top-7 left-0 z-10 flex items-center gap-1.5 rounded-full bg-brand-primary px-2.5 py-1 text-[10px] font-medium text-white opacity-0 shadow-sm transition-opacity group-hover:opacity-100",
             selected && "opacity-100",
           )}
         >
@@ -60,7 +60,10 @@ export function SortableBlockItem({ block, selected, onSelect, children }: Sorta
         </div>
 
         {block.type === "section" ? (
-          <div style={block.style} className="min-h-[60px]">
+          // The dashed border/tint below is editor-only chrome (a className, never part of
+          // block.style, so never published) -- without it, a section with no background of
+          // its own is otherwise completely invisible while editing, which reads as broken.
+          <div style={block.style} className="min-h-[72px] rounded-md border border-dashed border-gray-300 bg-gray-50/60">
             {children}
           </div>
         ) : (

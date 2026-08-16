@@ -47,7 +47,7 @@ export default async function PublicPage({ params }: PageParams) {
   const content = parseContent(page.publishedContent);
 
   return (
-    <main className="mx-auto max-w-5xl">
+    <main className="site-content mx-auto max-w-5xl">
       <BlockList blocks={content.blocks} />
     </main>
   );

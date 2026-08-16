@@ -2,6 +2,7 @@
 
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { LayoutTemplate } from "lucide-react";
 
 import type { BlockNode } from "@/lib/site-builder/types";
 import { SortableBlockItem } from "./SortableBlockItem";
@@ -32,7 +33,12 @@ export function CanvasBlockList({ blocks, onChange, selectedId, onSelect, emptyH
   }
 
   if (blocks.length === 0) {
-    return <p className="text-text-muted rounded-md border border-dashed border-border py-6 text-center text-xs">{emptyHint}</p>;
+    return (
+      <div className="text-text-muted flex flex-col items-center gap-2 rounded-md border border-dashed border-gray-300 py-10 text-center text-xs">
+        <LayoutTemplate className="size-5 text-gray-300" />
+        {emptyHint}
+      </div>
+    );
   }
 
   return (

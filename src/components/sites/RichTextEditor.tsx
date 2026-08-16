@@ -60,9 +60,34 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
     editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
   }
 
+  const currentBlockType = editor?.isActive("heading", { level: 1 })
+    ? "h1"
+    : editor?.isActive("heading", { level: 2 })
+      ? "h2"
+      : editor?.isActive("heading", { level: 3 })
+        ? "h3"
+        : "paragraph";
+
+  function handleBlockTypeChange(value: string) {
+    if (!editor) return;
+    if (value === "paragraph") editor.chain().focus().setParagraph().run();
+    else editor.chain().focus().toggleHeading({ level: Number(value.slice(1)) as 1 | 2 | 3 }).run();
+  }
+
   return (
     <div className="rounded-input border border-border bg-white overflow-hidden">
       <div className="flex flex-wrap items-center gap-1 border-b border-border bg-surface-secondary px-2 py-1.5">
+        <select
+          disabled={mode === "html"}
+          value={currentBlockType}
+          onChange={(e) => handleBlockTypeChange(e.target.value)}
+          className="border-border mr-1 rounded border bg-white px-1.5 py-1 text-xs disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <option value="paragraph">Paragraph</option>
+          <option value="h1">Heading 1</option>
+          <option value="h2">Heading 2</option>
+          <option value="h3">Heading 3</option>
+        </select>
         <ToolbarButton title="Bold" active={editor?.isActive("bold")} disabled={mode === "html"} onClick={() => editor?.chain().focus().toggleBold().run()}>
           <Bold className="size-3.5" />
         </ToolbarButton>

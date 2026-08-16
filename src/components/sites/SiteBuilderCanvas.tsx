@@ -146,8 +146,11 @@ export function SiteBuilderCanvas({ siteId, page }: { siteId: string; page: Page
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto bg-surface-secondary p-8">
-        <div className="mx-auto max-w-4xl rounded-lg bg-white p-6 shadow-sm" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="flex-1 overflow-y-auto p-8"
+        style={{ backgroundColor: "#eef1f5", backgroundImage: "radial-gradient(#d3dae3 1px, transparent 1px)", backgroundSize: "20px 20px" }}
+      >
+        <div className="site-content mx-auto max-w-4xl rounded-lg bg-white p-8 shadow-md" onClick={(e) => e.stopPropagation()}>
           <CanvasBlockList
             blocks={content.blocks}
             onChange={(blocks) => setContent({ blocks })}
