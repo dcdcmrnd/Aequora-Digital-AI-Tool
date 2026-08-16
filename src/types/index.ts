@@ -441,6 +441,8 @@ export interface Automation {
   allowMultipleEntries: boolean;
   /** false = block a new run once this contact has ever finished a run here before. */
   allowReentry: boolean;
+  /** Bearer secret for the inbound webhook URL: /api/automations/webhook/[webhookSecret]. */
+  webhookSecret: string;
   flow: AutomationFlow;
   createdById: string;
   runs?: AutomationRun[];

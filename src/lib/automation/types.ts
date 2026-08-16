@@ -29,7 +29,8 @@ export type TriggerType =
   | "opportunity_lost"
   | "task_completed"
   | "note_added"
-  | "email_opened";
+  | "email_opened"
+  | "webhook_received";
 
 export type ConditionType = "email_opened" | "has_tag" | "opportunity_at_stage" | "days_since_entered" | "field_comparison";
 

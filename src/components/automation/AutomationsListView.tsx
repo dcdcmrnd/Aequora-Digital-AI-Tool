@@ -22,6 +22,7 @@ const TRIGGER_LABELS: Record<AutomationTriggerType, string> = {
   task_completed: "Task Completed",
   note_added: "Note Added",
   email_opened: "Email Opened",
+  webhook_received: "Webhook Received",
 };
 
 const STATUS_STYLES: Record<string, string> = {

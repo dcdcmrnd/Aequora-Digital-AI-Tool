@@ -1,3 +1,5 @@
+import crypto from "crypto";
+
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { z } from "zod";
@@ -87,6 +89,7 @@ export async function POST(req: NextRequest) {
       allowReentry: parsed.data.allowReentry,
       flow: JSON.stringify(parsed.data.flow),
       createdById: session.user.id,
+      webhookSecret: crypto.randomBytes(24).toString("hex"),
     },
   });
 

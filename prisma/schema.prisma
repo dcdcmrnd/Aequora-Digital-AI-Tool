@@ -600,6 +600,12 @@ model Automation {
   // existed before these settings shipped.
   allowMultipleEntries Boolean @default(true) // false = a contact already actively running/waiting in this automation is skipped on a repeat trigger
   allowReentry         Boolean @default(true) // false = a contact who already finished a run here (any terminal status) is skipped on a repeat trigger
+  // Bearer secret for the inbound "Webhook Received" trigger -- the URL
+  // /api/automations/webhook/[webhookSecret] is unauthenticated by design (external
+  // senders can't do OAuth), so this value alone gates who can fire the automation.
+  // @default(cuid()) only backfills existing rows; new/regenerated secrets use a
+  // crypto.randomBytes value from application code, which is not guessable like a cuid.
+  webhookSecret String        @unique @default(cuid())
   flow        String          @default("{\"nodes\":[],\"edges\":[]}") // React Flow nodes+edges, JSON string
   createdById String
   createdBy   User            @relation("AutomationCreator", fields: [createdById], references: [id], onDelete: Cascade)
@@ -619,6 +625,8 @@ model AutomationRun {
   waitUntil     DateTime?
   waitToken     String?                   @unique
   detail        String?
+  payload       String?                   // JSON body the inbound webhook trigger was fired with, if any -- exposed to later steps as {{webhook.*}}
+  variables     String?                   // JSON map of {responseVariableName: parsedResponseBody}, accumulated by HTTP/Webhook steps -- exposed as {{http.<name>.*}}
   createdAt     DateTime                  @default(now())
   updatedAt     DateTime                  @updatedAt
   emailTracking EmailTracking[]

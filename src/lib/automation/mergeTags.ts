@@ -61,3 +61,21 @@ export function applyMergeTags(text: string, values: Record<string, string>): st
   }
   return result;
 }
+
+/**
+ * Flattens the top-level keys of a webhook payload or captured HTTP response into
+ * `{{prefix.key}}` merge tokens, e.g. flattenForMergeTags("webhook", {email: "a@b.com"})
+ * -> {"{{webhook.email}}": "a@b.com"}. Nested objects/arrays are JSON-stringified rather
+ * than recursed into, so the value is still reachable as text even if not flattened further.
+ */
+export function flattenForMergeTags(prefix: string, obj: Record<string, unknown> | null | undefined): Record<string, string> {
+  if (!obj || typeof obj !== "object") return {};
+  const values: Record<string, string> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    const token = `{{${prefix}.${key}}}`;
+    if (value === null || value === undefined) values[token] = "";
+    else if (typeof value === "object") values[token] = JSON.stringify(value);
+    else values[token] = String(value);
+  }
+  return values;
+}

@@ -5,7 +5,7 @@ import { verifyAndCacheForContacts } from "@/lib/emailVerification";
 import { sendEmail } from "@/lib/gmail";
 import { createNotification } from "@/lib/activity";
 import { formatDailyTime, formatWeekdayTime, getNextTimeOccurrenceUtc, getNextWeekdayOccurrenceUtc } from "@/lib/utils/schedule";
-import { applyMergeTags, contactMergeValues } from "./mergeTags";
+import { applyMergeTags, contactMergeValues, flattenForMergeTags } from "./mergeTags";
 import type {
   AutomationEdge,
   AutomationFlow,
@@ -252,6 +252,84 @@ export async function enrollContactInAutomation(automationId: string, contactId:
   return true;
 }
 
+interface WebhookTriggerConfig {
+  contactField?: string;
+  createContact?: boolean;
+  nameField?: string;
+  phoneField?: string;
+  companyField?: string;
+}
+
+/** Looks up (or optionally creates) the contact an inbound webhook payload refers to, per the trigger's field-mapping config. */
+async function resolveWebhookContact(
+  systemUserId: string,
+  payload: Record<string, unknown>,
+  config: WebhookTriggerConfig | undefined,
+): Promise<string | undefined> {
+  const emailField = config?.contactField?.trim() || "email";
+  const rawEmail = payload[emailField];
+  const email = typeof rawEmail === "string" ? rawEmail.trim().toLowerCase() : undefined;
+  if (!email) return undefined;
+
+  const existing = await prisma.contact.findFirst({ where: { email: { equals: email, mode: "insensitive" } } });
+  if (existing) return existing.id;
+  if (!config?.createContact) return undefined;
+
+  const pick = (field?: string) => {
+    if (!field) return undefined;
+    const value = payload[field.trim()];
+    return typeof value === "string" ? value.trim() : undefined;
+  };
+
+  const contact = await prisma.contact.create({
+    data: {
+      name: pick(config.nameField) || email,
+      email,
+      phone: pick(config.phoneField) || undefined,
+      company: pick(config.companyField) || undefined,
+      createdById: systemUserId,
+    },
+  });
+  return contact.id;
+}
+
+/**
+ * Fires the single automation identified by a webhook secret (see
+ * /api/automations/webhook/[secret]). Unlike runAutomationsForTrigger — which broadcasts an
+ * event to every automation listening for a given trigger type — an inbound webhook URL is
+ * scoped to exactly one automation by construction, so this looks up that one automation
+ * directly rather than scanning all active automations for a match.
+ */
+export async function runInboundWebhook(secret: string, payload: Record<string, unknown>): Promise<"ok" | "not_found" | "no_action"> {
+  const automation = await prisma.automation.findUnique({ where: { webhookSecret: secret } });
+  if (!automation || !automation.isActive) return "not_found";
+
+  const flow = parseFlow(automation.flow);
+  const triggerNode = flow.nodes.find((n) => n.type === "trigger");
+  const triggerData = triggerNode?.data as { triggerType?: TriggerType } & WebhookTriggerConfig | undefined;
+  if (!triggerNode || triggerData?.triggerType !== "webhook_received") return "not_found";
+
+  const firstNodeId = nextNodeId(flow, triggerNode.id);
+  if (!firstNodeId) return "no_action"; // trigger configured but nothing attached yet
+
+  const contactId = await resolveWebhookContact(automation.createdById, payload, triggerData);
+  if (contactId && !(await canEnterAutomation(automation, contactId))) return "no_action";
+
+  const run = await prisma.automationRun.create({
+    data: {
+      automationId: automation.id,
+      contactId: contactId ?? null,
+      status: "running",
+      currentNodeId: firstNodeId,
+      payload: JSON.stringify(payload),
+    },
+  });
+
+  await logStep(run.id, triggerNode.id, triggerNode.type, "success", "Webhook received");
+  await runLoop(run.id, flow, firstNodeId);
+  return "ok";
+}
+
 /** Resumes a run paused at a "wait" node — called by the cron sweep or the open-tracking pixel. */
 export async function resumeRun(runId: string): Promise<void> {
   const run = await prisma.automationRun.findUnique({ where: { id: runId } });
@@ -330,6 +408,17 @@ async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string,
   const automation = await prisma.automation.findUnique({ where: { id: run.automationId }, select: { createdById: true, name: true } });
   const systemUserId = automation?.createdById;
 
+  // Merge tokens contributed by the run's own history rather than the contact record:
+  // {{webhook.*}} from the inbound trigger's payload (if any), and {{http.<name>.*}} from
+  // any earlier Webhook step in this same run that saved its response under a variable name.
+  // Rebuilt fresh each time runLoop starts (including on resume), and extended in place below
+  // whenever a later Webhook step captures a new response.
+  let storedVariables: Record<string, Record<string, unknown>> = run.variables ? JSON.parse(run.variables) : {};
+  const dynamicValues: Record<string, string> = {
+    ...(run.payload ? flattenForMergeTags("webhook", JSON.parse(run.payload)) : {}),
+    ...Object.fromEntries(Object.entries(storedVariables).flatMap(([name, value]) => Object.entries(flattenForMergeTags(`http.${name}`, value)))),
+  };
+
   let currentNodeId: string | undefined = startNodeId;
 
   try {
@@ -356,7 +445,7 @@ async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string,
           }
 
           const data = node.data as { subject?: string; body?: string; cc?: string; fromEmail?: string };
-          const mergeValues = contactMergeValues(contact);
+          const mergeValues = { ...contactMergeValues(contact), ...dynamicValues };
           const subject = applyMergeTags(data.subject ?? "", mergeValues);
           const body = applyMergeTags(data.body ?? "", mergeValues);
           const cc = data.cc ? applyMergeTags(data.cc, mergeValues) : undefined;
@@ -631,7 +720,7 @@ async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string,
           if (!systemUserId) throw new Error("Could not resolve a creator for this task");
 
           const contact = run.contactId ? await prisma.contact.findUnique({ where: { id: run.contactId } }) : null;
-          const mergeValues = contact ? contactMergeValues(contact) : {};
+          const mergeValues = { ...(contact ? contactMergeValues(contact) : {}), ...dynamicValues };
           const title = applyMergeTags(data.title || "Untitled task", mergeValues);
           const description = data.description ? applyMergeTags(data.description, mergeValues) : undefined;
           const assigneeId = await resolveAssignee(data.assigneeMode, data.assigneeId, data.roundRobinUserIds, node.id);
@@ -662,7 +751,7 @@ async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string,
           if (!data.title) throw new Error("No title configured for this step");
 
           const contact = run.contactId ? await prisma.contact.findUnique({ where: { id: run.contactId } }) : null;
-          const mergeValues = contact ? contactMergeValues(contact) : {};
+          const mergeValues = { ...(contact ? contactMergeValues(contact) : {}), ...dynamicValues };
           const title = applyMergeTags(data.title, mergeValues);
           const content = data.content ? applyMergeTags(data.content, mergeValues) : "";
 
@@ -688,7 +777,7 @@ async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string,
             const field = data.field && CONTACT_TEXT_FIELDS.includes(data.field) ? data.field : "notes";
 
             const contact = await prisma.contact.findUnique({ where: { id: run.contactId } });
-            const mergeValues = contact ? contactMergeValues(contact) : {};
+            const mergeValues = { ...(contact ? contactMergeValues(contact) : {}), ...dynamicValues };
             const prompt = applyMergeTags(data.prompt, mergeValues);
 
             const result = await runAiPrompt(prompt);
@@ -716,7 +805,7 @@ async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string,
             if (!stage) throw new Error("Configured stage no longer exists");
 
             const contact = await prisma.contact.findUnique({ where: { id: run.contactId } });
-            const mergeValues = contact ? contactMergeValues(contact) : {};
+            const mergeValues = { ...(contact ? contactMergeValues(contact) : {}), ...dynamicValues };
             const name = applyMergeTags(data.name || contact?.name || "New opportunity", mergeValues);
 
             const opportunity = await prisma.opportunity.create({
@@ -744,7 +833,7 @@ async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string,
             if (!data.field || !CONTACT_TEXT_FIELDS.includes(data.field)) throw new Error("No field configured for this step");
 
             const contact = await prisma.contact.findUnique({ where: { id: run.contactId } });
-            const mergeValues = contact ? contactMergeValues(contact) : {};
+            const mergeValues = { ...(contact ? contactMergeValues(contact) : {}), ...dynamicValues };
             const value = applyMergeTags(data.value ?? "", mergeValues);
 
             await prisma.contact.update({ where: { id: run.contactId }, data: { [data.field]: value } });
@@ -815,7 +904,7 @@ async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string,
           if (!recipientId) throw new Error("No recipient configured for this step");
 
           const contact = run.contactId ? await prisma.contact.findUnique({ where: { id: run.contactId } }) : null;
-          const mergeValues = contact ? contactMergeValues(contact) : {};
+          const mergeValues = { ...(contact ? contactMergeValues(contact) : {}), ...dynamicValues };
           const title = applyMergeTags(data.title || "Automation notification", mergeValues);
           const body = applyMergeTags(data.body || "", mergeValues);
 
@@ -834,39 +923,91 @@ async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string,
 
       if (node.type === "webhook") {
         try {
-          const data = node.data as { url?: string; extraFields?: { key: string; value: string }[] };
+          const data = node.data as {
+            url?: string;
+            method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+            extraFields?: { key: string; value: string }[];
+            headers?: { key: string; value: string }[];
+            authType?: "none" | "bearer" | "basic" | "header";
+            authToken?: string;
+            authUsername?: string;
+            authPassword?: string;
+            authHeaderName?: string;
+            authHeaderValue?: string;
+            bodyMode?: "auto" | "raw";
+            rawBody?: string;
+            responseVariable?: string;
+          };
           if (!data.url) throw new Error("No URL configured for this step");
 
           const contact = run.contactId ? await prisma.contact.findUnique({ where: { id: run.contactId } }) : null;
-          const mergeValues = contact ? contactMergeValues(contact) : {};
-          const extra: Record<string, string> = {};
-          for (const field of data.extraFields ?? []) {
-            if (field.key) extra[field.key] = applyMergeTags(field.value ?? "", mergeValues);
+          const mergeValues = { ...(contact ? contactMergeValues(contact) : {}), ...dynamicValues };
+          const method = data.method || "POST";
+          const url = applyMergeTags(data.url, mergeValues);
+          const hasBody = method === "POST" || method === "PUT" || method === "PATCH";
+
+          const headers: Record<string, string> = {};
+          if (hasBody) headers["Content-Type"] = "application/json";
+          for (const h of data.headers ?? []) {
+            if (h.key) headers[h.key] = applyMergeTags(h.value ?? "", mergeValues);
+          }
+          if (data.authType === "bearer" && data.authToken) {
+            headers["Authorization"] = `Bearer ${applyMergeTags(data.authToken, mergeValues)}`;
+          } else if (data.authType === "basic" && data.authUsername) {
+            const user = applyMergeTags(data.authUsername, mergeValues);
+            const pass = applyMergeTags(data.authPassword ?? "", mergeValues);
+            headers["Authorization"] = `Basic ${Buffer.from(`${user}:${pass}`).toString("base64")}`;
+          } else if (data.authType === "header" && data.authHeaderName) {
+            headers[data.authHeaderName] = applyMergeTags(data.authHeaderValue ?? "", mergeValues);
           }
 
-          const payload = {
-            automationId: run.automationId,
-            automationName: automation?.name ?? "",
-            runId: run.id,
-            triggeredAt: new Date().toISOString(),
-            contact: contact ? { id: contact.id, name: contact.name, email: contact.email } : null,
-            extra,
-          };
+          let body: string | undefined;
+          if (hasBody) {
+            if (data.bodyMode === "raw") {
+              body = applyMergeTags(data.rawBody ?? "", mergeValues);
+            } else {
+              const extra: Record<string, string> = {};
+              for (const field of data.extraFields ?? []) {
+                if (field.key) extra[field.key] = applyMergeTags(field.value ?? "", mergeValues);
+              }
+              body = JSON.stringify({
+                automationId: run.automationId,
+                automationName: automation?.name ?? "",
+                runId: run.id,
+                triggeredAt: new Date().toISOString(),
+                contact: contact ? { id: contact.id, name: contact.name, email: contact.email } : null,
+                extra,
+              });
+            }
+          }
 
           const controller = new AbortController();
           const timeout = setTimeout(() => controller.abort(), WEBHOOK_TIMEOUT_MS);
+          let responseText = "";
           try {
-            const res = await fetch(data.url, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(payload),
-              signal: controller.signal,
-            });
-            if (!res.ok) throw new Error(`Webhook responded with ${res.status}`);
+            const res = await fetch(url, { method, headers, body, signal: controller.signal });
+            responseText = await res.text().catch(() => "");
+            if (!res.ok) throw new Error(`Webhook responded with ${res.status}${responseText ? `: ${responseText.slice(0, 200)}` : ""}`);
           } finally {
             clearTimeout(timeout);
           }
-          await logStep(run.id, node.id, node.type, "success", `Posted to ${data.url}`);
+
+          let detail = `${method} ${url}`;
+          if (data.responseVariable?.trim()) {
+            const varName = data.responseVariable.trim();
+            let parsed: unknown;
+            try {
+              parsed = responseText ? JSON.parse(responseText) : {};
+            } catch {
+              parsed = { value: responseText };
+            }
+            const varObj = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : { value: parsed };
+            storedVariables = { ...storedVariables, [varName]: varObj };
+            await prisma.automationRun.update({ where: { id: run.id }, data: { variables: JSON.stringify(storedVariables) } });
+            Object.assign(dynamicValues, flattenForMergeTags(`http.${varName}`, varObj));
+            detail += ` → saved response as "${varName}"`;
+          }
+          await logStep(run.id, node.id, node.type, "success", detail);
         } catch (err) {
           await logStep(run.id, node.id, node.type, "error", err instanceof Error ? err.message : "Unknown error");
           throw err;

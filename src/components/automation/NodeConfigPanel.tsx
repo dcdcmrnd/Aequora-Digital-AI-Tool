@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Copy, Plus as PlusIcon, X, Trash2 } from "lucide-react";
+import { Copy, Plus as PlusIcon, RefreshCw, X, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
 
 import { EmailBodyEditor } from "@/components/automation/EmailBodyEditor";
@@ -35,6 +35,7 @@ const TRIGGER_OPTIONS: { value: AutomationTriggerType; label: string }[] = [
   { value: "task_completed", label: "Task Completed" },
   { value: "note_added", label: "Note Added" },
   { value: "email_opened", label: "Email Opened" },
+  { value: "webhook_received", label: "Webhook Received" },
 ];
 
 const CONTACTLESS_TRIGGERS: AutomationTriggerType[] = ["task_completed", "note_added"];
@@ -91,6 +92,7 @@ export function NodeConfigPanel({ node, stages, automationId, onClose, onSave, o
   const [projects, setProjects] = useState<SimpleProject[]>([]);
   const [categories, setCategories] = useState<SimpleCategory[]>([]);
   const [automations, setAutomations] = useState<Automation[]>([]);
+  const [regeneratingSecret, setRegeneratingSecret] = useState(false);
 
   useEffect(() => {
     setData(node.data);
@@ -189,6 +191,31 @@ export function NodeConfigPanel({ node, stages, automationId, onClose, onSave, o
     onSave(data);
   }
 
+  async function handleCopyWebhookUrl(url: string) {
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Webhook URL copied");
+    } catch {
+      toast.error("Couldn't copy — copy it manually instead.");
+    }
+  }
+
+  async function handleRegenerateWebhookSecret() {
+    if (!automationId) return;
+    setRegeneratingSecret(true);
+    try {
+      const res = await fetch(`/api/automations/${automationId}/webhook-secret`, { method: "POST" });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error ?? "Failed to regenerate webhook URL.");
+      setAutomations((prev) => prev.map((a) => (a.id === automationId ? { ...a, webhookSecret: result.webhookSecret } : a)));
+      toast.success("Webhook URL regenerated — update any senders using the old one.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to regenerate webhook URL.");
+    } finally {
+      setRegeneratingSecret(false);
+    }
+  }
+
   const rules = (data.rules as ConditionRule[] | undefined) ?? [];
   const inCompoundMode = rules.length > 0;
 
@@ -271,6 +298,17 @@ export function NodeConfigPanel({ node, stages, automationId, onClose, onSave, o
                   </SelectContent>
                 </Select>
               </Field>
+            )}
+            {data.triggerType === "webhook_received" && (
+              <WebhookTriggerFields
+                automationId={automationId}
+                webhookSecret={automations.find((a) => a.id === automationId)?.webhookSecret}
+                data={data}
+                onChange={set}
+                onCopy={handleCopyWebhookUrl}
+                onRegenerate={handleRegenerateWebhookSecret}
+                regenerating={regeneratingSecret}
+              />
             )}
             {CONTACTLESS_TRIGGERS.includes(data.triggerType as AutomationTriggerType) && (
               <p className="text-text-muted text-xs">
@@ -1162,8 +1200,87 @@ function AssigneeFields({
   );
 }
 
+/** Config UI for the inbound "Webhook Received" trigger — the URL an external app POSTs to, and how to map that payload to a contact. */
+function WebhookTriggerFields({
+  automationId, webhookSecret, data, onChange, onCopy, onRegenerate, regenerating,
+}: {
+  automationId?: string;
+  webhookSecret?: string;
+  data: Record<string, unknown>;
+  onChange: (key: string, value: unknown) => void;
+  onCopy: (url: string) => void;
+  onRegenerate: () => void;
+  regenerating: boolean;
+}) {
+  if (!automationId || !webhookSecret) {
+    return <p className="text-text-muted text-xs">Save this automation first, then reopen this step to get its webhook URL.</p>;
+  }
+
+  const url = `${window.location.origin}/api/automations/webhook/${webhookSecret}`;
+
+  return (
+    <>
+      <Field label="Webhook URL" hint="POST JSON here to trigger this automation">
+        <div className="flex gap-1.5">
+          <Input value={url} readOnly className="flex-1 font-mono text-xs" />
+          <Button type="button" variant="secondary" size="sm" onClick={() => onCopy(url)} title="Copy">
+            <Copy className="size-3.5" />
+          </Button>
+        </div>
+      </Field>
+      <button
+        type="button"
+        onClick={onRegenerate}
+        disabled={regenerating}
+        className="text-danger flex items-center gap-1 text-xs font-medium hover:underline disabled:opacity-50"
+      >
+        <RefreshCw className={`size-3 ${regenerating ? "animate-spin" : ""}`} />
+        Regenerate URL (invalidates the old one)
+      </button>
+
+      <div className="border-border space-y-3 border-t pt-3">
+        <Field label="Match contact by" hint="key in the incoming JSON body">
+          <Input value={(data.contactField as string) ?? ""} onChange={(e) => onChange("contactField", e.target.value)} placeholder="email" />
+        </Field>
+        <label className="flex items-center gap-2 text-sm text-text-secondary select-none">
+          <input
+            type="checkbox"
+            checked={(data.createContact as boolean) ?? false}
+            onChange={(e) => onChange("createContact", e.target.checked)}
+            className="h-4 w-4 rounded border-border text-brand-primary focus:ring-brand-primary"
+          />
+          Create a contact if none match
+        </label>
+        {(data.createContact as boolean) && (
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Name field" hint="optional">
+              <Input value={(data.nameField as string) ?? ""} onChange={(e) => onChange("nameField", e.target.value)} placeholder="name" />
+            </Field>
+            <Field label="Phone field" hint="optional">
+              <Input value={(data.phoneField as string) ?? ""} onChange={(e) => onChange("phoneField", e.target.value)} placeholder="phone" />
+            </Field>
+            <Field label="Company field" hint="optional">
+              <Input value={(data.companyField as string) ?? ""} onChange={(e) => onChange("companyField", e.target.value)} placeholder="company" />
+            </Field>
+          </div>
+        )}
+        <p className="text-text-muted text-xs">
+          Every field in the incoming JSON body is available to later steps as{" "}
+          <code className="rounded bg-surface-secondary px-1">{"{{webhook.fieldname}}"}</code>. If no contact matches
+          (and creation is off), the run continues without a contact — pair it with contact-independent steps.
+        </p>
+      </div>
+    </>
+  );
+}
+
 function WebhookFields({ data, onChange }: { data: Record<string, unknown>; onChange: (key: string, value: unknown) => void }) {
   const extraFields = (data.extraFields as { key: string; value: string }[]) ?? [];
+  const headerFields = (data.headers as { key: string; value: string }[]) ?? [];
+  const method = (data.method as string) ?? "POST";
+  const hasBody = method === "POST" || method === "PUT" || method === "PATCH";
+  const authType = (data.authType as string) ?? "none";
+  const bodyMode = (data.bodyMode as string) ?? "auto";
 
   function updateField(i: number, patch: Partial<{ key: string; value: string }>) {
     onChange("extraFields", extraFields.map((f, idx) => (idx === i ? { ...f, ...patch } : f)));
@@ -1175,31 +1292,154 @@ function WebhookFields({ data, onChange }: { data: Record<string, unknown>; onCh
     onChange("extraFields", [...extraFields, { key: "", value: "" }]);
   }
 
+  function updateHeader(i: number, patch: Partial<{ key: string; value: string }>) {
+    onChange("headers", headerFields.map((f, idx) => (idx === i ? { ...f, ...patch } : f)));
+  }
+  function removeHeader(i: number) {
+    onChange("headers", headerFields.filter((_, idx) => idx !== i));
+  }
+  function addHeader() {
+    onChange("headers", [...headerFields, { key: "", value: "" }]);
+  }
+
   return (
     <>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Method">
+          <Select value={method} onValueChange={(v) => onChange("method", v)}>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="GET">GET</SelectItem>
+              <SelectItem value="POST">POST</SelectItem>
+              <SelectItem value="PUT">PUT</SelectItem>
+              <SelectItem value="PATCH">PATCH</SelectItem>
+              <SelectItem value="DELETE">DELETE</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label="Authentication">
+          <Select value={authType} onValueChange={(v) => onChange("authType", v)}>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">None</SelectItem>
+              <SelectItem value="bearer">Bearer token</SelectItem>
+              <SelectItem value="basic">Basic auth</SelectItem>
+              <SelectItem value="header">Custom header</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+      </div>
+
       <Field label="URL">
         <Input value={(data.url as string) ?? ""} onChange={(e) => onChange("url", e.target.value)} placeholder="https://..." />
       </Field>
+
+      {authType === "bearer" && (
+        <Field label="Token">
+          <Input value={(data.authToken as string) ?? ""} onChange={(e) => onChange("authToken", e.target.value)} placeholder="Merge tags work here" />
+        </Field>
+      )}
+      {authType === "basic" && (
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Username">
+            <Input value={(data.authUsername as string) ?? ""} onChange={(e) => onChange("authUsername", e.target.value)} />
+          </Field>
+          <Field label="Password">
+            <Input type="password" value={(data.authPassword as string) ?? ""} onChange={(e) => onChange("authPassword", e.target.value)} />
+          </Field>
+        </div>
+      )}
+      {authType === "header" && (
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Header name">
+            <Input value={(data.authHeaderName as string) ?? ""} onChange={(e) => onChange("authHeaderName", e.target.value)} placeholder="X-Api-Key" />
+          </Field>
+          <Field label="Header value">
+            <Input value={(data.authHeaderValue as string) ?? ""} onChange={(e) => onChange("authHeaderValue", e.target.value)} />
+          </Field>
+        </div>
+      )}
+
       <div>
-        <p className="text-text-secondary mb-1.5 text-xs font-medium">Extra fields</p>
+        <p className="text-text-secondary mb-1.5 text-xs font-medium">Headers</p>
         <div className="space-y-2">
-          {extraFields.map((f, i) => (
+          {headerFields.map((f, i) => (
             <div key={i} className="flex gap-1.5">
-              <Input value={f.key} onChange={(e) => updateField(i, { key: e.target.value })} placeholder="key" className="w-24" />
-              <Input value={f.value} onChange={(e) => updateField(i, { value: e.target.value })} placeholder="value" className="flex-1" />
-              <button type="button" onClick={() => removeField(i)} className="text-text-muted hover:text-danger">
+              <Input value={f.key} onChange={(e) => updateHeader(i, { key: e.target.value })} placeholder="key" className="w-24" />
+              <Input value={f.value} onChange={(e) => updateHeader(i, { value: e.target.value })} placeholder="value" className="flex-1" />
+              <button type="button" onClick={() => removeHeader(i)} className="text-text-muted hover:text-danger">
                 <Trash2 className="size-4" />
               </button>
             </div>
           ))}
         </div>
-        <button type="button" onClick={addField} className="text-brand-primary mt-2 flex items-center gap-1 text-xs font-medium hover:underline">
+        <button type="button" onClick={addHeader} className="text-brand-primary mt-2 flex items-center gap-1 text-xs font-medium hover:underline">
           <PlusIcon className="size-3" />
-          Add field
+          Add header
         </button>
       </div>
+
+      {hasBody && (
+        <>
+          <Field label="Body">
+            <Select value={bodyMode} onValueChange={(v) => onChange("bodyMode", v)}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="auto">Automation + contact info, plus fields below</SelectItem>
+                <SelectItem value="raw">Raw JSON</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+
+          {bodyMode === "raw" ? (
+            <Field label="Raw body" hint="merge tags work here">
+              <Textarea
+                value={(data.rawBody as string) ?? ""}
+                onChange={(e) => onChange("rawBody", e.target.value)}
+                rows={5}
+                className="font-mono text-xs"
+              />
+            </Field>
+          ) : (
+            <div>
+              <p className="text-text-secondary mb-1.5 text-xs font-medium">Extra fields</p>
+              <div className="space-y-2">
+                {extraFields.map((f, i) => (
+                  <div key={i} className="flex gap-1.5">
+                    <Input value={f.key} onChange={(e) => updateField(i, { key: e.target.value })} placeholder="key" className="w-24" />
+                    <Input value={f.value} onChange={(e) => updateField(i, { value: e.target.value })} placeholder="value" className="flex-1" />
+                    <button type="button" onClick={() => removeField(i)} className="text-text-muted hover:text-danger">
+                      <Trash2 className="size-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <button type="button" onClick={addField} className="text-brand-primary mt-2 flex items-center gap-1 text-xs font-medium hover:underline">
+                <PlusIcon className="size-3" />
+                Add field
+              </button>
+            </div>
+          )}
+        </>
+      )}
+
+      <Field label="Save response as" hint="optional">
+        <Input
+          value={(data.responseVariable as string) ?? ""}
+          onChange={(e) => onChange("responseVariable", e.target.value)}
+          placeholder="e.g. lookup"
+        />
+      </Field>
       <p className="text-text-muted text-xs">
-        Always includes automation, run, and contact info automatically — extra fields are merged in alongside them. Merge tags work in values.
+        Merge tags work in the URL, auth, headers, and body. If you name a response variable, later steps can
+        reference fields from the JSON response as{" "}
+        <code className="rounded bg-surface-secondary px-1">{"{{http.<name>.<field>}}"}</code>.
       </p>
     </>
   );
