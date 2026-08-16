@@ -5,37 +5,56 @@ import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
-import { Bold, Code2, Image as ImageIcon, Italic, Link2, Underline as UnderlineIcon } from "lucide-react";
+import { Bold, Image as ImageIcon, Italic, Link2, Underline as UnderlineIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-// Trimmed version of automation/EmailBodyEditor.tsx's TipTap setup -- same extension family,
-// minus the email-specific merge tags/font-color/insert-button tooling this doesn't need.
 interface RichTextEditorProps {
-  value: string;
+  html: string;
   onChange: (html: string) => void;
+  /** Called once on blur/click-away, after the final onChange -- lets the caller exit edit mode. */
+  onDone?: () => void;
+  autoFocus?: boolean;
 }
 
-export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
-  const [mode, setMode] = useState<"design" | "html">("design");
-  const fileInputRef = useRef<HTMLInputElement>(null);
+/**
+ * True inline editing: mounted directly in place of a block's static rendering (see
+ * EditableTextBlock.tsx), styled to match .site-content exactly so there's no visual jump
+ * between "not editing" and "editing" -- only a small floating toolbar above it gives it away.
+ * Lazily mounted (one instance, only for whichever block is currently selected/being edited) per
+ * this session's research: many simultaneous TipTap/ProseMirror instances is untested territory
+ * in this codebase, so only ever one is live at a time.
+ */
+export function RichTextEditor({ html, onChange, onDone, autoFocus }: RichTextEditorProps) {
   const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const editor = useEditor({
     extensions: [StarterKit.configure({ link: false }), Image, Link.configure({ openOnClick: false })],
-    content: value,
+    content: html,
     onUpdate: ({ editor }) => onChange(editor.getHTML()),
-    editorProps: {
-      attributes: { class: "prose prose-sm max-w-none min-h-[120px] px-3 py-2 focus:outline-none" },
-    },
+    editorProps: { attributes: { class: "site-content outline-none" } },
     immediatelyRender: false,
+    autofocus: autoFocus ? "end" : false,
   });
 
+  // Deliberately NOT TipTap's own onBlur lifecycle hook -- that fires whenever the contentEditable
+  // itself loses focus, including when focus moves to THIS component's own toolbar (a button or
+  // the heading select), which would exit edit mode mid-format. Instead, a single onBlur on the
+  // outer container (React's onBlur bubbles, unlike native focusout... it's actually built on
+  // focusout, which does bubble) checks relatedTarget -- only treat it as "really done" if focus
+  // landed outside this whole container, not on a toolbar control within it.
+  function handleContainerBlur(e: React.FocusEvent<HTMLDivElement>) {
+    if (!containerRef.current?.contains(e.relatedTarget as Node | null)) onDone?.();
+  }
+
+  // Uncontrolled internally -- only re-sync if the external value diverges for a reason other
+  // than this editor's own typing (e.g. switching which block is selected).
   useEffect(() => {
-    if (!editor || mode !== "design") return;
-    if (value !== editor.getHTML()) editor.commands.setContent(value, { emitUpdate: false });
+    if (editor && html !== editor.getHTML()) editor.commands.setContent(html, { emitUpdate: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, editor]);
+  }, [editor]);
 
   async function handleImagePick(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -75,57 +94,39 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
   }
 
   return (
-    <div className="rounded-input border border-border bg-white overflow-hidden">
-      <div className="flex flex-wrap items-center gap-1 border-b border-border bg-surface-secondary px-2 py-1.5">
+    <div ref={containerRef} className="relative" onClick={(e) => e.stopPropagation()} onBlur={handleContainerBlur}>
+      <div className="absolute -top-10 left-0 z-20 flex items-center gap-0.5 rounded-md border border-border bg-white px-1 py-1 shadow-md">
         <select
-          disabled={mode === "html"}
           value={currentBlockType}
           onChange={(e) => handleBlockTypeChange(e.target.value)}
-          className="border-border mr-1 rounded border bg-white px-1.5 py-1 text-xs disabled:cursor-not-allowed disabled:opacity-50"
+          className="border-border mr-0.5 rounded border bg-white px-1 py-1 text-xs"
         >
-          <option value="paragraph">Paragraph</option>
+          <option value="paragraph">Text</option>
           <option value="h1">Heading 1</option>
           <option value="h2">Heading 2</option>
           <option value="h3">Heading 3</option>
         </select>
-        <ToolbarButton title="Bold" active={editor?.isActive("bold")} disabled={mode === "html"} onClick={() => editor?.chain().focus().toggleBold().run()}>
+        <ToolbarButton title="Bold" active={editor?.isActive("bold")} onClick={() => editor?.chain().focus().toggleBold().run()}>
           <Bold className="size-3.5" />
         </ToolbarButton>
-        <ToolbarButton title="Italic" active={editor?.isActive("italic")} disabled={mode === "html"} onClick={() => editor?.chain().focus().toggleItalic().run()}>
+        <ToolbarButton title="Italic" active={editor?.isActive("italic")} onClick={() => editor?.chain().focus().toggleItalic().run()}>
           <Italic className="size-3.5" />
         </ToolbarButton>
-        <ToolbarButton title="Underline" active={editor?.isActive("underline")} disabled={mode === "html"} onClick={() => editor?.chain().focus().toggleUnderline().run()}>
+        <ToolbarButton title="Underline" active={editor?.isActive("underline")} onClick={() => editor?.chain().focus().toggleUnderline().run()}>
           <UnderlineIcon className="size-3.5" />
         </ToolbarButton>
-        <ToolbarButton title="Insert link" disabled={mode === "html"} onClick={handleInsertLink}>
+        <ToolbarButton title="Insert link" onClick={handleInsertLink}>
           <Link2 className="size-3.5" />
         </ToolbarButton>
-        <ToolbarButton title="Insert image" disabled={mode === "html" || uploading} onClick={() => fileInputRef.current?.click()}>
+        <ToolbarButton title="Insert image" disabled={uploading} onClick={() => fileInputRef.current?.click()}>
           <ImageIcon className="size-3.5" />
         </ToolbarButton>
         <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImagePick} className="hidden" />
-
-        <div className="ml-auto flex items-center gap-1 text-xs">
-          <button type="button" onClick={() => setMode("design")} className={cn("rounded px-2 py-1", mode === "design" ? "text-text-primary bg-white shadow-sm" : "text-text-muted")}>
-            Design
-          </button>
-          <button type="button" onClick={() => setMode("html")} className={cn("flex items-center gap-1 rounded px-2 py-1", mode === "html" ? "text-text-primary bg-white shadow-sm" : "text-text-muted")}>
-            <Code2 className="size-3" />
-            HTML
-          </button>
-        </div>
       </div>
 
-      {mode === "design" ? (
+      <div className="rounded-md ring-2 ring-brand-primary/40">
         <EditorContent editor={editor} />
-      ) : (
-        <textarea
-          rows={6}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-full resize-none border-0 px-3 py-2 font-mono text-xs focus:outline-none"
-        />
-      )}
+      </div>
     </div>
   );
 }
@@ -135,11 +136,19 @@ function ToolbarButton({ children, onClick, active, disabled, title }: { childre
     <button
       type="button"
       title={title}
-      onClick={onClick}
+      // Without this, clicking a toolbar button blurs the contentEditable FIRST (buttons steal
+      // focus on mousedown), which fires the editor's onBlur/onDone before the click's format
+      // action even applies -- exiting edit mode mid-click. preventDefault on mousedown keeps
+      // focus (and the current text selection) in the editor throughout the click.
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
       disabled={disabled}
       className={cn(
-        "text-text-secondary rounded px-1.5 py-1 text-xs hover:bg-white disabled:cursor-not-allowed disabled:opacity-50",
-        active && "text-brand-primary bg-white shadow-sm",
+        "text-text-secondary rounded px-1.5 py-1 text-xs hover:bg-surface-secondary disabled:cursor-not-allowed disabled:opacity-50",
+        active && "text-brand-primary bg-surface-secondary",
       )}
     >
       {children}

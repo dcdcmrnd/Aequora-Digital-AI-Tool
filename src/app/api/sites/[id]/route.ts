@@ -13,6 +13,7 @@ const updateSchema = z.object({
   slug: z.string().regex(SLUG_PATTERN, "Slug must be lowercase letters, numbers, and hyphens only.").optional(),
   contactId: z.string().nullable().optional(),
   status: z.enum(["draft", "published", "archived"]).optional(),
+  themeTokens: z.string().optional(),
 });
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
@@ -52,6 +53,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (clash) return NextResponse.json({ error: "That slug is already in use." }, { status: 409 });
   }
 
+  if (parsed.data.themeTokens !== undefined) {
+    try {
+      JSON.parse(parsed.data.themeTokens);
+    } catch {
+      return NextResponse.json({ error: "themeTokens must be valid JSON." }, { status: 400 });
+    }
+  }
+
   const site = await prisma.site.update({
     where: { id: params.id },
     data: {
@@ -59,6 +68,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       ...(parsed.data.slug !== undefined && { slug: parsed.data.slug }),
       ...(parsed.data.contactId !== undefined && { contactId: parsed.data.contactId }),
       ...(parsed.data.status !== undefined && { status: parsed.data.status }),
+      ...(parsed.data.themeTokens !== undefined && { themeTokens: parsed.data.themeTokens }),
     },
   });
 

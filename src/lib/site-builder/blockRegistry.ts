@@ -1,4 +1,4 @@
-import { Image as ImageIcon, LayoutPanelTop, MousePointerClick, MoveVertical, Type, Video, type LucideIcon } from "lucide-react";
+import { Columns as ColumnsIcon, Image as ImageIcon, LayoutPanelTop, MousePointerClick, MoveVertical, RectangleHorizontal, Type, Video, type LucideIcon } from "lucide-react";
 
 import type { BlockType } from "./types";
 
@@ -23,6 +23,25 @@ export const BLOCK_DEFINITIONS: Record<BlockType, BlockDefinition> = {
     canHaveChildren: true,
     defaultProps: () => ({}),
     defaultStyle: () => ({ padding: "48px 24px" }),
+  },
+  columns: {
+    category: "Layout",
+    label: "Columns",
+    icon: ColumnsIcon,
+    accent: "bg-indigo-50 text-indigo-600",
+    canHaveChildren: true,
+    defaultProps: () => ({}),
+  },
+  column: {
+    category: "Layout",
+    label: "Column",
+    icon: RectangleHorizontal,
+    accent: "bg-indigo-50 text-indigo-600",
+    canHaveChildren: true,
+    // Created only as a "columns" block's children (via createColumnsBlock() in
+    // sectionTemplates.ts) or by that block's own "Add Column" action -- not offered in the
+    // atomic block picker directly, see PICKABLE_BLOCK_TYPES below.
+    defaultProps: () => ({ widthPercent: 50 }),
   },
   text: {
     category: "Content",
@@ -70,4 +89,6 @@ export const BLOCK_CATEGORIES: BlockCategory[] = ["Layout", "Content", "Media"];
 
 export const PICKABLE_BLOCK_TYPES: { type: BlockType; category: BlockCategory }[] = (
   Object.entries(BLOCK_DEFINITIONS) as [BlockType, BlockDefinition][]
-).map(([type, def]) => ({ type, category: def.category }));
+)
+  .filter(([type]) => type !== "column") // only ever created as a "columns" block's own child
+  .map(([type, def]) => ({ type, category: def.category }));

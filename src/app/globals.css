@@ -26,11 +26,21 @@
      deliberately NOT the app's 14px CRM density (body above), since a marketing page needs a
      normal web type scale. Element-level rules give TipTap-authored HTML (Text blocks) sensible
      default heading/paragraph sizing WITHOUT Tailwind Typography's opinionated "prose" scale,
-     which would otherwise override a block's own Style-tab font-size (see TextBlock.tsx). */
+     which would otherwise override a block's own Style-tab font-size (see TextBlock.tsx).
+     Colors/fonts reference --site-* custom properties (with fallbacks) injected by
+     themeTokensToCssVars() in theme.ts -- both the public page and the editor canvas set these
+     identically from the same Site.themeTokens, so neither can drift from the other. */
   .site-content {
+    font-family: var(--site-font-body, Inter), sans-serif;
     font-size: 16px;
     line-height: 1.6;
-    color: #1f2937;
+    color: var(--site-color-text, #1f2937);
+    background-color: var(--site-color-background, transparent);
+  }
+  .site-content h1,
+  .site-content h2,
+  .site-content h3 {
+    font-family: var(--site-font-heading, Inter), sans-serif;
   }
   .site-content h1 {
     @apply mb-4 text-4xl font-bold leading-tight;
@@ -51,7 +61,8 @@
     @apply mb-4 list-decimal pl-6;
   }
   .site-content a {
-    @apply text-brand-primary underline;
+    color: var(--site-color-primary, #0f7b8a);
+    @apply underline;
   }
   .site-content img {
     @apply h-auto max-w-full rounded-md;

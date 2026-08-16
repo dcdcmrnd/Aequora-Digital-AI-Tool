@@ -102,7 +102,19 @@ export function useSite(siteId: string) {
     onError: (error) => toast.error(toastErrorMessage(error, "Failed to delete page")),
   });
 
-  return { ...query, site: query.data?.site, createPage, publishPage, deletePage };
+  const updateThemeTokens = useMutation({
+    mutationFn: (themeTokens: string) =>
+      apiFetch<{ site: Site }>(`/api/sites/${siteId}`, { method: "PATCH", body: JSON.stringify({ themeTokens }) }),
+    onSuccess: (data) => {
+      queryClient.setQueryData<{ site: Omit<Site, "pages"> & { pages: Page[] } } | undefined>(["site", siteId], (prev) =>
+        prev ? { site: { ...prev.site, themeTokens: data.site.themeTokens } } : prev,
+      );
+      toast.success("Design updated");
+    },
+    onError: (error) => toast.error(toastErrorMessage(error, "Failed to update design")),
+  });
+
+  return { ...query, site: query.data?.site, createPage, publishPage, deletePage, updateThemeTokens };
 }
 
 /** Silent autosave for the editor -- no toast, and patches the cached site directly instead of refetching, so typing never causes a network-round-trip flicker. */

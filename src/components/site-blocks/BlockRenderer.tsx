@@ -1,5 +1,6 @@
 import type { BlockNode } from "@/lib/site-builder/types";
 import { SectionBlock } from "./SectionBlock";
+import { ColumnsBlock, ColumnBlock } from "./ColumnsBlock";
 import { TextBlock } from "./TextBlock";
 import { ButtonBlock } from "./ButtonBlock";
 import { ImageBlock } from "./ImageBlock";
@@ -25,6 +26,10 @@ export function BlockPreview({ block }: { block: BlockNode }) {
   switch (block.type) {
     case "section":
       return <SectionBlock block={block} />;
+    case "columns":
+      return <ColumnsBlock block={block} />;
+    case "column":
+      return <ColumnBlock block={block} />;
     case "text":
       return <TextBlock block={block} />;
     case "button":

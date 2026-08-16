@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { BlockList } from "@/components/site-blocks/BlockRenderer";
+import { googleFontsHref } from "@/lib/site-builder/designPresets";
 import { parseContent } from "@/lib/site-builder/render";
+import { parseThemeTokens, themeTokensToCssVars } from "@/lib/site-builder/theme";
 import { prisma } from "@/lib/prisma";
 
 // This route group has no layout (unlike (app)'s, which is the only place that ever calls
@@ -25,12 +27,13 @@ async function findPublishedPage(siteSlug: string, pageSlug?: string[]) {
     : await prisma.page.findFirst({ where: { siteId: site.id, isHomepage: true } });
 
   if (!page || page.status !== "published") return null;
-  return page;
+  return { site, page };
 }
 
 export async function generateMetadata({ params }: PageParams): Promise<Metadata> {
-  const page = await findPublishedPage(params.siteSlug, params.pageSlug);
-  if (!page) return {};
+  const found = await findPublishedPage(params.siteSlug, params.pageSlug);
+  if (!found) return {};
+  const { page } = found;
   return {
     title: page.metaTitle || page.title,
     description: page.metaDescription || undefined,
@@ -41,14 +44,19 @@ export async function generateMetadata({ params }: PageParams): Promise<Metadata
 }
 
 export default async function PublicPage({ params }: PageParams) {
-  const page = await findPublishedPage(params.siteSlug, params.pageSlug);
-  if (!page) notFound();
+  const found = await findPublishedPage(params.siteSlug, params.pageSlug);
+  if (!found) notFound();
 
-  const content = parseContent(page.publishedContent);
+  const content = parseContent(found.page.publishedContent);
+  const themeTokens = parseThemeTokens(found.site.themeTokens);
 
   return (
-    <main className="site-content mx-auto max-w-5xl">
-      <BlockList blocks={content.blocks} />
-    </main>
+    <>
+      {/* eslint-disable-next-line @next/next/no-page-custom-font -- dynamic curated font set (Site Design), not a fixed build-time next/font import */}
+      <link rel="stylesheet" href={googleFontsHref()} />
+      <main className="site-content mx-auto max-w-5xl" style={themeTokensToCssVars(themeTokens)}>
+        <BlockList blocks={content.blocks} />
+      </main>
+    </>
   );
 }
