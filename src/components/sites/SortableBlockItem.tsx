@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
@@ -28,11 +28,21 @@ export function SortableBlockItem({ block, selected, onSelect, children }: Sorta
   const def = BLOCK_DEFINITIONS[block.type];
   const Icon = def.icon;
 
+  // Deliberately NOT CSS `:hover`/`group-hover`, and NOT onMouseEnter/Leave either -- both
+  // apply to every ancestor of whatever the pointer is over (a child is geometrically inside
+  // its parent's box too), so hovering a child block was also lighting up the parent Section's
+  // chrome at the same time. onMouseOver/Out DO bubble, so calling stopPropagation() in the
+  // innermost block's handler stops the browser from ever notifying an ancestor's listener --
+  // exactly one block's chrome visible at a time, whichever is deepest under the pointer.
+  const [hovered, setHovered] = useState(false);
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition: transition ?? undefined,
     opacity: isDragging ? 0.4 : 1,
   };
+
+  const showChrome = selected || hovered;
 
   return (
     <div ref={setNodeRef} style={style} className="relative">
@@ -41,15 +51,23 @@ export function SortableBlockItem({ block, selected, onSelect, children }: Sorta
           e.stopPropagation();
           onSelect();
         }}
+        onMouseOver={(e) => {
+          e.stopPropagation();
+          setHovered(true);
+        }}
+        onMouseOut={(e) => {
+          e.stopPropagation();
+          setHovered(false);
+        }}
         className={cn(
-          "group relative rounded-md border-2 transition-colors cursor-pointer",
-          selected ? "border-brand-primary" : "border-transparent hover:border-brand-primary/30",
+          "relative rounded-md border-2 transition-colors cursor-pointer",
+          selected ? "border-brand-primary" : hovered ? "border-brand-primary/30" : "border-transparent",
         )}
       >
         <div
           className={cn(
-            "absolute -top-7 left-0 z-10 flex items-center gap-1.5 rounded-full bg-brand-primary px-2.5 py-1 text-[10px] font-medium text-white opacity-0 shadow-sm transition-opacity group-hover:opacity-100",
-            selected && "opacity-100",
+            "absolute -top-7 left-0 z-10 flex items-center gap-1.5 rounded-full bg-brand-primary px-2.5 py-1 text-[10px] font-medium text-white shadow-sm transition-opacity",
+            showChrome ? "opacity-100" : "opacity-0",
           )}
         >
           <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing" onClick={(e) => e.stopPropagation()}>
