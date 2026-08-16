@@ -50,6 +50,9 @@ model User {
   gmailTokens          GmailToken[]         @relation("GmailTokenOwner")
   assignedContacts     Contact[]            @relation("ContactAssignee")
   callsInitiated       Call[]               @relation("CallInitiator")
+  sitesCreated         Site[]               @relation("SiteCreator")
+  siteAssetsUploaded   SiteAsset[]          @relation("SiteAssetUploader")
+  pageVersionsCreated  PageVersion[]        @relation("PageVersionCreator")
 }
 
 model Invitation {
@@ -550,6 +553,7 @@ model Contact {
   automationRuns AutomationRun[]
   emailTracking EmailTracking[]
   calls          Call[]
+  sites          Site[]
 }
 
 // --- Pipeline / Opportunities ---
@@ -721,4 +725,91 @@ model Call {
   updatedAt     DateTime @updatedAt
 
   @@index([contactId])
+}
+
+// --- Website Builder ---
+// Phase 1 (this migration): Site/Page/PageVersion/SiteAsset only -- proves draft/publish
+// separation and truly public rendering end-to-end. Custom domains (SiteDomain) and
+// reusable components (SiteSymbol) are later phases, deliberately not modeled yet.
+
+model Site {
+  id          String   @id @default(cuid())
+  name        String // internal label, e.g. "Acme Corp -- Marketing Site"
+  slug        String   @unique // used in the default preview path /p/[slug]
+  status      String   @default("draft") // draft | published | archived -- has this site EVER been published
+  faviconUrl  String?
+  themeTokens String   @default("{}") // JSON: {colors:{...}, fonts:{...}} -- global design tokens, consumed once the editor (Phase 2) exists
+  contactId   String?
+  contact     Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  createdById String
+  createdBy   User     @relation("SiteCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  pages  Page[]
+  assets SiteAsset[]
+}
+
+model Page {
+  id         String @id @default(cuid())
+  siteId     String
+  site       Site   @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  slug       String
+  title      String
+  // Enforced in application code, not the DB -- same "enforced in code" pattern as
+  // GmailToken.isPrimary. At most one true per site; the homepage is served at /p/[siteSlug]
+  // with no further path segments.
+  isHomepage Boolean @default(false)
+  status     String  @default("draft") // draft | published -- page-level, more granular than Site.status
+
+  // Editing always reads/writes draftContent. Publishing copies draftContent ->
+  // publishedContent + sets publishedAt; the public render path reads ONLY
+  // publishedContent where status = "published", so further draft edits never go live
+  // until Publish is clicked again. JSON PageContent shape -- see src/lib/site-builder/types.ts.
+  draftContent     String    @default("{\"blocks\":[]}")
+  publishedContent String?
+  publishedAt      DateTime?
+
+  metaTitle       String?
+  metaDescription String?
+  ogImageUrl      String?
+  canonicalUrl    String?
+  noIndex         Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  versions PageVersion[]
+
+  @@unique([siteId, slug])
+}
+
+// Immutable snapshot log, written on every Publish -- same append-only audit-log shape
+// as AutomationRunStep. Gives real version history/restore, not just in-session undo.
+model PageVersion {
+  id          String   @id @default(cuid())
+  pageId      String
+  page        Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  content     String // JSON snapshot of PageContent at this point
+  label       String? // "Published" | "Autosave" | custom
+  createdById String?
+  createdBy   User?    @relation("PageVersionCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+}
+
+// Per-site media library row -- same shape as CompanyDocument. Uploaded via the shared
+// /api/upload endpoint (src/app/api/upload/route.ts), URL stored here for reuse across pages.
+model SiteAsset {
+  id           String   @id @default(cuid())
+  siteId       String
+  site         Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  url          String
+  filename     String
+  mimeType     String?
+  fileSize     Int?
+  width        Int?
+  height       Int?
+  uploadedById String
+  uploadedBy   User     @relation("SiteAssetUploader", fields: [uploadedById], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
 }

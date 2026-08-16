@@ -22,6 +22,8 @@ export type PermissionType =
   | "pipeline.manage"
   | "automation.view"
   | "automation.manage"
+  | "sites.view"
+  | "sites.manage"
   | "team.view"
   | "company.email"
   | "ai.task_assistant"
@@ -47,6 +49,8 @@ export const ALL_PERMISSIONS: { key: PermissionType; label: string; group: strin
   { key: "pipeline.manage", label: "Manage Pipeline", group: "Pipeline" },
   { key: "automation.view", label: "View Automations", group: "Automation" },
   { key: "automation.manage", label: "Manage Automations", group: "Automation" },
+  { key: "sites.view", label: "View Websites", group: "Websites" },
+  { key: "sites.manage", label: "Manage Websites", group: "Websites" },
   { key: "team.view", label: "View Team", group: "Team" },
   { key: "company.email", label: "Access Company Email", group: "Inbox" },
   { key: "ai.task_assistant", label: "Task Assistant", group: "AI" },
@@ -448,6 +452,41 @@ export interface Automation {
   runs?: AutomationRun[];
   contactsEntered?: number;
   activeContacts?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type { BlockNode, BlockType, PageContent } from "@/lib/site-builder/types";
+
+export interface Page {
+  id: string;
+  siteId: string;
+  slug: string;
+  title: string;
+  isHomepage: boolean;
+  status: "draft" | "published";
+  draftContent: string;
+  publishedContent: string | null;
+  publishedAt: string | null;
+  metaTitle: string | null;
+  metaDescription: string | null;
+  ogImageUrl: string | null;
+  canonicalUrl: string | null;
+  noIndex: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Site {
+  id: string;
+  name: string;
+  slug: string;
+  status: "draft" | "published" | "archived";
+  faviconUrl: string | null;
+  themeTokens: string;
+  contactId: string | null;
+  createdById: string;
+  pages?: Pick<Page, "id" | "title" | "slug" | "isHomepage" | "status">[];
   createdAt: string;
   updatedAt: string;
 }

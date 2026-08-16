@@ -18,6 +18,8 @@ export const PERMISSIONS = {
   PIPELINE_MANAGE: "pipeline.manage",
   AUTOMATION_VIEW: "automation.view",
   AUTOMATION_MANAGE: "automation.manage",
+  SITES_VIEW: "sites.view",
+  SITES_MANAGE: "sites.manage",
   TEAM_VIEW: "team.view",
   COMPANY_EMAIL_ACCESS: "company.email",
   AI_TASK_ASSISTANT: "ai.task_assistant",
@@ -42,6 +44,7 @@ export const DEFAULT_MEMBER_PERMISSIONS: PermissionType[] = [
   PERMISSIONS.PIPELINE_VIEW,
   PERMISSIONS.PIPELINE_MANAGE,
   PERMISSIONS.AUTOMATION_VIEW,
+  PERMISSIONS.SITES_VIEW,
 ];
 
 export async function checkPermission(

@@ -51,6 +51,7 @@ export function Sidebar({ companyName = "Aequora Digital", companyLogoUrl, onClo
   const canViewContacts = usePermission("contacts.view");
   const canViewPipeline = usePermission("pipeline.view");
   const canViewAutomation = usePermission("automation.view");
+  const canViewSites = usePermission("sites.view");
   const canAccessCompanyEmail = usePermission("company.email");
   const isAdmin = session?.user?.role === "admin";
 
@@ -100,6 +101,7 @@ export function Sidebar({ companyName = "Aequora Digital", companyLogoUrl, onClo
         {canViewContacts && <NavLink href="/calls" label="Calls" icon={<PhoneNavIcon />} />}
         {canViewPipeline && <NavLink href="/pipeline" label="Pipeline" icon={<PipelineIcon />} />}
         {canViewAutomation && <NavLink href="/automation" label="Automation" icon={<ZapIcon />} />}
+        {canViewSites && <NavLink href="/sites" label="Websites" icon={<GlobeIcon />} />}
 
         {/* Workspace */}
         <p className="px-3 pt-4 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-[#475569]">Workspace</p>
@@ -211,6 +213,16 @@ function ZapIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
       <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+    </svg>
+  );
+}
+
+function GlobeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="2" y1="12" x2="22" y2="12" />
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
     </svg>
   );
 }
