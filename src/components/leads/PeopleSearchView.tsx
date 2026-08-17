@@ -19,7 +19,10 @@ import type { LeadPerson } from "@/types";
 export function PeopleSearchView() {
   const [position, setPosition] = useState("");
   const [industry, setIndustry] = useState("");
-  const [location, setLocation] = useState("");
+  // Defaults to the whole US market rather than being required -- editable
+  // down to a specific state/city if you want to narrow it, but left as-is
+  // this searches nationwide.
+  const [location, setLocation] = useState("United States");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [savingId, setSavingId] = useState<string | undefined>();
 
@@ -29,9 +32,13 @@ export function PeopleSearchView() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!position.trim() || !industry.trim() || !location.trim()) return;
+    if (!industry.trim()) return;
     setSelectedIds(new Set());
-    search.mutate({ position: position.trim(), industry: industry.trim(), location: location.trim() });
+    search.mutate({
+      position: position.trim() || undefined,
+      industry: industry.trim(),
+      location: location.trim() || undefined,
+    });
   }
 
   function toggle(id: string) {
@@ -65,7 +72,7 @@ export function PeopleSearchView() {
     <div className="space-y-4">
       <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-3">
         <div>
-          <label className="text-text-secondary mb-1 block text-xs font-medium">Position</label>
+          <label className="text-text-secondary mb-1 block text-xs font-medium">Position (optional)</label>
           <Input
             placeholder="e.g. Operations Manager"
             value={position}
@@ -83,15 +90,15 @@ export function PeopleSearchView() {
           />
         </div>
         <div>
-          <label className="text-text-secondary mb-1 block text-xs font-medium">Location</label>
+          <label className="text-text-secondary mb-1 block text-xs font-medium">Location (optional)</label>
           <Input
-            placeholder="e.g. Sydney, Australia"
+            placeholder="e.g. Texas, or a specific city"
             value={location}
             onChange={(e) => setLocation(e.target.value)}
             className="w-52"
           />
         </div>
-        <Button type="submit" loading={search.isPending} disabled={!position.trim() || !industry.trim() || !location.trim()}>
+        <Button type="submit" loading={search.isPending} disabled={!industry.trim()}>
           <Search className="size-3.5" />
           Search
         </Button>
@@ -138,8 +145,10 @@ export function PeopleSearchView() {
 
       {!search.data && !search.isPending && (
         <p className="text-text-muted text-xs">
-          Searches for businesses matching Industry + Location, then automatically crawls the first ~10 results&apos;
-          websites for people matching Position. Results here stay separate from the Found People tab.
+          Searches for businesses matching Industry (nationwide across the US by default, or narrow it with
+          Location), then automatically crawls the first ~10 results&apos; websites for people — matching Position if
+          given, otherwise standard decision-maker titles (Owner, Founder, Director, etc.). Results here stay
+          separate from the Found People tab.
         </p>
       )}
     </div>

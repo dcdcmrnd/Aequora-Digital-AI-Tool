@@ -7,9 +7,9 @@ import { apiFetch, ApiError } from "@/lib/api-client";
 import type { LeadPerson } from "@/types";
 
 export interface PeopleSearchInput {
-  position: string;
+  position?: string;
   industry: string;
-  location: string;
+  location?: string;
 }
 
 export interface PeopleSearchResponse {

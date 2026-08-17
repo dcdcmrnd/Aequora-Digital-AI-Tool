@@ -22,10 +22,15 @@ const CRAWL_CONCURRENCY = 3;
 
 export const maxDuration = 60;
 
+// Position and location are both optional -- Position falls back to just the
+// standard ICP title vocabulary (see personFinder's buildTitlePatterns,
+// which already drops empty extra terms), and Location falls back to "United
+// States" so a search scoped only by Industry still has something valid to
+// hand Google Places (a fully empty location isn't a legal Places query).
 const schema = z.object({
-  position: z.string().trim().min(1),
+  position: z.string().trim().optional().default(""),
   industry: z.string().trim().min(1),
-  location: z.string().trim().min(1),
+  location: z.string().trim().optional().default(""),
 });
 
 /**
@@ -45,8 +50,9 @@ export async function POST(req: NextRequest) {
   if (!canManage) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const parsed = schema.safeParse(await req.json());
-  if (!parsed.success) return NextResponse.json({ error: "Position, industry, and location are all required." }, { status: 400 });
-  const { position, industry, location } = parsed.data;
+  if (!parsed.success) return NextResponse.json({ error: "Industry is required." }, { status: 400 });
+  const { position, industry } = parsed.data;
+  const location = parsed.data.location || "United States";
 
   const { leads } = await discoverCompaniesForPeopleSearch(session.user.id, industry, location);
   const toCrawl = leads.filter((lead) => lead.website).slice(0, PEOPLE_SEARCH_CRAWL_CAP);
@@ -54,7 +60,7 @@ export async function POST(req: NextRequest) {
   const peopleSearch = await prisma.peopleSearch.create({
     data: {
       userId: session.user.id,
-      position,
+      position: position || "Any",
       industry,
       location,
       companiesFound: leads.length,
@@ -80,7 +86,7 @@ export async function POST(req: NextRequest) {
     action: "created",
     entityType: "people_search",
     entityId: peopleSearch.id,
-    entityName: `${position} in ${industry} — ${location}`,
+    entityName: `${position ? `${position} ` : ""}in ${industry} — ${location}`,
     metadata: { companiesFound: leads.length, companiesCrawled: toCrawl.length, peopleFound: people.length, failed },
   });
 
