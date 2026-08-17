@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Paperclip, Pencil, PhoneCall, Search, Workflow } from "lucide-react";
+import { ArrowLeft, Mail, Pencil, PhoneCall, Reply, Search, Workflow } from "lucide-react";
 import toast from "react-hot-toast";
 
 import { BulkWorkflowModal } from "@/components/contacts/BulkActionsBar";
@@ -40,8 +40,10 @@ export function ConversationsView() {
   const [contacts, setContacts] = useState<ThreadContact[]>([]);
   const [loadingContacts, setLoadingContacts] = useState(true);
   const [search, setSearch] = useState("");
+  const [searchResults, setSearchResults] = useState<ThreadContact[] | null>(null);
+  const [searching, setSearching] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(urlContactId);
-  const [replyOpen, setReplyOpen] = useState(false);
+  const [replyTarget, setReplyTarget] = useState<Extract<TimelineItem, { type: "email" }> | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [workflowOpen, setWorkflowOpen] = useState(false);
@@ -116,16 +118,47 @@ export function ConversationsView() {
     if (urlContactId) setSelectedId(urlContactId);
   }, [urlContactId]);
 
+  // The list above only ever holds ~30 recent threads plus whatever's
+  // currently unread -- searching it client-side meant an older, already-read
+  // conversation (like one from weeks ago) could exist and still be openable
+  // by direct link, yet be unfindable by typing its name, because it was
+  // never in that small preloaded set to begin with. Typing a search now
+  // queries Gmail directly (debounced) instead of filtering that snapshot,
+  // so it actually finds anything, not just what happened to already be loaded.
+  useEffect(() => {
+    const term = search.trim();
+    if (!term) {
+      setSearchResults(null);
+      setSearching(false);
+      return;
+    }
+
+    setSearching(true);
+    const handle = setTimeout(() => {
+      fetch(`/api/gmail/threads?${new URLSearchParams({ scope: "agency", q: `${term} (in:inbox OR in:sent)` })}`)
+        .then((res) => res.json())
+        .then((data) => {
+          const threads = Array.isArray(data.threads) ? data.threads : [];
+          const byContactId = new Map<string, ThreadContact>();
+          for (const t of threads) {
+            if (!t.contactId || byContactId.has(t.contactId)) continue;
+            byContactId.set(t.contactId, { id: t.contactId, name: t.contactName, email: t.contactEmail, hasUnread: !!t.isUnread });
+          }
+          setSearchResults(Array.from(byContactId.values()));
+        })
+        .catch(() => toast.error("Search failed."))
+        .finally(() => setSearching(false));
+    }, 400);
+
+    return () => clearTimeout(handle);
+  }, [search]);
+
   function selectContact(id: string) {
     setSelectedId(id);
     router.replace(`/conversations?contactId=${id}`, { scroll: false });
   }
 
-  const filteredContacts = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return contacts;
-    return contacts.filter((c) => c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q));
-  }, [contacts, search]);
+  const displayedContacts = search.trim() ? (searchResults ?? []) : contacts;
 
   const { contact, isLoading: contactLoading } = useContact(selectedId);
   const { items, isLoading: timelineLoading, refetch: refetchTimeline } = useContactTimeline(selectedId);
@@ -160,12 +193,14 @@ export function ConversationsView() {
           </div>
         </div>
         <div className="flex-1 overflow-y-auto">
-          {loadingContacts ? (
-            <p className="text-text-muted p-4 text-center text-sm">Loading...</p>
-          ) : filteredContacts.length === 0 ? (
-            <p className="text-text-muted p-4 text-center text-sm">No conversations yet.</p>
+          {(search.trim() ? searching : loadingContacts) ? (
+            <p className="text-text-muted p-4 text-center text-sm">{search.trim() ? "Searching..." : "Loading..."}</p>
+          ) : displayedContacts.length === 0 ? (
+            <p className="text-text-muted p-4 text-center text-sm">
+              {search.trim() ? `No conversations match "${search.trim()}".` : "No conversations yet."}
+            </p>
           ) : (
-            filteredContacts.map((c) => (
+            displayedContacts.map((c) => (
               <button
                 key={c.id}
                 onClick={() => selectContact(c.id)}
@@ -250,6 +285,16 @@ export function ConversationsView() {
                         ) : (
                           <p className="text-text-primary whitespace-pre-wrap bg-white p-3.5 text-sm">{item.text}</p>
                         )}
+                        <div className="border-border flex justify-end border-t px-2.5 py-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setReplyTarget(item)}
+                            className="text-text-secondary hover:text-brand-primary inline-flex items-center gap-1 text-xs font-medium"
+                          >
+                            <Reply className="size-3" />
+                            Reply
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ) : (
@@ -278,14 +323,15 @@ export function ConversationsView() {
 
             <div className="flex items-center gap-2 border-t border-border px-4 py-3">
               <button
-                onClick={() => (lastEmail ? setReplyOpen(true) : setComposeOpen(true))}
+                onClick={() => (lastEmail ? setReplyTarget(lastEmail) : setComposeOpen(true))}
                 className="border-border text-text-muted hover:border-brand-primary hover:text-text-primary bg-white flex-1 rounded-full border px-4 py-2.5 text-left text-sm transition-colors"
               >
                 {lastEmail ? `Reply to ${contact?.name ?? "contact"}…` : `Email ${contact?.name ?? "contact"}…`}
               </button>
               {lastEmail && (
-                <Button size="sm" variant="ghost" onClick={() => setComposeOpen(true)} title="New email (not a reply)">
-                  <Paperclip className="size-3.5" />
+                <Button size="sm" variant="secondary" onClick={() => setComposeOpen(true)}>
+                  <Mail className="size-3.5" />
+                  New Email
                 </Button>
               )}
             </div>
@@ -365,20 +411,20 @@ export function ConversationsView() {
       {contact && workflowOpen && (
         <BulkWorkflowModal selectedIds={[contact.id]} onClose={() => setWorkflowOpen(false)} onDone={() => setWorkflowOpen(false)} />
       )}
-      {contact && lastEmail && (
+      {contact && replyTarget && (
         <ComposeModal
-          open={replyOpen}
+          open={!!replyTarget}
           onClose={() => {
-            setReplyOpen(false);
+            setReplyTarget(null);
             refetchTimeline();
           }}
           mode="reply"
           scope="agency"
-          defaultTo={lastEmail.isOutgoing ? lastEmail.to : lastEmail.from}
-          defaultSubject={lastEmail.subject.startsWith("Re:") ? lastEmail.subject : `Re: ${lastEmail.subject}`}
-          threadId={lastEmail.threadId}
-          inReplyTo={lastEmail.id}
-          references={lastEmail.id}
+          defaultTo={replyTarget.isOutgoing ? replyTarget.to : replyTarget.from}
+          defaultSubject={replyTarget.subject.startsWith("Re:") ? replyTarget.subject : `Re: ${replyTarget.subject}`}
+          threadId={replyTarget.threadId}
+          inReplyTo={replyTarget.id}
+          references={replyTarget.id}
         />
       )}
       {contact?.email && (
