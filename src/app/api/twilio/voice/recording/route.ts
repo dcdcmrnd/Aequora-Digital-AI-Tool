@@ -20,11 +20,12 @@ export async function POST(req: NextRequest) {
   const signature = req.headers.get("X-Twilio-Signature") ?? "";
 
   if (!twilio.validateRequest(creds.authToken, signature, req.url, params)) {
+    console.error(`[twilio/voice/recording] Signature validation failed for url=${req.url}`);
     return new NextResponse("Invalid signature.", { status: 403 });
   }
 
   if (params.RecordingStatus === "completed" && params.CallSid && params.RecordingSid) {
-    await prisma.call.updateMany({
+    const result = await prisma.call.updateMany({
       where: { twilioCallSid: params.CallSid },
       data: {
         recordingSid: params.RecordingSid,
@@ -32,6 +33,15 @@ export async function POST(req: NextRequest) {
         recordingDurationSec: params.RecordingDuration ? Number(params.RecordingDuration) : undefined,
       },
     });
+    // Recordings were reported missing even on calls that completed with a
+    // real duration -- this callback's own delivery/matching had no
+    // visibility at all, so there was no way to tell whether Twilio never
+    // called back, or called back with a CallSid that matched no row.
+    if (result.count === 0) {
+      console.error(`[twilio/voice/recording] No Call row matched twilioCallSid=${params.CallSid} (RecordingSid=${params.RecordingSid})`);
+    }
+  } else {
+    console.error(`[twilio/voice/recording] Ignored callback: RecordingStatus=${params.RecordingStatus} CallSid=${params.CallSid} RecordingSid=${params.RecordingSid}`);
   }
 
   return new NextResponse(null, { status: 204 });
