@@ -642,6 +642,7 @@ async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string,
         const data = node.data as {
           mode?: string; amount?: number; unit?: WaitUnit; condition?: string;
           dayOfWeek?: number | null; time?: string; timezone?: string; direction?: "before" | "after";
+          pastDueAction?: "continue" | "end";
         };
 
         if (data.mode === "event") {
@@ -654,8 +655,14 @@ async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string,
             const target = new Date(contact.eventDate.getTime() + (direction === "before" ? -offsetMs : offsetMs));
 
             if (target.getTime() <= Date.now()) {
-              // The target moment already passed (e.g. the event date is close, or already
-              // gone) -- proceed immediately rather than "waiting" for a time already behind us.
+              // The target moment already passed (e.g. enrolled late, or the event is close) --
+              // there's nothing left to wait for, so what happens next is whichever the step was
+              // configured for: skip ahead (default, preserves pre-existing automations that
+              // predate this option) or stop the run here entirely.
+              if (data.pastDueAction === "end") {
+                await logStep(run.id, node.id, node.type, "success", `Event wait target (${direction} event date) already passed — ending workflow`);
+                break;
+              }
               await logStep(run.id, node.id, node.type, "success", `Event wait target (${direction} event date) already passed — continuing immediately`);
               currentNodeId = nextNodeId(flow, node.id);
               continue;

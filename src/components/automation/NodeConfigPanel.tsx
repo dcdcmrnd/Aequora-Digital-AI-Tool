@@ -621,9 +621,21 @@ export function NodeConfigPanel({ node, stages, automationId, onClose, onSave, o
                     </SelectContent>
                   </Select>
                 </Field>
+                <Field label="If the wait time has already passed">
+                  <Select value={(data.pastDueAction as string) ?? "continue"} onValueChange={(v) => set("pastDueAction", v)}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="continue">Skip ahead — continue to the next step</SelectItem>
+                      <SelectItem value="end">End the workflow for this contact</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
                 <p className="text-text-muted text-xs">
-                  Requires a <strong>Set Event Date</strong> step earlier in this workflow. If that date has already
-                  passed by the time a contact reaches this step, it continues immediately instead of waiting.
+                  Requires a <strong>Set Event Date</strong> step earlier in this workflow. A contact can reach this
+                  step after the target moment has already gone by (e.g. enrolled late, or the event is close) — the
+                  option above decides what happens then instead of waiting for a time already behind us.
                 </p>
               </>
             )}
