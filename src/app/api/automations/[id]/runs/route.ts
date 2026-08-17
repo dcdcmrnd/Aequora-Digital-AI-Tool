@@ -29,7 +29,12 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       ...(nodeId ? {} : { steps: { orderBy: { createdAt: "asc" } } }),
     },
     orderBy: { createdAt: "desc" },
-    take: nodeId ? 200 : 50,
+    // The full Execution Log (no nodeId) used to cap at 50, silently
+    // truncating any automation with more contacts than that -- the
+    // Execution Log tab now does its own client-side search + pagination
+    // over the whole list, so this only needs to guard against a truly
+    // runaway automation, not the couple hundred contacts a normal one has.
+    take: nodeId ? 200 : 5000,
   });
 
   return NextResponse.json({ runs });
