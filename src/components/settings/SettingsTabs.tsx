@@ -10,6 +10,9 @@ interface Props {
   categoriesPanel: React.ReactNode;
   emailPanel: React.ReactNode;
   phonePanel: React.ReactNode;
+  customFieldsPanel: React.ReactNode;
+  customValuesPanel: React.ReactNode;
+  tagsPanel: React.ReactNode;
 }
 
 const TABS = [
@@ -19,22 +22,35 @@ const TABS = [
   { id: "categories", label: "Note Categories" },
   { id: "email", label: "Agency Email" },
   { id: "phone", label: "Calling" },
+  { id: "customFields", label: "Custom Fields" },
+  { id: "customValues", label: "Custom Values" },
+  { id: "tags", label: "Tags" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
 
-export function SettingsTabs({ teamPanel, companyPanel, documentsPanel, categoriesPanel, emailPanel, phonePanel }: Props) {
+export function SettingsTabs({
+  teamPanel,
+  companyPanel,
+  documentsPanel,
+  categoriesPanel,
+  emailPanel,
+  phonePanel,
+  customFieldsPanel,
+  customValuesPanel,
+  tagsPanel,
+}: Props) {
   const [active, setActive] = useState<TabId>("team");
 
   return (
     <div>
-      <div className="flex border-b border-border mb-6">
+      <div className="flex border-b border-border mb-6 overflow-x-auto">
         {TABS.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActive(tab.id)}
             className={cn(
-              "px-4 py-3 text-sm font-medium transition-colors border-b-2 -mb-px",
+              "px-4 py-3 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap",
               active === tab.id
                 ? "border-brand-primary text-brand-primary"
                 : "border-transparent text-text-secondary hover:text-text-primary"
@@ -51,6 +67,9 @@ export function SettingsTabs({ teamPanel, companyPanel, documentsPanel, categori
       {active === "categories" && categoriesPanel}
       {active === "email" && emailPanel}
       {active === "phone" && phonePanel}
+      {active === "customFields" && customFieldsPanel}
+      {active === "customValues" && customValuesPanel}
+      {active === "tags" && tagsPanel}
     </div>
   );
 }

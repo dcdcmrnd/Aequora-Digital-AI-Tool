@@ -386,6 +386,31 @@ export interface Contact {
   assignedTo?: { id: string; name: string } | null;
   createdAt: string;
   updatedAt: string;
+  /** Custom Field values on this contact, keyed by CustomFieldDefinition.key. */
+  customFields?: Record<string, string>;
+}
+
+export type CustomFieldType = "text" | "number" | "date" | "dropdown" | "checkbox" | "textarea";
+
+export interface CustomFieldDefinition {
+  id: string;
+  name: string;
+  key: string;
+  type: CustomFieldType;
+  options: string[];
+  required: boolean;
+  order: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CustomValue {
+  id: string;
+  name: string;
+  key: string;
+  value: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface PipelineStage {

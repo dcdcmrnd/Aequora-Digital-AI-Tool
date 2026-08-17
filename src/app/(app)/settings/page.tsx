@@ -6,9 +6,12 @@ import { redirect } from "next/navigation";
 import { AgencyEmailPanel } from "@/components/settings/AgencyEmailPanel";
 import { CategoryManager } from "@/components/settings/CategoryManager";
 import { CompanySettingsPanel } from "@/components/settings/CompanySettingsPanel";
+import { CustomFieldsPanel } from "@/components/settings/CustomFieldsPanel";
+import { CustomValuesPanel } from "@/components/settings/CustomValuesPanel";
 import { DocumentsManager } from "@/components/settings/DocumentsManager";
 import { PhoneSettingsPanel } from "@/components/settings/PhoneSettingsPanel";
 import { SettingsTabs } from "@/components/settings/SettingsTabs";
+import { TagsManagerPanel } from "@/components/settings/TagsManagerPanel";
 import { TeamView } from "@/components/team/TeamView";
 import { ProfileForm } from "@/components/profile/ProfileForm";
 import { MyContactFieldsPanel } from "@/components/profile/MyContactFieldsPanel";
@@ -110,6 +113,9 @@ export default async function SettingsPage() {
         categoriesPanel={<CategoryManager categories={categories as any} />}
         emailPanel={<AgencyEmailPanel emails={connectedEmails} />}
         phonePanel={<PhoneSettingsPanel />}
+        customFieldsPanel={<CustomFieldsPanel />}
+        customValuesPanel={<CustomValuesPanel />}
+        tagsPanel={<TagsManagerPanel />}
       />
     </div>
   );

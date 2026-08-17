@@ -1,3 +1,5 @@
+import { prisma } from "@/lib/prisma";
+
 export interface MergeTag {
   token: string;
   label: string;
@@ -53,6 +55,12 @@ export const SAMPLE_MERGE_VALUES: Record<string, string> = {
   "{{contact.website}}": "https://acme.com",
   "{{contact.details}}": "Sample details",
 };
+
+/** Every Custom Value as {{custom_values.<key>}} -> value, for merging into an automation run's dynamicValues once per run (see engine.ts's runLoop). */
+export async function customValueMergeValues(): Promise<Record<string, string>> {
+  const values = await prisma.customValue.findMany();
+  return Object.fromEntries(values.map((v) => [`{{custom_values.${v.key}}}`, v.value]));
+}
 
 export function applyMergeTags(text: string, values: Record<string, string>): string {
   let result = text;

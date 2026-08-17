@@ -11,6 +11,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/Select";
 import { TagInput } from "@/components/ui/TagInput";
 import { Textarea } from "@/components/ui/Textarea";
+import { useCustomFields } from "@/hooks/useCustomFields";
 import { type ContactInput, useContactTags, useContacts } from "@/hooks/useContacts";
 import { usePermission } from "@/hooks/usePermission";
 import type { Contact } from "@/types";
@@ -38,6 +39,7 @@ type FormState = {
   address: string;
   notes: string;
   tags: string[];
+  customFields: Record<string, string>;
 };
 
 function toFormState(source?: Partial<Contact> | Partial<ContactInput>): FormState {
@@ -60,12 +62,14 @@ function toFormState(source?: Partial<Contact> | Partial<ContactInput>): FormSta
     address: source?.address ?? "",
     notes: source?.notes ?? "",
     tags: source?.tags ?? [],
+    customFields: (source as Partial<Contact>)?.customFields ?? {},
   };
 }
 
 export function ContactFormModal({ open, onClose, contact, prefill, onSaved }: ContactFormModalProps) {
   const { createContact, updateContact } = useContacts();
   const { tags: tagSuggestions } = useContactTags();
+  const { fields: customFieldDefs } = useCustomFields();
   const [form, setForm] = useState<FormState>(() => toFormState(contact ?? prefill));
   const [assignedToId, setAssignedToId] = useState(contact?.assignedToId ?? "");
   const [users, setUsers] = useState<{ id: string; name: string }[]>([]);
@@ -84,6 +88,10 @@ export function ContactFormModal({ open, onClose, contact, prefill, onSaved }: C
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function setCustomField(key: string, value: string) {
+    setForm((prev) => ({ ...prev, customFields: { ...prev.customFields, [key]: value } }));
   }
 
   function addEmailField() {
@@ -131,6 +139,7 @@ export function ContactFormModal({ open, onClose, contact, prefill, onSaved }: C
       tags: form.tags,
       sourceLeadId: !isEditing ? prefill?.sourceLeadId : undefined,
       assignedToId: isEditing ? assignedToId || null : undefined,
+      customFields: customFieldDefs.length > 0 ? form.customFields : undefined,
     };
 
     const onSuccess = {
@@ -257,6 +266,46 @@ export function ContactFormModal({ open, onClose, contact, prefill, onSaved }: C
             suggestions={tagSuggestions}
           />
         </Field>
+
+        {customFieldDefs.length > 0 && (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {customFieldDefs.map((cf) => (
+              <Field key={cf.id} label={cf.name} required={cf.required}>
+                {cf.type === "textarea" ? (
+                  <Textarea
+                    rows={2}
+                    value={form.customFields[cf.key] ?? ""}
+                    onChange={(e) => setCustomField(cf.key, e.target.value)}
+                    required={cf.required}
+                  />
+                ) : cf.type === "checkbox" ? (
+                  <input
+                    type="checkbox"
+                    checked={form.customFields[cf.key] === "true"}
+                    onChange={(e) => setCustomField(cf.key, e.target.checked ? "true" : "false")}
+                    className="text-brand-primary focus:ring-brand-primary size-4 rounded border-border"
+                  />
+                ) : cf.type === "dropdown" ? (
+                  <Select value={form.customFields[cf.key] ?? ""} onValueChange={(v) => setCustomField(cf.key, v)}>
+                    <SelectTrigger className="w-full"><SelectValue placeholder="Select..." /></SelectTrigger>
+                    <SelectContent>
+                      {cf.options.map((opt) => (
+                        <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    type={cf.type === "number" ? "number" : cf.type === "date" ? "date" : "text"}
+                    value={form.customFields[cf.key] ?? ""}
+                    onChange={(e) => setCustomField(cf.key, e.target.value)}
+                    required={cf.required}
+                  />
+                )}
+              </Field>
+            ))}
+          </div>
+        )}
 
         <Field label="Notes">
           <Textarea rows={3} value={form.notes} onChange={(e) => set("notes", e.target.value)} />

@@ -8,6 +8,7 @@ import { runAutomationsForTrigger } from "@/lib/automation/engine";
 import { escapeLikePattern } from "@/lib/db";
 import { checkPermission } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
+import { flattenContactCustomFields, upsertContactCustomFieldValues } from "@/services/customFields";
 
 const contactSchema = z.object({
   name: z.string().min(1, "Name is required."),
@@ -26,6 +27,7 @@ const contactSchema = z.object({
   notes: z.string().optional(),
   tags: z.array(z.string()).optional(),
   sourceLeadId: z.string().optional(),
+  customFields: z.record(z.string()).optional(),
 });
 
 export async function GET() {
@@ -36,15 +38,20 @@ export async function GET() {
   if (!canView) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const contacts = await prisma.contact.findMany({
-    include: { createdBy: { select: { id: true, name: true } }, assignedTo: { select: { id: true, name: true } } },
+    include: {
+      createdBy: { select: { id: true, name: true } },
+      assignedTo: { select: { id: true, name: true } },
+      customFieldValues: { include: { field: { select: { key: true } } } },
+    },
     orderBy: { createdAt: "desc" },
   });
 
   return NextResponse.json({
-    contacts: contacts.map((contact) => ({
+    contacts: contacts.map(({ customFieldValues, ...contact }) => ({
       ...contact,
       tags: JSON.parse(contact.tags),
       additionalEmails: JSON.parse(contact.additionalEmails),
+      customFields: flattenContactCustomFields(customFieldValues),
     })),
   });
 }
@@ -62,7 +69,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid contact." }, { status: 400 });
   }
 
-  const { additionalEmails, ...rest } = parsed.data;
+  const { additionalEmails, customFields, ...rest } = parsed.data;
 
   if (rest.email) {
     const existing = await prisma.contact.findFirst({
@@ -84,6 +91,8 @@ export async function POST(req: NextRequest) {
     include: { createdBy: { select: { id: true, name: true } } },
   });
 
+  if (customFields) await upsertContactCustomFieldValues(contact.id, customFields);
+
   await logActivity({
     userId: session.user.id,
     action: "created",
@@ -98,7 +107,14 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json(
-    { contact: { ...contact, tags: JSON.parse(contact.tags), additionalEmails: JSON.parse(contact.additionalEmails) } },
+    {
+      contact: {
+        ...contact,
+        tags: JSON.parse(contact.tags),
+        additionalEmails: JSON.parse(contact.additionalEmails),
+        customFields: customFields ?? {},
+      },
+    },
     { status: 201 },
   );
 }

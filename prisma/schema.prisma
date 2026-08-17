@@ -585,6 +585,51 @@ model Contact {
   emailTracking EmailTracking[]
   calls          Call[]
   sites          Site[]
+  customFieldValues ContactCustomFieldValue[]
+}
+
+// Account-wide reusable snippet (e.g. "Company Support Phone") -- GHL-style
+// Custom Value, referenced in email/automation bodies as {{custom_values.<key>}}
+// (see lib/automation/mergeTags.ts). Unlike a Custom Field, this isn't tied
+// to a Contact -- it's one value shared everywhere the token is used.
+model CustomValue {
+  id        String   @id @default(cuid())
+  name      String
+  key       String   @unique // slug used in the merge token, e.g. "company_support_phone"
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// A user-defined field on Contact records (GHL-style Custom Field) -- lets
+// the team track data points beyond Contact's fixed columns without a schema
+// change per field. Values live in ContactCustomFieldValue (EAV) rather than
+// as real columns here, since the set of fields is user-editable at runtime.
+model CustomFieldDefinition {
+  id        String   @id @default(cuid())
+  name      String
+  key       String   @unique // slug used to key a contact's value, e.g. "birthday"
+  type      String   // text | number | date | dropdown | checkbox | textarea
+  options   String   @default("[]") // JSON array of strings -- only meaningful when type = dropdown
+  required  Boolean  @default(false)
+  order     Int      @default(0) // display order in the field list and on the Contact form
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  values ContactCustomFieldValue[]
+}
+
+model ContactCustomFieldValue {
+  id        String                @id @default(cuid())
+  contactId String
+  contact   Contact               @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  fieldId   String
+  field     CustomFieldDefinition @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  value     String                // raw string; interpretation (number/date/checkbox) follows field.type
+  updatedAt DateTime              @updatedAt
+
+  @@unique([contactId, fieldId])
+  @@index([fieldId])
 }
 
 // --- Pipeline / Opportunities ---

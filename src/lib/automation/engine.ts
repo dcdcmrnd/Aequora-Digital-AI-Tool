@@ -4,8 +4,8 @@ import { runAiPrompt } from "@/lib/ai";
 import { verifyAndCacheForContacts } from "@/lib/emailVerification";
 import { sendEmail } from "@/lib/gmail";
 import { createNotification } from "@/lib/activity";
-import { formatDailyTime, formatWeekdayTime, getNextTimeOccurrenceUtc, getNextWeekdayOccurrenceUtc } from "@/lib/utils/schedule";
-import { applyMergeTags, contactMergeValues, flattenForMergeTags } from "./mergeTags";
+import { formatDailyTime, formatEventDateTime, formatWeekdayTime, getNextTimeOccurrenceUtc, getNextWeekdayOccurrenceUtc, zonedDateTimeToUtc } from "@/lib/utils/schedule";
+import { applyMergeTags, contactMergeValues, customValueMergeValues, flattenForMergeTags } from "./mergeTags";
 import type {
   AutomationEdge,
   AutomationFlow,
@@ -415,6 +415,7 @@ async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string,
   // whenever a later Webhook step captures a new response.
   let storedVariables: Record<string, Record<string, unknown>> = run.variables ? JSON.parse(run.variables) : {};
   const dynamicValues: Record<string, string> = {
+    ...(await customValueMergeValues()),
     ...(run.payload ? flattenForMergeTags("webhook", JSON.parse(run.payload)) : {}),
     ...Object.fromEntries(Object.entries(storedVariables).flatMap(([name, value]) => Object.entries(flattenForMergeTags(`http.${name}`, value)))),
   };
@@ -574,12 +575,17 @@ async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string,
           if (!run.contactId) {
             await logStep(run.id, node.id, node.type, "success", "No contact for this run");
           } else {
-            const data = node.data as { value?: string };
-            const eventDate = data.value ? new Date(data.value) : null;
+            const data = node.data as { value?: string; timezone?: string };
+            const timezone = data.timezone || "America/New_York";
+            // data.value is a <input type="datetime-local"> string (e.g.
+            // "2026-03-05T14:00") with no timezone of its own -- interpreted
+            // as whatever the configured timezone means by that wall-clock
+            // time, not the server's (UTC on Vercel) or the browser's.
+            const eventDate = data.value ? zonedDateTimeToUtc(data.value, timezone) : null;
             if (!eventDate || Number.isNaN(eventDate.getTime())) throw new Error("No event date configured for this step");
 
             await prisma.contact.update({ where: { id: run.contactId }, data: { eventDate } });
-            await logStep(run.id, node.id, node.type, "success", `Event date set to ${eventDate.toLocaleString()}`);
+            await logStep(run.id, node.id, node.type, "success", `Event date set to ${formatEventDateTime(eventDate, timezone)}`);
           }
         } catch (err) {
           await logStep(run.id, node.id, node.type, "error", err instanceof Error ? err.message : "Unknown error");

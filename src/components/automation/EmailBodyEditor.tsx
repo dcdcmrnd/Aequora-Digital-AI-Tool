@@ -10,6 +10,7 @@ import { Bold, Code2, Image as ImageIcon, Italic, Link2, Palette, Underline as U
 
 import { Dropdown } from "@/components/ui/Dropdown";
 import { Textarea } from "@/components/ui/Textarea";
+import { useCustomValues } from "@/hooks/useCustomValues";
 import { CONTACT_MERGE_TAGS } from "@/lib/automation/mergeTags";
 import { cn } from "@/lib/utils";
 
@@ -54,6 +55,7 @@ export function EmailBodyEditor({ value, onChange }: EmailBodyEditorProps) {
   const [mode, setMode] = useState<"design" | "html">("design");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const { values: customValues } = useCustomValues();
 
   const editor = useEditor({
     extensions: [
@@ -201,10 +203,16 @@ export function EmailBodyEditor({ value, onChange }: EmailBodyEditorProps) {
               Custom value
             </button>
           }
-          items={CONTACT_MERGE_TAGS.map((tag) => ({
-            label: tag.label,
-            onClick: () => editor?.chain().focus().insertContent(tag.token).run(),
-          }))}
+          items={[
+            ...CONTACT_MERGE_TAGS.map((tag) => ({
+              label: tag.label,
+              onClick: () => editor?.chain().focus().insertContent(tag.token).run(),
+            })),
+            ...customValues.map((v) => ({
+              label: v.name,
+              onClick: () => editor?.chain().focus().insertContent(`{{custom_values.${v.key}}}`).run(),
+            })),
+          ]}
         />
 
         <div className="ml-auto flex items-center gap-1 text-xs">

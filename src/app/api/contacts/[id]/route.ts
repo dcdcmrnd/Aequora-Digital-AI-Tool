@@ -8,6 +8,7 @@ import { authOptions } from "@/lib/auth";
 import { runAutomationsForTrigger } from "@/lib/automation/engine";
 import { checkPermission } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
+import { flattenContactCustomFields, upsertContactCustomFieldValues } from "@/services/customFields";
 
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
@@ -26,6 +27,7 @@ const updateSchema = z.object({
   notes: z.string().nullable().optional(),
   tags: z.array(z.string()).optional(),
   assignedToId: z.string().nullable().optional(),
+  customFields: z.record(z.string()).optional(),
 });
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
@@ -37,12 +39,22 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   const contact = await prisma.contact.findUnique({
     where: { id: params.id },
-    include: { createdBy: { select: { id: true, name: true } }, assignedTo: { select: { id: true, name: true } } },
+    include: {
+      createdBy: { select: { id: true, name: true } },
+      assignedTo: { select: { id: true, name: true } },
+      customFieldValues: { include: { field: { select: { key: true } } } },
+    },
   });
   if (!contact) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+  const { customFieldValues, ...rest } = contact;
   return NextResponse.json({
-    contact: { ...contact, tags: JSON.parse(contact.tags), additionalEmails: JSON.parse(contact.additionalEmails) },
+    contact: {
+      ...rest,
+      tags: JSON.parse(contact.tags),
+      additionalEmails: JSON.parse(contact.additionalEmails),
+      customFields: flattenContactCustomFields(customFieldValues),
+    },
   });
 }
 
@@ -102,8 +114,20 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
   }
 
+  if (parsed.data.customFields) await upsertContactCustomFieldValues(updated.id, parsed.data.customFields);
+
+  const customFieldValues = await prisma.contactCustomFieldValue.findMany({
+    where: { contactId: updated.id },
+    include: { field: { select: { key: true } } },
+  });
+
   return NextResponse.json({
-    contact: { ...updated, tags: JSON.parse(updated.tags), additionalEmails: JSON.parse(updated.additionalEmails) },
+    contact: {
+      ...updated,
+      tags: JSON.parse(updated.tags),
+      additionalEmails: JSON.parse(updated.additionalEmails),
+      customFields: flattenContactCustomFields(customFieldValues),
+    },
   });
 }
 

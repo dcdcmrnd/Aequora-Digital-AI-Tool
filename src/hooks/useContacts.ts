@@ -25,6 +25,7 @@ export interface ContactInput {
   tags?: string[];
   sourceLeadId?: string;
   assignedToId?: string | null;
+  customFields?: Record<string, string>;
 }
 
 export interface ContactUpdateInput extends Partial<ContactInput> {
