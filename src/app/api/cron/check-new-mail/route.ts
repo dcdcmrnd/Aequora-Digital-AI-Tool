@@ -15,7 +15,6 @@ import { prisma } from "@/lib/prisma";
 // past them, permanently losing bounce/reply detection for those messages.
 const MAX_MESSAGES_PER_ACCOUNT = 200;
 const LIST_PAGE_SIZE = 100;
-const MAX_NOTIFICATIONS_PER_ACCOUNT = 10;
 
 // How far back to look for an outbound send this inbound message might be a
 // bounce/reply to -- bounces almost always land within minutes to hours,
@@ -107,7 +106,6 @@ export async function GET(req: NextRequest) {
       const recipients = token.ownerId ? [token.ownerId] : agencyRecipientIds;
       const entityType = token.ownerId ? "inbox" : "conversations";
 
-      let notifiedForThisAccount = 0;
       for (const item of candidates) {
         if (!item.id) continue;
 
@@ -171,22 +169,23 @@ export async function GET(req: NextRequest) {
           }
         }
 
-        if (notifiedForThisAccount < MAX_NOTIFICATIONS_PER_ACCOUNT) {
-          await Promise.all(
-            recipients.map((userId) =>
-              createNotification({
-                userId,
-                type: "new_email",
-                title: `New email from ${from}`,
-                body: subject,
-                entityType,
-                entityId: token.ownerId ?? "agency",
-              }),
-            ),
-          );
-          notifiedForThisAccount += 1;
-          notified += 1;
-        }
+        // No per-account cap here -- silently dropping notifications past an
+        // arbitrary count is exactly the bug this file's own history already
+        // fixed once for bounce/reply detection (see MAX_MESSAGES_PER_ACCOUNT's
+        // comment above). Every genuinely new message gets notified.
+        await Promise.all(
+          recipients.map((userId) =>
+            createNotification({
+              userId,
+              type: "new_email",
+              title: `New email from ${from}`,
+              body: subject,
+              entityType,
+              entityId: token.ownerId ?? "agency",
+            }),
+          ),
+        );
+        notified += 1;
       }
 
       await prisma.gmailToken.update({ where: { id: token.id }, data: { lastCheckedAt: checkedAt } });
