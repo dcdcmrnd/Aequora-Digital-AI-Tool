@@ -33,7 +33,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     );
   }
 
-  const people = await upsertFoundPeople(lead.id, found);
+  const people = await upsertFoundPeople(lead.id, found, undefined, lead.phone);
 
   await logActivity({
     userId: session.user.id,

@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
   await mapWithConcurrency(toCrawl, CRAWL_CONCURRENCY, async (lead) => {
     try {
       const found = await findPeopleFromWebsite(lead.website!, titleTerms);
-      await upsertFoundPeople(lead.id, found, peopleSearch.id);
+      await upsertFoundPeople(lead.id, found, peopleSearch.id, lead.phone);
     } catch {
       failed += 1;
     }

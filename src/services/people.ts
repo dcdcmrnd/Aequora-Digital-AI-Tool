@@ -18,11 +18,17 @@ const PEOPLE_SEARCH_TARGET_RESULTS = 60; // total businesses to gather, before t
  * provenance they were first discovered with even if a later crawl touches
  * their other fields, so a People Search re-crawling a company never
  * silently reclassifies someone already in "Found People".
+ *
+ * `leadPhone` (the business's own number, already on file from Google
+ * Places) fills in for people whose own direct line wasn't found on the
+ * site -- better than leaving the column blank when a switchboard number is
+ * already known, and still overridden by any tel: link found for them.
  */
 export async function upsertFoundPeople(
   leadId: string,
   found: FoundPerson[],
   peopleSearchId?: string,
+  leadPhone?: string | null,
 ): Promise<LeadPerson[]> {
   const existing = await prisma.leadPerson.findMany({ where: { leadId } });
   const existingByName = new Map(existing.map((p) => [normalizeName(p.name ?? ""), p]));
@@ -36,7 +42,7 @@ export async function upsertFoundPeople(
       email: person.email,
       emailSource: person.emailSource,
       emailValid: person.emailValid,
-      phone: person.phone,
+      phone: person.phone ?? leadPhone ?? null,
       source: "website_crawl" as const,
       confidence: person.confidence,
       foundOnUrl: person.foundOnUrl,

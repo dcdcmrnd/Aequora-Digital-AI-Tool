@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
 
   const leads = await prisma.lead.findMany({
     where: { id: { in: parsed.data.leadIds }, website: { not: null } },
-    select: { id: true, website: true },
+    select: { id: true, website: true, phone: true },
   });
 
   let peopleFound = 0;
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
       return;
     }
 
-    await upsertFoundPeople(lead.id, found);
+    await upsertFoundPeople(lead.id, found, undefined, lead.phone);
     peopleFound += found.length;
   });
 

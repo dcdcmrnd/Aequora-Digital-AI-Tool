@@ -274,6 +274,11 @@ async function resolveEmailForCandidate(
 export async function findPeopleFromWebsite(websiteUrl: string, icpTitles: string[]): Promise<FoundPerson[]> {
   const baseUrl = await assertPublicHttpUrl(websiteUrl);
   const homeHtml = await fetchHtml(baseUrl);
+  // "www.example.com" has no MX records of its own -- mail lives on the bare
+  // domain -- so guessing/verifying against the raw hostname produced
+  // correct-looking but undeliverable @www.example.com addresses and a false
+  // "no mail server" warning on every single one.
+  const domain = baseUrl.hostname.replace(/^www\./i, "");
 
   const subpageUrls = extractSubpageLinks(homeHtml, baseUrl);
   const subpageResults = await mapWithConcurrency(subpageUrls, SUBPAGE_FETCH_CONCURRENCY, async (url) => {
@@ -303,7 +308,7 @@ export async function findPeopleFromWebsite(websiteUrl: string, icpTitles: strin
 
   return Promise.all(
     merged.map(async (candidate) => {
-      const emailResult = await resolveEmailForCandidate(candidate, baseUrl.hostname, patternFn);
+      const emailResult = await resolveEmailForCandidate(candidate, domain, patternFn);
       const title = candidate.title ? trimTrailingPunctuation(candidate.title) : null;
       return {
         name: candidate.name,
