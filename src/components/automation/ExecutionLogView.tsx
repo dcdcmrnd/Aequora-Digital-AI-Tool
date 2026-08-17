@@ -1,13 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import { CheckCircle2, Clock, User, XCircle } from "lucide-react";
+import { useEffect, useState } from "react";
+import { CheckCircle2, ChevronLeft, ChevronRight, Clock, Search, User, XCircle } from "lucide-react";
 
 import { NODE_DEFINITIONS } from "@/lib/automation/nodeRegistry";
 import { Badge } from "@/components/ui/Badge";
+import { Input } from "@/components/ui/Input";
 import { useAutomationRuns } from "@/hooks/useAutomations";
 import { cn, formatRelativeTime } from "@/lib/utils";
 import type { AutomationRun, AutomationRunStep } from "@/types";
+
+const PAGE_SIZE = 15;
 
 const STATUS_META: Record<AutomationRun["status"], { label: string; variant: "success" | "warning" | "danger" | "muted" }> = {
   running: { label: "Running", variant: "muted" },
@@ -84,7 +87,27 @@ interface ExecutionLogViewProps {
 export function ExecutionLogView({ automationId, enabled }: ExecutionLogViewProps) {
   const { runs, isLoading } = useAutomationRuns(automationId, enabled);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(0);
   const selectedRun = runs?.find((r) => r.id === selectedRunId) ?? null;
+
+  const filteredRuns = (runs ?? []).filter((run) => {
+    if (!search.trim()) return true;
+    const q = search.trim().toLowerCase();
+    return (run.contact?.name?.toLowerCase().includes(q) ?? false) || (run.contact?.email?.toLowerCase().includes(q) ?? false);
+  });
+  const pageCount = Math.max(1, Math.ceil(filteredRuns.length / PAGE_SIZE));
+  const pageRuns = filteredRuns.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
+
+  // A new search (or the run list itself changing size) can leave `page`
+  // past the new last page -- snap back instead of showing a blank list.
+  useEffect(() => {
+    setPage((p) => Math.min(p, pageCount - 1));
+  }, [pageCount]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [search]);
 
   if (isLoading) {
     return <p className="text-text-muted text-sm">Loading...</p>;
@@ -102,26 +125,68 @@ export function ExecutionLogView({ automationId, enabled }: ExecutionLogViewProp
 
   return (
     <div className="flex h-[70vh] gap-4 overflow-hidden rounded-card border border-border">
-      <div className="w-72 shrink-0 overflow-y-auto border-r border-border bg-surface-secondary">
-        {runs.map((run) => (
-          <button
-            key={run.id}
-            onClick={() => setSelectedRunId(run.id)}
-            className={cn(
-              "flex w-full items-start gap-2.5 border-b border-border px-3 py-3 text-left hover:bg-white",
-              selectedRunId === run.id && "bg-white",
-            )}
-          >
-            <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
-              <User className="size-3.5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-text-primary truncate text-sm font-medium">{run.contact?.name ?? "Unknown contact"}</p>
-              <p className="text-text-muted text-xs">{formatRelativeTime(run.createdAt)}</p>
-            </div>
-            <Badge variant={STATUS_META[run.status].variant}>{STATUS_META[run.status].label}</Badge>
-          </button>
-        ))}
+      <div className="flex w-72 shrink-0 flex-col border-r border-border bg-surface-secondary">
+        <div className="border-b border-border p-2">
+          <div className="relative">
+            <Search className="text-text-muted pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by name or email..."
+              className="h-8 pl-8 text-xs"
+            />
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto">
+          {pageRuns.length === 0 ? (
+            <p className="text-text-muted p-4 text-center text-xs">No contacts match &quot;{search}&quot;.</p>
+          ) : (
+            pageRuns.map((run) => (
+              <button
+                key={run.id}
+                onClick={() => setSelectedRunId(run.id)}
+                className={cn(
+                  "flex w-full items-start gap-2.5 border-b border-border px-3 py-3 text-left hover:bg-white",
+                  selectedRunId === run.id && "bg-white",
+                )}
+              >
+                <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
+                  <User className="size-3.5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-text-primary truncate text-sm font-medium">{run.contact?.name ?? "Unknown contact"}</p>
+                  <p className="text-text-muted text-xs">{formatRelativeTime(run.createdAt)}</p>
+                </div>
+                <Badge variant={STATUS_META[run.status].variant}>{STATUS_META[run.status].label}</Badge>
+              </button>
+            ))
+          )}
+        </div>
+
+        {pageCount > 1 && (
+          <div className="flex items-center justify-between border-t border-border px-3 py-2">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0}
+              className="text-text-muted hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-30"
+            >
+              <ChevronLeft className="size-4" />
+            </button>
+            <span className="text-text-muted text-[11px]">
+              Page {page + 1} of {pageCount}
+            </span>
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+              disabled={page >= pageCount - 1}
+              className="text-text-muted hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-30"
+            >
+              <ChevronRight className="size-4" />
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
