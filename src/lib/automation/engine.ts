@@ -332,26 +332,41 @@ export async function runInboundWebhook(secret: string, payload: Record<string, 
 
 /** Resumes a run paused at a "wait" node — called by the cron sweep or the open-tracking pixel. */
 export async function resumeRun(runId: string): Promise<void> {
-  const run = await prisma.automationRun.findUnique({ where: { id: runId } });
-  if (!run || run.status !== "waiting" || !run.currentNodeId) return;
+  try {
+    const run = await prisma.automationRun.findUnique({ where: { id: runId } });
+    if (!run || run.status !== "waiting" || !run.currentNodeId) return;
 
-  const automation = await prisma.automation.findUnique({ where: { id: run.automationId } });
-  if (!automation) return;
+    const automation = await prisma.automation.findUnique({ where: { id: run.automationId } });
+    if (!automation) return;
 
-  const flow = parseFlow(automation.flow);
-  const next = nextNodeId(flow, run.currentNodeId);
+    const flow = parseFlow(automation.flow);
+    const next = nextNodeId(flow, run.currentNodeId);
 
-  await prisma.automationRun.update({
-    where: { id: run.id },
-    data: { status: "running", waitUntil: null, waitToken: null },
-  });
+    await prisma.automationRun.update({
+      where: { id: run.id },
+      data: { status: "running", waitUntil: null, waitToken: null },
+    });
 
-  if (!next) {
-    await prisma.automationRun.update({ where: { id: run.id }, data: { status: "completed", currentNodeId: null } });
-    return;
+    if (!next) {
+      await prisma.automationRun.update({ where: { id: run.id }, data: { status: "completed", currentNodeId: null } });
+      return;
+    }
+
+    await runLoop(run.id, flow, next);
+  } catch (err) {
+    // A single bad run (corrupt flow JSON, a transient DB hiccup, etc.) must
+    // never take the whole batch down with it -- the daily cron calls this
+    // once per due run in a plain loop, so an uncaught throw here used to
+    // propagate out of the route handler and abort every other run still
+    // waiting behind it for that entire invocation. Since the failing run
+    // stayed "waiting" and due, it would then fail the exact same way on
+    // every subsequent cron run too, permanently starving everything queued
+    // after it -- this is why waits kept silently not firing.
+    console.error(`resumeRun failed for run ${runId}`, err);
+    await prisma.automationRun
+      .update({ where: { id: runId }, data: { status: "error", detail: err instanceof Error ? err.message : "Unknown error" } })
+      .catch(() => {});
   }
-
-  await runLoop(run.id, flow, next);
 }
 
 /** Manually stops a contact's run — used by the "Remove from Workflow" action in the builder's per-step contact list. */

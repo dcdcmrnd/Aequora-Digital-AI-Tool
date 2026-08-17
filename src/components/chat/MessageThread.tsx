@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { formatMessageTimestamp } from "@/lib/chatFormat";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/Avatar";
 import type { ChatRoom } from "./ChatPageClient";
@@ -511,7 +512,7 @@ export function MessageThread({ room, currentUserId, currentUserName, isAdmin, o
                       </div>
                     )}
                     <span className="text-[10px] text-text-muted mt-1 mx-1">
-                      {formatTime(msg.createdAt)}
+                      {formatMessageTimestamp(msg.createdAt)}
                       {msg.editedAt && " · edited"}
                     </span>
                   </div>
@@ -770,10 +771,6 @@ function StopIcon() {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-}
 
 function formatDuration(seconds: number) {
   const m = Math.floor(seconds / 60);

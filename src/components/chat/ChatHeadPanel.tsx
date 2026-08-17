@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Send, X } from "lucide-react";
 
 import { Avatar } from "@/components/ui/Avatar";
+import { formatMessageTimestamp } from "@/lib/chatFormat";
 import { cn } from "@/lib/utils";
 import type { ChatHeadRoom } from "@/lib/chatHeadsStore";
 
@@ -109,6 +110,7 @@ export function ChatHeadPanel({ room, currentUserId, onClose }: Props) {
                 >
                   {m.content}
                 </div>
+                <span className="text-text-muted mt-0.5 mx-1 text-[10px]">{formatMessageTimestamp(m.createdAt)}</span>
               </div>
             );
           })

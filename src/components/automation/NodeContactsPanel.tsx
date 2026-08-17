@@ -32,6 +32,9 @@ export function NodeContactsPanel({ automationId, nodeId, nodeLabel, onClose }: 
   const pageCount = runs ? Math.max(1, Math.ceil(runs.length / PAGE_SIZE)) : 1;
   const pageRuns = runs?.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE) ?? [];
   const pageAllSelected = pageRuns.length > 0 && pageRuns.every((r) => selectedIds.has(r.id));
+  // `runs` already holds every contact at this step (paginated only client-side
+  // above), so "select all" across pages is just selecting every id in it.
+  const everySelected = !!runs && runs.length > 0 && runs.every((r) => selectedIds.has(r.id));
 
   function toggleOne(runId: string) {
     setSelectedIds((prev) => {
@@ -49,6 +52,11 @@ export function NodeContactsPanel({ automationId, nodeId, nodeLabel, onClose }: 
       else pageRuns.forEach((r) => next.add(r.id));
       return next;
     });
+  }
+
+  function toggleEveryRun() {
+    if (!runs) return;
+    setSelectedIds(everySelected ? new Set() : new Set(runs.map((r) => r.id)));
   }
 
   function handleBulk(action: "remove" | "advance") {
@@ -73,15 +81,26 @@ export function NodeContactsPanel({ automationId, nodeId, nodeLabel, onClose }: 
 
       {runs && runs.length > 0 && (
         <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-2">
-          <label className="flex items-center gap-2 text-xs text-text-secondary select-none">
-            <input
-              type="checkbox"
-              checked={pageAllSelected}
-              onChange={togglePageAll}
-              className="size-3.5 rounded border-border text-brand-primary focus:ring-brand-primary"
-            />
-            {selectedIds.size > 0 ? `${selectedIds.size} selected` : "Select this page"}
-          </label>
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 text-xs text-text-secondary select-none">
+              <input
+                type="checkbox"
+                checked={pageAllSelected}
+                onChange={togglePageAll}
+                className="size-3.5 rounded border-border text-brand-primary focus:ring-brand-primary"
+              />
+              {selectedIds.size > 0 ? `${selectedIds.size} selected` : "Select this page"}
+            </label>
+            {pageCount > 1 && (
+              <button
+                type="button"
+                onClick={toggleEveryRun}
+                className="text-brand-primary text-xs font-medium hover:underline"
+              >
+                {everySelected ? "Clear selection" : `Select all ${runs.length}`}
+              </button>
+            )}
+          </div>
           {pageCount > 1 && (
             <div className="flex items-center gap-1">
               <button
