@@ -11,8 +11,11 @@ import { discoverRemoteHiring } from "@/services/remoteHiring";
 // crawl per company, capped to fit inside Vercel Hobby's 60s ceiling.
 export const maxDuration = 60;
 
+// Empty keyword is allowed (and is what the UI sends on first load, before
+// the user has typed anything) -- searchRemoteHiringJobs treats it as "no
+// filter", surfacing the most recently posted roles across the board.
 const schema = z.object({
-  keyword: z.string().trim().min(1),
+  keyword: z.string().trim().optional().default(""),
   location: z.string().trim().optional(),
 });
 
@@ -48,7 +51,7 @@ export async function POST(req: NextRequest) {
     action: "created",
     entityType: "people_search",
     entityId: result.searchId,
-    entityName: `Remote hiring: ${parsed.data.keyword}`,
+    entityName: `Remote hiring: ${parsed.data.keyword || "all listings"}`,
     metadata: {
       jobsFound: result.jobsFound,
       companiesMatched: result.companiesMatched,

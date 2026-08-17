@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Search } from "lucide-react";
 
@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/Table";
 import { useBulkSavePeopleAsContacts } from "@/hooks/usePeople";
-import { useRemoteHiringSearch } from "@/hooks/useRemoteHiringSearch";
+import { useRemoteHiringSearch, type RemoteHiringSearchResponse } from "@/hooks/useRemoteHiringSearch";
 import type { LeadPerson, RemoteHiringPost } from "@/types";
 
 function postStatus(post: RemoteHiringPost) {
@@ -18,6 +18,15 @@ function postStatus(post: RemoteHiringPost) {
   if ((post.lead?.people.length ?? 0) > 0) return <Badge variant="success">Contact found</Badge>;
   return <Badge variant="warning">Matched, no contact</Badge>;
 }
+
+// Survives switching tabs away and back within the same browser session (the
+// component unmounts/remounts each time, which would otherwise blank the
+// view and re-run the search) -- module-level rather than component state
+// specifically so re-mounting doesn't lose it. Not persisted beyond a
+// reload: each search does a real, billed Google Places lookup per matched
+// company, so auto-firing it again on every reload isn't worth avoiding one
+// extra click.
+let cachedResult: RemoteHiringSearchResponse | null = null;
 
 /**
  * Sources hiring signals from a live remote job board (Remotive) instead of
@@ -31,10 +40,26 @@ export function RemoteHiringView() {
   const [location, setLocation] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [savingId, setSavingId] = useState<string | undefined>();
+  const [cached, setCached] = useState<RemoteHiringSearchResponse | null>(cachedResult);
 
   const search = useRemoteHiringSearch();
   const saveAsContacts = useBulkSavePeopleAsContacts();
-  const posts = search.data?.posts ?? [];
+
+  // Auto-loads the current top remote-hiring listings (empty keyword = no
+  // filter, see searchRemoteHiringJobs) so the tab shows something on open
+  // instead of an empty form -- but only once per session (see cachedResult
+  // above), since each run does a real Places lookup per matched company.
+  useEffect(() => {
+    if (cachedResult || search.isPending) return;
+    search.mutate(
+      { keyword: "", location: undefined },
+      { onSuccess: (result) => { cachedResult = result; setCached(result); } },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const data = search.data ?? cached;
+  const posts = data?.posts ?? [];
 
   // PeopleTable expects each person's `lead` relation for its Company
   // column/link -- the nested crawl result doesn't carry it back (it's
@@ -49,9 +74,11 @@ export function RemoteHiringView() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!keyword.trim()) return;
     setSelectedIds(new Set());
-    search.mutate({ keyword: keyword.trim(), location: location.trim() || undefined });
+    search.mutate(
+      { keyword: keyword.trim(), location: location.trim() || undefined },
+      { onSuccess: (result) => { cachedResult = result; setCached(result); } },
+    );
   }
 
   function toggle(id: string) {
@@ -87,10 +114,10 @@ export function RemoteHiringView() {
         <div>
           <label className="text-text-secondary mb-1 block text-xs font-medium">Role or keyword</label>
           <Input
-            placeholder="e.g. Customer Support"
+            placeholder="Leave blank to see all current listings"
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
-            className="w-56"
+            className="w-64"
           />
         </div>
         <div>
@@ -102,7 +129,7 @@ export function RemoteHiringView() {
             className="w-52"
           />
         </div>
-        <Button type="submit" loading={search.isPending} disabled={!keyword.trim()}>
+        <Button type="submit" loading={search.isPending}>
           <Search className="size-3.5" />
           Search
         </Button>
@@ -116,11 +143,11 @@ export function RemoteHiringView() {
 
       {search.isError && <p className="text-danger text-sm">That search failed. Please try again.</p>}
 
-      {search.data && (
+      {data && !search.isPending && (
         <>
           <p className="text-text-muted text-sm">
-            Found {search.data.jobsFound} job posts, matched {search.data.companiesMatched} to a real business —{" "}
-            {search.data.peopleFound} {search.data.peopleFound === 1 ? "person" : "people"} found.
+            Found {data.jobsFound} job posts, matched {data.companiesMatched} to a real business —{" "}
+            {data.peopleFound} {data.peopleFound === 1 ? "person" : "people"} found.
           </p>
 
           <div className="rounded-card border-border overflow-x-auto border">
@@ -203,7 +230,7 @@ export function RemoteHiringView() {
         </>
       )}
 
-      {!search.data && !search.isPending && (
+      {!data && !search.isPending && !search.isError && (
         <p className="text-text-muted text-xs">
           Searches Remotive for companies currently posting remote-hiring job ads, then best-effort matches each to a
           real business (via Google Places) and crawls its site for a named contact — phone included when the

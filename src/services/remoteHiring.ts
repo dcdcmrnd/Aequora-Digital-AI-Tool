@@ -69,7 +69,7 @@ export async function discoverRemoteHiring(
   const peopleSearch = await prisma.peopleSearch.create({
     data: {
       userId,
-      position: keyword,
+      position: keyword.trim() || "All listings",
       industry: "Remote hiring (Remotive)",
       location: locationFilter?.trim() || "Any",
       companiesFound: jobs.length,
