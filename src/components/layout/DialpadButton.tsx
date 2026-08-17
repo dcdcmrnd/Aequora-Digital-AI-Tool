@@ -12,6 +12,17 @@ const KEYPAD_KEYS = [
   ["*", "0", "#"],
 ];
 
+const KEYPAD_LETTERS: Record<string, string> = {
+  "2": "ABC",
+  "3": "DEF",
+  "4": "GHI",
+  "5": "JKL",
+  "6": "MNO",
+  "7": "PQRS",
+  "8": "TUV",
+  "9": "WXYZ",
+};
+
 /** Header "dial any number" button — for calling numbers that aren't saved as a contact. */
 export function DialpadButton() {
   const { startCall } = useCall();
@@ -93,9 +104,12 @@ export function DialpadButton() {
                   key={key}
                   type="button"
                   onClick={() => pressKey(key)}
-                  className="flex items-center justify-center rounded-btn border border-border py-2 text-sm font-medium text-text-primary hover:bg-surface-hover active:bg-surface-secondary transition-colors"
+                  className="flex flex-col items-center justify-center gap-0.5 rounded-btn border border-border py-1.5 text-text-primary hover:bg-surface-hover active:bg-surface-secondary transition-colors"
                 >
-                  {key}
+                  <span className="text-sm font-medium leading-none">{key}</span>
+                  <span className="text-text-muted text-[9px] font-medium leading-none tracking-wide">
+                    {KEYPAD_LETTERS[key] ?? " "}
+                  </span>
                 </button>
               ))}
             </div>

@@ -20,6 +20,17 @@ const KEYPAD_KEYS = [
   ["*", "0", "#"],
 ];
 
+const KEYPAD_LETTERS: Record<string, string> = {
+  "2": "ABC",
+  "3": "DEF",
+  "4": "GHI",
+  "5": "JKL",
+  "6": "MNO",
+  "7": "PQRS",
+  "8": "TUV",
+  "9": "WXYZ",
+};
+
 function formatDuration(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000);
   const minutes = Math.floor(totalSeconds / 60);
@@ -83,9 +94,12 @@ export function CallWidget() {
                 key={key}
                 type="button"
                 onClick={() => pressKey(key)}
-                className="text-text-primary hover:bg-surface-hover active:bg-surface-secondary flex items-center justify-center rounded-btn border border-border py-2 text-sm font-medium transition-colors"
+                className="text-text-primary hover:bg-surface-hover active:bg-surface-secondary flex flex-col items-center justify-center gap-0.5 rounded-btn border border-border py-1.5 transition-colors"
               >
-                {key}
+                <span className="text-sm font-medium leading-none">{key}</span>
+                <span className="text-text-muted text-[9px] font-medium leading-none tracking-wide">
+                  {KEYPAD_LETTERS[key] ?? " "}
+                </span>
               </button>
             ))}
           </div>
