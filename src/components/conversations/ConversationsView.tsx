@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Mail, Pencil, PhoneCall, Plus, Reply, Search, Workflow } from "lucide-react";
+import { ArrowLeft, Mail, MailOpen, Pencil, PhoneCall, Plus, Reply, Search, Workflow } from "lucide-react";
 import toast from "react-hot-toast";
 
 import { BulkWorkflowModal } from "@/components/contacts/BulkActionsBar";
@@ -117,6 +117,8 @@ export function ConversationsView() {
   const [editOpen, setEditOpen] = useState(false);
   const [workflowOpen, setWorkflowOpen] = useState(false);
   const [opportunityModal, setOpportunityModal] = useState<{ opportunity?: Opportunity } | null>(null);
+  const [marking, setMarking] = useState(false);
+  const [contactsRefreshKey, setContactsRefreshKey] = useState(0);
 
   // Column 1: distinct contacts ordered by their actual most recent message
   // time (mergeThreadsByContact sorts on that directly, not on whatever
@@ -169,19 +171,19 @@ export function ConversationsView() {
       cancelled = true;
       clearInterval(interval);
     };
-  }, []);
+    // contactsRefreshKey: bumped after marking a conversation read/unread so
+    // this list's own unread state reflects that change immediately, not
+    // just on the next 30s poll.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contactsRefreshKey]);
 
   useEffect(() => {
     if (urlContactId) setSelectedId(urlContactId);
   }, [urlContactId]);
 
-  // The list above only ever holds ~30 recent threads plus whatever's
-  // currently unread -- searching it client-side meant an older, already-read
-  // conversation (like one from weeks ago) could exist and still be openable
-  // by direct link, yet be unfindable by typing its name, because it was
-  // never in that small preloaded set to begin with. Typing a search now
-  // queries Gmail directly (debounced) instead of filtering that snapshot,
-  // so it actually finds anything, not just what happened to already be loaded.
+  // Typing a search queries Gmail directly (debounced) rather than filtering
+  // the list above -- an older conversation not among that list is still
+  // findable by name/email this way, not just whatever happened to load.
   useEffect(() => {
     const term = search.trim();
     if (!term) {
@@ -218,6 +220,7 @@ export function ConversationsView() {
   const { opportunities } = useOpportunities();
 
   const lastEmail = [...items].reverse().find((i): i is Extract<TimelineItem, { type: "email" }> => i.type === "email");
+  const conversationHasUnread = items.some((i) => i.type === "email" && i.isUnread);
   const contactOpportunities = (opportunities ?? []).filter((o) => o.contactId === selectedId);
 
   // Messages render oldest-first (a normal email/chat reading order), but
@@ -235,6 +238,35 @@ export function ConversationsView() {
   function handleTagsChange(tags: string[]) {
     if (!contact) return;
     updateContact.mutate({ id: contact.id, tags });
+  }
+
+  // Marks every thread that makes up this conversation (a contact can have
+  // several separate Gmail threads over time, all merged into one feed here)
+  // read or unread in one go, mirroring GHL's per-conversation "Mark as
+  // Unread" action -- reuses the same bulk endpoint the Inbox's multi-select
+  // toolbar already calls.
+  async function handleMarkReadStatus(read: boolean) {
+    const threadIds = Array.from(
+      new Set(items.filter((i): i is Extract<TimelineItem, { type: "email" }> => i.type === "email").map((i) => i.threadId)),
+    );
+    if (threadIds.length === 0) return;
+
+    setMarking(true);
+    try {
+      const res = await fetch("/api/gmail/threads/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ threadIds, action: read ? "markRead" : "markUnread", scope: "agency" }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success(read ? "Marked as read." : "Marked as unread.");
+      refetchTimeline();
+      setContactsRefreshKey((k) => k + 1);
+    } catch {
+      toast.error("Couldn't update read status. Please try again.");
+    } finally {
+      setMarking(false);
+    }
   }
 
   return (
@@ -336,7 +368,20 @@ export function ConversationsView() {
                 <p className="text-text-primary text-sm font-semibold">{contact?.name ?? "..."}</p>
                 {contact?.company && <p className="text-text-muted text-xs">{contact.company}</p>}
               </div>
-              {contact?.phone && <CallButton contactId={contact.id} name={contact.name} phone={contact.phone} />}
+              <div className="flex items-center gap-1">
+                {items.some((i) => i.type === "email") && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={marking}
+                    onClick={() => handleMarkReadStatus(conversationHasUnread)}
+                  >
+                    <MailOpen className="size-3.5" />
+                    {conversationHasUnread ? "Mark as Read" : "Mark as Unread"}
+                  </Button>
+                )}
+                {contact?.phone && <CallButton contactId={contact.id} name={contact.name} phone={contact.phone} />}
+              </div>
             </div>
 
             <div className="flex-1 space-y-3 overflow-y-auto bg-surface-secondary/40 p-4">
