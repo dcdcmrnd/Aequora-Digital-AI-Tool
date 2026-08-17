@@ -17,16 +17,18 @@ interface OpportunityFormModalProps {
   pipeline: Pipeline;
   opportunity?: Opportunity;
   defaultStageId?: string;
+  /** Pre-selects the contact for a new opportunity, e.g. when opened from that contact's own conversation. Ignored once editing an existing opportunity (its own contactId always wins, and can't be changed). */
+  defaultContactId?: string;
 }
 
-export function OpportunityFormModal({ open, onClose, pipeline, opportunity, defaultStageId }: OpportunityFormModalProps) {
+export function OpportunityFormModal({ open, onClose, pipeline, opportunity, defaultStageId, defaultContactId }: OpportunityFormModalProps) {
   const { contacts } = useContacts();
   const { createOpportunity, updateOpportunity, deleteOpportunity } = useOpportunities();
   const isEditing = !!opportunity;
 
   const [name, setName] = useState(opportunity?.name ?? "");
   const [value, setValue] = useState(opportunity?.value?.toString() ?? "");
-  const [contactId, setContactId] = useState(opportunity?.contactId ?? "");
+  const [contactId, setContactId] = useState(opportunity?.contactId ?? defaultContactId ?? "");
   const [stageId, setStageId] = useState(opportunity?.stageId ?? defaultStageId ?? pipeline.stages[0]?.id ?? "");
   const [notes, setNotes] = useState(opportunity?.notes ?? "");
 

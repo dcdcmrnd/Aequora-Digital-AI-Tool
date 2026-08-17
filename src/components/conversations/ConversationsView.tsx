@@ -3,20 +3,24 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Mail, Pencil, PhoneCall, Reply, Search, Workflow } from "lucide-react";
+import { ArrowLeft, Mail, Pencil, PhoneCall, Plus, Reply, Search, Workflow } from "lucide-react";
 import toast from "react-hot-toast";
 
 import { BulkWorkflowModal } from "@/components/contacts/BulkActionsBar";
 import { ContactFormModal } from "@/components/contacts/ContactFormModal";
 import { CallButton } from "@/components/calls/CallWidget";
 import { ComposeModal } from "@/components/inbox/ComposeModal";
+import { OpportunityFormModal } from "@/components/pipeline/OpportunityFormModal";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { TagInput } from "@/components/ui/TagInput";
 import { useContact, useContactTags, useContacts } from "@/hooks/useContacts";
 import { useContactAutomationRuns, useContactTimeline, type TimelineItem } from "@/hooks/useConversations";
+import { useOpportunities } from "@/hooks/useOpportunities";
+import { usePipeline } from "@/hooks/usePipeline";
 import { CALL_STATUS_LABEL, formatCallDuration, isVoicemail } from "@/lib/calls";
 import { cn, formatRelativeTime } from "@/lib/utils";
+import type { Opportunity, OpportunityStatus } from "@/types";
 
 interface ThreadContact {
   id: string;
@@ -25,9 +29,11 @@ interface ThreadContact {
   hasUnread: boolean;
   /** Epoch ms of that contact's most recent message across every thread seen -- the actual sort key, not just whatever order the source queries happened to return. */
   lastMessageAt: number;
+  /** Last message's snippet, so the list reads like an actual inbox instead of just a name+email directory. */
+  snippet: string;
 }
 
-/** Merges thread lists from one or more /api/gmail/threads responses into one contact per row, keeping the latest message time and unread flag across every thread seen for that contact. */
+/** Merges thread lists from one or more /api/gmail/threads responses into one contact per row, keeping the latest message time, snippet, and unread flag across every thread seen for that contact. */
 function mergeThreadsByContact(threadLists: any[][]): ThreadContact[] {
   const byContactId = new Map<string, ThreadContact>();
   for (const threads of threadLists) {
@@ -42,15 +48,25 @@ function mergeThreadsByContact(threadLists: any[][]): ThreadContact[] {
           email: t.contactEmail,
           hasUnread: !!t.isUnread,
           lastMessageAt,
+          snippet: t.snippet ?? "",
         });
       } else {
         if (t.isUnread) existing.hasUnread = true;
-        if (lastMessageAt > existing.lastMessageAt) existing.lastMessageAt = lastMessageAt;
+        if (lastMessageAt > existing.lastMessageAt) {
+          existing.lastMessageAt = lastMessageAt;
+          existing.snippet = t.snippet ?? existing.snippet;
+        }
       }
     }
   }
   return Array.from(byContactId.values()).sort((a, b) => b.lastMessageAt - a.lastMessageAt);
 }
+
+const OPPORTUNITY_STATUS_META: Record<OpportunityStatus, { label: string; dot: string; text: string }> = {
+  open: { label: "Open", dot: "bg-blue-500", text: "text-blue-700" },
+  won: { label: "Won", dot: "bg-emerald-500", text: "text-emerald-700" },
+  lost: { label: "Lost", dot: "bg-red-500", text: "text-danger" },
+};
 
 const RUN_STATUS_LABEL: Record<string, string> = {
   running: "Running",
@@ -66,6 +82,7 @@ export function ConversationsView() {
 
   const [contacts, setContacts] = useState<ThreadContact[]>([]);
   const [loadingContacts, setLoadingContacts] = useState(true);
+  const [listFilter, setListFilter] = useState<"all" | "unread">("all");
   const [search, setSearch] = useState("");
   const [searchResults, setSearchResults] = useState<ThreadContact[] | null>(null);
   const [searching, setSearching] = useState(false);
@@ -74,6 +91,7 @@ export function ConversationsView() {
   const [composeOpen, setComposeOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [workflowOpen, setWorkflowOpen] = useState(false);
+  const [opportunityModal, setOpportunityModal] = useState<{ opportunity?: Opportunity } | null>(null);
 
   // Column 1: distinct contacts ordered by their actual most recent message
   // time (mergeThreadsByContact sorts on that directly, not on whatever
@@ -173,15 +191,19 @@ export function ConversationsView() {
     router.replace(`/conversations?contactId=${id}`, { scroll: false });
   }
 
-  const displayedContacts = search.trim() ? (searchResults ?? []) : contacts;
+  const baseContacts = search.trim() ? (searchResults ?? []) : contacts;
+  const displayedContacts = listFilter === "unread" ? baseContacts.filter((c) => c.hasUnread) : baseContacts;
 
   const { contact, isLoading: contactLoading } = useContact(selectedId);
   const { items, isLoading: timelineLoading, refetch: refetchTimeline } = useContactTimeline(selectedId);
   const { runs } = useContactAutomationRuns(selectedId);
   const { updateContact } = useContacts();
   const { tags: tagSuggestions } = useContactTags();
+  const { pipeline } = usePipeline();
+  const { opportunities } = useOpportunities();
 
   const lastEmail = [...items].reverse().find((i): i is Extract<TimelineItem, { type: "email" }> => i.type === "email");
+  const contactOpportunities = (opportunities ?? []).filter((o) => o.contactId === selectedId);
 
   // Messages render oldest-first (a normal email/chat reading order), but
   // nothing was ever scrolling the pane down -- opening a conversation, or
@@ -203,12 +225,31 @@ export function ConversationsView() {
   return (
     <div className="flex h-[calc(100vh-7rem)] overflow-hidden rounded-card border border-border bg-white">
       {/* Column 1: contacts */}
-      <div className="flex w-72 shrink-0 flex-col border-r border-border">
+      <div className="flex w-80 shrink-0 flex-col border-r border-border">
         <div className="border-b border-border p-3">
           <Link href="/contacts" className="text-text-muted hover:text-text-primary mb-2 flex items-center gap-1 text-xs">
             <ArrowLeft className="size-3.5" />
             Contacts
           </Link>
+
+          <div className="mb-2 flex items-center gap-4 text-sm">
+            {(["all", "unread"] as const).map((f) => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setListFilter(f)}
+                className={cn(
+                  "border-b-2 pb-1 font-medium capitalize transition-colors",
+                  listFilter === f
+                    ? "border-brand-primary text-brand-primary"
+                    : "text-text-secondary hover:text-text-primary border-transparent",
+                )}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
+
           <div className="relative">
             <Search className="text-text-muted pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2" />
             <input
@@ -218,13 +259,23 @@ export function ConversationsView() {
               className="border-border w-full rounded-input border py-1.5 pl-8 pr-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand-primary"
             />
           </div>
+
+          {!(search.trim() ? searching : loadingContacts) && (
+            <p className="text-text-muted mt-2 text-[11px] uppercase tracking-wide">
+              {displayedContacts.length} result{displayedContacts.length === 1 ? "" : "s"}
+            </p>
+          )}
         </div>
         <div className="flex-1 overflow-y-auto">
           {(search.trim() ? searching : loadingContacts) ? (
             <p className="text-text-muted p-4 text-center text-sm">{search.trim() ? "Searching..." : "Loading..."}</p>
           ) : displayedContacts.length === 0 ? (
             <p className="text-text-muted p-4 text-center text-sm">
-              {search.trim() ? `No conversations match "${search.trim()}".` : "No conversations yet."}
+              {search.trim()
+                ? `No conversations match "${search.trim()}".`
+                : listFilter === "unread"
+                  ? "No unread conversations."
+                  : "No conversations yet."}
             </p>
           ) : (
             displayedContacts.map((c) => (
@@ -232,18 +283,25 @@ export function ConversationsView() {
                 key={c.id}
                 onClick={() => selectContact(c.id)}
                 className={cn(
-                  "flex w-full items-center gap-2.5 border-b border-border px-3 py-2.5 text-left transition-colors hover:bg-surface-secondary",
-                  selectedId === c.id && "bg-brand-primary/5",
+                  "flex w-full items-start gap-2.5 border-b border-border border-l-2 px-3 py-2.5 text-left transition-colors hover:bg-surface-secondary",
+                  selectedId === c.id ? "bg-brand-primary/5 border-l-brand-primary" : "border-l-transparent",
                 )}
               >
                 <Avatar name={c.name} size="sm" />
                 <div className="min-w-0 flex-1">
-                  <p className={cn("truncate text-sm", c.hasUnread ? "text-text-primary font-semibold" : "text-text-primary font-medium")}>
-                    {c.name}
+                  <div className="flex items-center justify-between gap-2">
+                    <p className={cn("truncate text-sm", c.hasUnread ? "text-text-primary font-semibold" : "text-text-primary font-medium")}>
+                      {c.name}
+                    </p>
+                    <span className="text-text-muted shrink-0 text-[11px]">
+                      {c.lastMessageAt ? formatRelativeTime(new Date(c.lastMessageAt)) : ""}
+                    </span>
+                  </div>
+                  <p className={cn("truncate text-xs", c.hasUnread ? "text-text-primary font-medium" : "text-text-muted")}>
+                    {c.snippet || c.email}
                   </p>
-                  <p className="text-text-muted truncate text-xs">{c.email}</p>
                 </div>
-                {c.hasUnread && <span className="bg-brand-primary size-2 shrink-0 rounded-full" title="Unread messages" />}
+                {c.hasUnread && <span className="bg-brand-primary mt-1.5 size-2 shrink-0 rounded-full" title="Unread messages" />}
               </button>
             ))
           )}
@@ -391,6 +449,54 @@ export function ConversationsView() {
                 </Button>
               </div>
 
+              {pipeline && (
+                <div>
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <p className="text-text-secondary text-xs font-medium">Opportunities</p>
+                    <button
+                      type="button"
+                      onClick={() => setOpportunityModal({})}
+                      className="text-brand-primary inline-flex items-center gap-0.5 text-xs font-medium hover:underline"
+                    >
+                      <Plus className="size-3" />
+                      Add
+                    </button>
+                  </div>
+                  {contactOpportunities.length === 0 ? (
+                    <p className="text-text-muted text-xs">No opportunities yet.</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {contactOpportunities.map((o) => {
+                        const stage = pipeline.stages.find((s) => s.id === o.stageId);
+                        const stageIndex = pipeline.stages.findIndex((s) => s.id === o.stageId);
+                        const statusMeta = OPPORTUNITY_STATUS_META[o.status];
+                        return (
+                          <button
+                            key={o.id}
+                            type="button"
+                            onClick={() => setOpportunityModal({ opportunity: o })}
+                            className="border-border hover:border-brand-primary/40 w-full rounded-input border p-2 text-left text-xs transition-colors"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-text-primary truncate font-medium">{o.name}</span>
+                              <span className={cn("flex shrink-0 items-center gap-1", statusMeta.text)}>
+                                <span className={cn("size-1.5 rounded-full", statusMeta.dot)} />
+                                {statusMeta.label}
+                              </span>
+                            </div>
+                            <p className="text-text-muted mt-0.5">
+                              {o.value != null && `Value: $${o.value.toLocaleString()} · `}
+                              Stage: {stage?.name ?? "Unknown"}
+                              {stageIndex >= 0 && ` (${stageIndex + 1}/${pipeline.stages.length})`}
+                            </p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div>
                 <p className="text-text-secondary mb-1 text-xs font-medium">Tags</p>
                 <TagInput tags={contact.tags} onChange={handleTagsChange} placeholder="Add a tag..." suggestions={tagSuggestions} />
@@ -438,6 +544,15 @@ export function ConversationsView() {
       {contact && editOpen && <ContactFormModal open={editOpen} onClose={() => setEditOpen(false)} contact={contact} />}
       {contact && workflowOpen && (
         <BulkWorkflowModal selectedIds={[contact.id]} onClose={() => setWorkflowOpen(false)} onDone={() => setWorkflowOpen(false)} />
+      )}
+      {contact && pipeline && opportunityModal && (
+        <OpportunityFormModal
+          open={!!opportunityModal}
+          onClose={() => setOpportunityModal(null)}
+          pipeline={pipeline}
+          opportunity={opportunityModal.opportunity}
+          defaultContactId={contact.id}
+        />
       )}
       {contact && replyTarget && (
         <ComposeModal
