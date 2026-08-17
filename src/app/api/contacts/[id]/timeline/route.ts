@@ -19,6 +19,8 @@ interface EmailTimelineItem {
   from: string;
   to: string;
   isOutgoing: boolean;
+  /** Gmail's own UNREAD label on this specific message -- never true for isOutgoing (Gmail doesn't mark your own sent mail unread). */
+  isUnread: boolean;
   subject: string;
   html: string;
   text: string;
@@ -77,6 +79,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
             from,
             to,
             isOutgoing,
+            isUnread: !isOutgoing && !!msg.labelIds?.includes("UNREAD"),
             subject: getHeader(headers, "Subject"),
             html,
             text,

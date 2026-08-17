@@ -22,6 +22,7 @@ interface ThreadContact {
   id: string;
   name: string;
   email: string;
+  hasUnread: boolean;
 }
 
 const RUN_STATUS_LABEL: Record<string, string> = {
@@ -55,22 +56,45 @@ export function ConversationsView() {
   // something has landed there, so a contact we've emailed but who hasn't
   // replied yet lives entirely under SENT and was invisible here before.
   useEffect(() => {
-    setLoadingContacts(true);
-    fetch(`/api/gmail/threads?${new URLSearchParams({ scope: "agency", q: "in:inbox OR in:sent" })}`)
-      .then((res) => res.json())
-      .then((data) => {
-        const threads = Array.isArray(data.threads) ? data.threads : [];
-        const seen = new Set<string>();
-        const list: ThreadContact[] = [];
-        for (const t of threads) {
-          if (!t.contactId || seen.has(t.contactId)) continue;
-          seen.add(t.contactId);
-          list.push({ id: t.contactId, name: t.contactName, email: t.contactEmail });
-        }
-        setContacts(list);
-      })
-      .catch(() => toast.error("Couldn't load conversations."))
-      .finally(() => setLoadingContacts(false));
+    let cancelled = false;
+
+    function loadContacts(showLoading: boolean) {
+      if (showLoading) setLoadingContacts(true);
+      fetch(`/api/gmail/threads?${new URLSearchParams({ scope: "agency", q: "in:inbox OR in:sent" })}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (cancelled) return;
+          const threads = Array.isArray(data.threads) ? data.threads : [];
+          const byContactId = new Map<string, ThreadContact>();
+          for (const t of threads) {
+            if (!t.contactId) continue;
+            const existing = byContactId.get(t.contactId);
+            if (!existing) {
+              byContactId.set(t.contactId, { id: t.contactId, name: t.contactName, email: t.contactEmail, hasUnread: !!t.isUnread });
+            } else if (t.isUnread) {
+              // Threads are newest-first; an older thread for this contact can
+              // still carry unread mail even once a newer one has been read.
+              existing.hasUnread = true;
+            }
+          }
+          setContacts(Array.from(byContactId.values()));
+        })
+        .catch(() => {
+          if (!cancelled) toast.error("Couldn't load conversations.");
+        })
+        .finally(() => {
+          if (!cancelled) setLoadingContacts(false);
+        });
+    }
+
+    loadContacts(true);
+    // A new reply (or its read/unread state changing elsewhere, e.g. the
+    // main Inbox) wouldn't otherwise show up in this list without a reload.
+    const interval = setInterval(() => loadContacts(false), 30_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, []);
 
   useEffect(() => {
@@ -137,9 +161,12 @@ export function ConversationsView() {
               >
                 <Avatar name={c.name} size="sm" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-text-primary truncate text-sm font-medium">{c.name}</p>
+                  <p className={cn("truncate text-sm", c.hasUnread ? "text-text-primary font-semibold" : "text-text-primary font-medium")}>
+                    {c.name}
+                  </p>
                   <p className="text-text-muted truncate text-xs">{c.email}</p>
                 </div>
+                {c.hasUnread && <span className="bg-brand-primary size-2 shrink-0 rounded-full" title="Unread messages" />}
               </button>
             ))
           )}
@@ -183,7 +210,10 @@ export function ConversationsView() {
                             item.isOutgoing ? "border-brand-primary/20 bg-brand-primary/5" : "border-border bg-surface-secondary",
                           )}
                         >
-                          <p className="text-text-primary truncate text-xs font-semibold">{item.subject || "(no subject)"}</p>
+                          <div className="flex min-w-0 items-center gap-1.5">
+                            {item.isUnread && <span className="bg-brand-primary size-1.5 shrink-0 rounded-full" title="Unread" />}
+                            <p className="text-text-primary truncate text-xs font-semibold">{item.subject || "(no subject)"}</p>
+                          </div>
                           <span className="text-text-muted shrink-0 text-[11px]">{formatRelativeTime(item.date)}</span>
                         </div>
                         {/* Automated/manual emails are HTML-designed templates -- rendered as-is

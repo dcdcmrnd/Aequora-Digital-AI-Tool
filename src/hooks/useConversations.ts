@@ -12,6 +12,7 @@ export interface EmailTimelineItem {
   from: string;
   to: string;
   isOutgoing: boolean;
+  isUnread: boolean;
   subject: string;
   html: string;
   text: string;
@@ -41,6 +42,10 @@ export function useContactTimeline(contactId: string | null) {
     queryKey: ["contact-timeline", contactId],
     queryFn: () => apiFetch<ContactTimeline>(`/api/contacts/${contactId}/timeline`),
     enabled: !!contactId,
+    // A reply landing in Gmail while this conversation is open (or unread
+    // status changing elsewhere, e.g. read from the main Inbox) wouldn't
+    // otherwise show up here without a manual reload.
+    refetchInterval: 30_000,
   });
   return { ...query, items: query.data?.items ?? [] };
 }
