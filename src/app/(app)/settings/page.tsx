@@ -1,4 +1,6 @@
 import { getServerSession } from "next-auth";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getConnectedEmailsWithPrimary } from "@/lib/gmail";
@@ -10,7 +12,7 @@ import { CustomFieldsPanel } from "@/components/settings/CustomFieldsPanel";
 import { CustomValuesPanel } from "@/components/settings/CustomValuesPanel";
 import { DocumentsManager } from "@/components/settings/DocumentsManager";
 import { PhoneSettingsPanel } from "@/components/settings/PhoneSettingsPanel";
-import { SettingsTabs } from "@/components/settings/SettingsTabs";
+import { SettingsNav } from "@/components/settings/SettingsNav";
 import { TagsManagerPanel } from "@/components/settings/TagsManagerPanel";
 import { TeamView } from "@/components/team/TeamView";
 import { ProfileForm } from "@/components/profile/ProfileForm";
@@ -25,9 +27,18 @@ export default async function SettingsPage() {
   if (!isAdmin) {
     return (
       <div className="max-w-xl space-y-6">
-        <div>
-          <h1 className="text-xl font-semibold text-text-primary">Settings</h1>
-          <p className="text-sm text-text-secondary mt-0.5">Update your profile and contact details.</p>
+        <div className="space-y-3">
+          <Link
+            href="/"
+            className="text-text-secondary hover:text-text-primary -ml-1 inline-flex items-center gap-1.5 rounded-btn px-1 py-1 text-sm font-medium transition-colors"
+          >
+            <ArrowLeft className="size-4" />
+            Back to Dashboard
+          </Link>
+          <div>
+            <h1 className="text-xl font-semibold text-text-primary">Settings</h1>
+            <p className="text-sm text-text-secondary mt-0.5">Update your profile and contact details.</p>
+          </div>
         </div>
         <ProfileForm
           initialName={session.user.name ?? ""}
@@ -91,32 +102,25 @@ export default async function SettingsPage() {
   }));
 
   return (
-    <div className="max-w-2xl">
-      <div className="mb-6">
-        <h1 className="text-xl font-semibold text-text-primary">Settings</h1>
-        <p className="text-sm text-text-secondary mt-0.5">Admin settings for your workspace</p>
-      </div>
-
-      <SettingsTabs
-        teamPanel={<TeamView users={serializedTeam} isAdmin={isAdmin} currentUserId={session.user.id} />}
-        companyPanel={
-          <CompanySettingsPanel
-            initial={{
-              name: companySettings.name,
-              description: companySettings.description,
-              logoUrl: companySettings.logoUrl,
-              primaryColor: companySettings.primaryColor,
-            }}
-          />
-        }
-        documentsPanel={<DocumentsManager initial={serializedDocuments as any} />}
-        categoriesPanel={<CategoryManager categories={categories as any} />}
-        emailPanel={<AgencyEmailPanel emails={connectedEmails} />}
-        phonePanel={<PhoneSettingsPanel />}
-        customFieldsPanel={<CustomFieldsPanel />}
-        customValuesPanel={<CustomValuesPanel />}
-        tagsPanel={<TagsManagerPanel />}
-      />
-    </div>
+    <SettingsNav
+      teamPanel={<TeamView users={serializedTeam} isAdmin={isAdmin} currentUserId={session.user.id} />}
+      companyPanel={
+        <CompanySettingsPanel
+          initial={{
+            name: companySettings.name,
+            description: companySettings.description,
+            logoUrl: companySettings.logoUrl,
+            primaryColor: companySettings.primaryColor,
+          }}
+        />
+      }
+      documentsPanel={<DocumentsManager initial={serializedDocuments as any} />}
+      categoriesPanel={<CategoryManager categories={categories as any} />}
+      emailPanel={<AgencyEmailPanel emails={connectedEmails} />}
+      phonePanel={<PhoneSettingsPanel />}
+      customFieldsPanel={<CustomFieldsPanel />}
+      customValuesPanel={<CustomValuesPanel />}
+      tagsPanel={<TagsManagerPanel />}
+    />
   );
 }
