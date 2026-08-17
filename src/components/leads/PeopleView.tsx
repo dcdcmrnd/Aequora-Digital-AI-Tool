@@ -2,13 +2,16 @@
 
 import { FoundPeopleView } from "@/components/leads/FoundPeopleView";
 import { PeopleSearchView } from "@/components/leads/PeopleSearchView";
+import { RemoteHiringView } from "@/components/leads/RemoteHiringView";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/Tabs";
 
 /**
- * Two independent ways to find people, kept deliberately separate: people
+ * Three independent ways to find people, kept deliberately separate: people
  * found manually via "Find People" on a business in the Company tab
- * (FoundPeopleView), and people auto-discovered by Position + Industry +
- * Location (PeopleSearchView, PeopleSearch-tagged results).
+ * (FoundPeopleView), people auto-discovered by Position + Industry +
+ * Location (PeopleSearchView, PeopleSearch-tagged results), and companies
+ * actively hiring remote staff right now (RemoteHiringView, sourced from a
+ * live job board instead of a business search).
  */
 export function PeopleView() {
   return (
@@ -16,6 +19,7 @@ export function PeopleView() {
       <TabsList>
         <TabsTrigger value="found">Found People</TabsTrigger>
         <TabsTrigger value="search">People Search</TabsTrigger>
+        <TabsTrigger value="hiring">Hiring Now</TabsTrigger>
       </TabsList>
 
       <TabsContent value="found">
@@ -24,6 +28,10 @@ export function PeopleView() {
 
       <TabsContent value="search">
         <PeopleSearchView />
+      </TabsContent>
+
+      <TabsContent value="hiring">
+        <RemoteHiringView />
       </TabsContent>
     </Tabs>
   );

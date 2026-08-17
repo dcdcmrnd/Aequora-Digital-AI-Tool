@@ -316,6 +316,28 @@ export interface PeopleSearch {
   createdAt: string;
 }
 
+/** A "we're hiring remotely" job post pulled from a remote job board — see RemoteHiringView. */
+export interface RemoteHiringPost {
+  id: string;
+  peopleSearchId: string;
+  source: string;
+  externalId: string;
+  companyName: string;
+  position: string;
+  candidateLocation: string | null;
+  applyUrl: string;
+  companyWebsite: string | null;
+  leadId: string | null;
+  createdAt: string;
+  lead: {
+    id: string;
+    name: string;
+    phone: string | null;
+    website: string | null;
+    people: LeadPerson[];
+  } | null;
+}
+
 export interface SavedLead {
   id: string;
   userId: string;

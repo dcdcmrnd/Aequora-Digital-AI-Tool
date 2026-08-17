@@ -391,6 +391,7 @@ model Lead {
   savedByUsers SavedLead[]
   contacts     Contact[]
   people       LeadPerson[]
+  hiringPosts  RemoteHiringPost[]
 }
 
 // A decision-maker found at a Lead's business — via website crawl, email
@@ -449,7 +450,37 @@ model PeopleSearch {
   companiesCrawled Int      @default(0) // how many were actually crawled (capped)
   createdAt        DateTime @default(now())
 
-  people LeadPerson[]
+  people      LeadPerson[]
+  hiringPosts RemoteHiringPost[]
+}
+
+// One "we're hiring remotely" job post pulled from a public remote job board
+// (Remotive, more sources may follow) — the actual hiring signal a Remote
+// Hiring search surfaces. Kept separate from Lead/LeadPerson: a job post has
+// no Google Place of its own, so it's matched to a Lead only best-effort (by
+// company name) and stands on its own (companyName/position/applyUrl) when
+// no match is found or the company has no Google Business Profile at all.
+model RemoteHiringPost {
+  id                String        @id @default(cuid())
+  peopleSearchId    String
+  peopleSearch      PeopleSearch  @relation(fields: [peopleSearchId], references: [id], onDelete: Cascade)
+  source            String        // remotive
+  externalId        String        // dedupe key from the source API, unique per source
+  companyName       String
+  position          String        // the job title being hired for -- the pitch hook ("saw you're hiring for X")
+  candidateLocation String?       // source's free-text location restriction, e.g. "USA only", "Worldwide"
+  applyUrl          String
+  // Best-effort company site: a link pulled from the job description, or a
+  // Google Places match by company name when the description had none.
+  // Null means neither resolved -- the post still surfaces with just
+  // company/position/applyUrl for manual research.
+  companyWebsite    String?
+  leadId            String?
+  lead              Lead?         @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  createdAt         DateTime      @default(now())
+
+  @@unique([source, externalId])
+  @@index([peopleSearchId])
 }
 
 model LeadAudit {
