@@ -47,37 +47,52 @@ export function ConversationsView() {
   const [workflowOpen, setWorkflowOpen] = useState(false);
 
   // Column 1: distinct contacts from the most recent agency threads, newest
-  // conversation first (Gmail's own thread order). A brand-new contact with
-  // no messages yet still opens fine via the URL -- it just won't be in
-  // this list until a conversation actually starts.
+  // conversation first (Gmail's own thread order), with any genuinely
+  // unread contact pinned to the top regardless of recency. A brand-new
+  // contact with no messages yet still opens fine via the URL -- it just
+  // won't be in this list until a conversation actually starts.
   //
-  // Uses a `q` search (not `label: "INBOX"`) specifically so outbound-only
-  // threads show up too -- a thread only carries the INBOX label once
-  // something has landed there, so a contact we've emailed but who hasn't
-  // replied yet lives entirely under SENT and was invisible here before.
+  // The "recent" query uses `q` (not `label: "INBOX"`) specifically so
+  // outbound-only threads show up too -- a thread only carries the INBOX
+  // label once something has landed there, so a contact we've emailed but
+  // who hasn't replied yet lives entirely under SENT and was invisible here
+  // before. That query is capped at the 30 most-recent threads by *any*
+  // activity though, and this account sends a lot of daily outreach --
+  // enough outbound volume can push an actual unread reply clean off that
+  // list. A dedicated `is:unread` query is fetched alongside it specifically
+  // so an unread contact always shows up here even if it's not otherwise
+  // among the 30 most recent.
   useEffect(() => {
     let cancelled = false;
 
     function loadContacts(showLoading: boolean) {
       if (showLoading) setLoadingContacts(true);
-      fetch(`/api/gmail/threads?${new URLSearchParams({ scope: "agency", q: "in:inbox OR in:sent" })}`)
-        .then((res) => res.json())
-        .then((data) => {
+      Promise.all([
+        fetch(`/api/gmail/threads?${new URLSearchParams({ scope: "agency", q: "in:inbox OR in:sent" })}`).then((r) => r.json()),
+        fetch(`/api/gmail/threads?${new URLSearchParams({ scope: "agency", q: "is:unread" })}`).then((r) => r.json()),
+      ])
+        .then(([recentData, unreadData]) => {
           if (cancelled) return;
-          const threads = Array.isArray(data.threads) ? data.threads : [];
+          const recentThreads = Array.isArray(recentData.threads) ? recentData.threads : [];
+          const unreadThreads = Array.isArray(unreadData.threads) ? unreadData.threads : [];
+
           const byContactId = new Map<string, ThreadContact>();
-          for (const t of threads) {
+          for (const t of [...unreadThreads, ...recentThreads]) {
             if (!t.contactId) continue;
             const existing = byContactId.get(t.contactId);
             if (!existing) {
               byContactId.set(t.contactId, { id: t.contactId, name: t.contactName, email: t.contactEmail, hasUnread: !!t.isUnread });
             } else if (t.isUnread) {
-              // Threads are newest-first; an older thread for this contact can
-              // still carry unread mail even once a newer one has been read.
               existing.hasUnread = true;
             }
           }
-          setContacts(Array.from(byContactId.values()));
+
+          // Unread first (so a reply buried past the top-30-by-recency cap
+          // still surfaces immediately), preserving each group's own order.
+          const merged = Array.from(byContactId.values());
+          const unread = merged.filter((c) => c.hasUnread);
+          const rest = merged.filter((c) => !c.hasUnread);
+          setContacts([...unread, ...rest]);
         })
         .catch(() => {
           if (!cancelled) toast.error("Couldn't load conversations.");
