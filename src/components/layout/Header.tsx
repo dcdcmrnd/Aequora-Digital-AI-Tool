@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { NotificationBell } from "./NotificationBell";
+import { DialpadButton } from "./DialpadButton";
 import { GlobalSearch } from "./GlobalSearch";
 import { Dropdown } from "@/components/ui/Dropdown";
 import { Avatar } from "@/components/ui/Avatar";
@@ -73,6 +74,7 @@ export function Header({ onMenuClick }: HeaderProps) {
       </div>
 
       <div className="flex items-center gap-3 ml-4">
+        <DialpadButton />
         <NotificationBell />
 
         {session?.user && (
