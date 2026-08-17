@@ -92,11 +92,23 @@ export function ComposeModal({
         }),
       });
 
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        // The actual reason (bounced address, failed verification, Gmail not
+        // connected, etc.) was being thrown away and replaced with a blanket
+        // "Failed to send" -- with no way to tell those apart, there was no
+        // way to know what to actually fix.
+        const data = await res.json().catch(() => null);
+        const settingsHint = scope === "own" ? "Profile → My Email" : "Settings → Agency Email";
+        const message =
+          data?.error === "not_connected"
+            ? `Gmail isn't connected. Connect it in ${settingsHint}.`
+            : data?.error || "Failed to send. Please try again.";
+        throw new Error(message);
+      }
       toast.success(mode === "reply" ? "Reply sent." : "Email sent.");
       onClose();
-    } catch {
-      toast.error("Failed to send. Please try again.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to send. Please try again.");
     } finally {
       setSending(false);
     }

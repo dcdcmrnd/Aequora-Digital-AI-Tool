@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Mail, Pencil, PhoneCall, Reply, Search, Workflow } from "lucide-react";
@@ -168,6 +168,18 @@ export function ConversationsView() {
 
   const lastEmail = [...items].reverse().find((i): i is Extract<TimelineItem, { type: "email" }> => i.type === "email");
 
+  // Messages render oldest-first (a normal email/chat reading order), but
+  // nothing was ever scrolling the pane down -- opening a conversation, or
+  // this same one picking up a fresh reply via its 30s poll, just left the
+  // scroll position wherever it already was (the very top, for a first
+  // open), so the newest message was invisible below the fold instead of
+  // "not there." Jumps to the latest whenever the messages for the open
+  // conversation change, or when switching to a different conversation.
+  const bottomRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ block: "end" });
+  }, [items, selectedId]);
+
   function handleTagsChange(tags: string[]) {
     if (!contact) return;
     updateContact.mutate({ id: contact.id, tags });
@@ -319,6 +331,7 @@ export function ConversationsView() {
                   ),
                 )
               )}
+              <div ref={bottomRef} />
             </div>
 
             <div className="flex items-center gap-2 border-t border-border px-4 py-3">

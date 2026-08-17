@@ -35,20 +35,28 @@ export async function POST(req: NextRequest) {
       ? await prisma.contact.findFirst({ where: { email: { equals: escapeLikePattern(firstRecipient), mode: "insensitive" } } })
       : null;
 
-    if (contact?.emailBounced) {
-      return NextResponse.json(
-        { error: `A previous email to this address bounced${contact.emailBounceReason ? ` (${contact.emailBounceReason})` : ""}. Update the contact's email before sending again.` },
-        { status: 400 },
-      );
-    }
-
-    if (firstRecipient) {
-      const status = await verifyAndCacheForContacts(firstRecipient);
-      if (status === "invalid") {
+    // Both checks below exist to catch bad addresses before a *cold* send --
+    // neither makes sense for a reply (inReplyTo set): the recipient just
+    // emailed us, which is direct proof their inbox is live and working
+    // right now, regardless of a stale bounce flag from an earlier send or
+    // an MX lookup blip. Applying them here was blocking replies to people
+    // actively in the middle of a conversation with us.
+    if (!inReplyTo) {
+      if (contact?.emailBounced) {
         return NextResponse.json(
-          { error: "This address failed verification — invalid format or the domain can't receive mail. Double-check it before sending." },
+          { error: `A previous email to this address bounced${contact.emailBounceReason ? ` (${contact.emailBounceReason})` : ""}. Update the contact's email before sending again.` },
           { status: 400 },
         );
+      }
+
+      if (firstRecipient) {
+        const status = await verifyAndCacheForContacts(firstRecipient);
+        if (status === "invalid") {
+          return NextResponse.json(
+            { error: "This address failed verification — invalid format or the domain can't receive mail. Double-check it before sending." },
+            { status: 400 },
+          );
+        }
       }
     }
 
