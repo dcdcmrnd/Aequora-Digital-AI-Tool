@@ -23,6 +23,33 @@ interface ThreadContact {
   name: string;
   email: string;
   hasUnread: boolean;
+  /** Epoch ms of that contact's most recent message across every thread seen -- the actual sort key, not just whatever order the source queries happened to return. */
+  lastMessageAt: number;
+}
+
+/** Merges thread lists from one or more /api/gmail/threads responses into one contact per row, keeping the latest message time and unread flag across every thread seen for that contact. */
+function mergeThreadsByContact(threadLists: any[][]): ThreadContact[] {
+  const byContactId = new Map<string, ThreadContact>();
+  for (const threads of threadLists) {
+    for (const t of threads) {
+      if (!t.contactId) continue;
+      const lastMessageAt = t.date ? new Date(t.date).getTime() : 0;
+      const existing = byContactId.get(t.contactId);
+      if (!existing) {
+        byContactId.set(t.contactId, {
+          id: t.contactId,
+          name: t.contactName,
+          email: t.contactEmail,
+          hasUnread: !!t.isUnread,
+          lastMessageAt,
+        });
+      } else {
+        if (t.isUnread) existing.hasUnread = true;
+        if (lastMessageAt > existing.lastMessageAt) existing.lastMessageAt = lastMessageAt;
+      }
+    }
+  }
+  return Array.from(byContactId.values()).sort((a, b) => b.lastMessageAt - a.lastMessageAt);
 }
 
 const RUN_STATUS_LABEL: Record<string, string> = {
@@ -48,11 +75,13 @@ export function ConversationsView() {
   const [editOpen, setEditOpen] = useState(false);
   const [workflowOpen, setWorkflowOpen] = useState(false);
 
-  // Column 1: distinct contacts from the most recent agency threads, newest
-  // conversation first (Gmail's own thread order), with any genuinely
-  // unread contact pinned to the top regardless of recency. A brand-new
-  // contact with no messages yet still opens fine via the URL -- it just
-  // won't be in this list until a conversation actually starts.
+  // Column 1: distinct contacts ordered by their actual most recent message
+  // time (mergeThreadsByContact sorts on that directly, not on whatever
+  // order the source queries happened to return them in), with any
+  // genuinely unread contact pinned to the top of that ordering regardless
+  // of recency. A brand-new contact with no messages yet still opens fine
+  // via the URL -- it just won't be in this list until a conversation
+  // actually starts.
   //
   // The "recent" query uses `q` (not `label: "INBOX"`) specifically so
   // outbound-only threads show up too -- a thread only carries the INBOX
@@ -78,20 +107,7 @@ export function ConversationsView() {
           const recentThreads = Array.isArray(recentData.threads) ? recentData.threads : [];
           const unreadThreads = Array.isArray(unreadData.threads) ? unreadData.threads : [];
 
-          const byContactId = new Map<string, ThreadContact>();
-          for (const t of [...unreadThreads, ...recentThreads]) {
-            if (!t.contactId) continue;
-            const existing = byContactId.get(t.contactId);
-            if (!existing) {
-              byContactId.set(t.contactId, { id: t.contactId, name: t.contactName, email: t.contactEmail, hasUnread: !!t.isUnread });
-            } else if (t.isUnread) {
-              existing.hasUnread = true;
-            }
-          }
-
-          // Unread first (so a reply buried past the top-30-by-recency cap
-          // still surfaces immediately), preserving each group's own order.
-          const merged = Array.from(byContactId.values());
+          const merged = mergeThreadsByContact([recentThreads, unreadThreads]);
           const unread = merged.filter((c) => c.hasUnread);
           const rest = merged.filter((c) => !c.hasUnread);
           setContacts([...unread, ...rest]);
@@ -139,12 +155,7 @@ export function ConversationsView() {
         .then((res) => res.json())
         .then((data) => {
           const threads = Array.isArray(data.threads) ? data.threads : [];
-          const byContactId = new Map<string, ThreadContact>();
-          for (const t of threads) {
-            if (!t.contactId || byContactId.has(t.contactId)) continue;
-            byContactId.set(t.contactId, { id: t.contactId, name: t.contactName, email: t.contactEmail, hasUnread: !!t.isUnread });
-          }
-          setSearchResults(Array.from(byContactId.values()));
+          setSearchResults(mergeThreadsByContact([threads]));
         })
         .catch(() => toast.error("Search failed."))
         .finally(() => setSearching(false));
