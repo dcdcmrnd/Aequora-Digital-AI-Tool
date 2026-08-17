@@ -13,7 +13,8 @@ import {
   type Node as RFNode,
   type Edge as RFEdge,
 } from "@xyflow/react";
-import { Redo2, Undo2 } from "lucide-react";
+import { ClipboardPaste, Redo2, Undo2, X } from "lucide-react";
+import toast from "react-hot-toast";
 
 import { CanvasNode } from "@/components/automation/CanvasNode";
 import { InsertableEdge } from "@/components/automation/InsertableEdge";
@@ -94,9 +95,38 @@ function layout(nodes: AutomationNode[], edges: AutomationFlow["edges"]): Automa
 interface NodeMenuActions {
   onCopyNode: (nodeId: string) => void;
   onCopySubtree: (nodeId: string) => void;
+  onMoveNode: (nodeId: string) => void;
+  onMoveSubtree: (nodeId: string) => void;
   onDeleteNode: (nodeId: string) => void;
   onDeleteSubtree: (nodeId: string) => void;
 }
+
+function collectSubtreeIds(nodeId: string, edges: AutomationFlow["edges"]): string[] {
+  const ids: string[] = [];
+  function walk(id: string) {
+    ids.push(id);
+    edges.filter((e) => e.source === id).forEach((e) => walk(e.target));
+  }
+  walk(nodeId);
+  return ids;
+}
+
+/** A detached node-or-subtree awaiting placement -- built once (at Copy/Move time) and spliced in wherever the user next clicks a "+". */
+interface Chunk {
+  nodes: AutomationNode[];
+  internalEdges: AutomationFlow["edges"];
+  /** Receives the incoming connection from whatever destination is chosen. */
+  rootId: string;
+  /** Dead-ends within the chunk -- each receives the destination's outgoing connection, if any. */
+  leafIds: string[];
+}
+
+interface Clipboard {
+  mode: "copy" | "move";
+  chunk: Chunk;
+}
+
+type PasteDestination = { sourceId: string; branch: string | null } | { edge: AutomationFlow["edges"][number] };
 
 function withPlaceholders(
   nodes: AutomationNode[],
@@ -107,9 +137,12 @@ function withPlaceholders(
   counts: Record<string, number>,
   onShowContacts: (nodeId: string) => void,
   menuActions: NodeMenuActions,
+  clipboard: Clipboard | null,
+  onApplyClipboard: (destination: PasteDestination) => void,
 ): { nodes: RFNode[]; edges: RFEdge[] } {
   const phNodes: RFNode[] = [];
   const phEdges: RFEdge[] = [];
+  const pasting = !!clipboard;
 
   for (const node of nodes) {
     // A node with no outgoing-edge slot (e.g. end_workflow) never gets a placeholder appended.
@@ -127,7 +160,12 @@ function withPlaceholders(
         id: phId,
         type: "placeholder",
         position: { x: node.position.x + xOffset, y: node.position.y + ROW_HEIGHT },
-        data: { onOpenPicker: () => openPicker((type) => onPick(node.id, branch, type)) },
+        data: {
+          pasting,
+          onOpenPicker: pasting
+            ? () => onApplyClipboard({ sourceId: node.id, branch: branch ?? null })
+            : () => openPicker((type) => onPick(node.id, branch, type)),
+        },
         draggable: false,
       });
       phEdges.push({ id: `edge-${phId}`, source: node.id, target: phId, sourceHandle: branch ?? null, type: "smoothstep" });
@@ -146,6 +184,8 @@ function withPlaceholders(
           __onShowContacts: () => onShowContacts(n.id),
           __onCopyNode: () => menuActions.onCopyNode(n.id),
           __onCopySubtree: () => menuActions.onCopySubtree(n.id),
+          __onMoveNode: () => menuActions.onMoveNode(n.id),
+          __onMoveSubtree: () => menuActions.onMoveSubtree(n.id),
           __onDeleteNode: () => menuActions.onDeleteNode(n.id),
           __onDeleteSubtree: () => menuActions.onDeleteSubtree(n.id),
         },
@@ -153,7 +193,14 @@ function withPlaceholders(
       ...phNodes,
     ],
     edges: [
-      ...edges.map((e) => ({ ...e, type: "insertable", data: { onOpenPicker: () => openPicker((type) => onInsert(e, type)) } })),
+      ...edges.map((e) => ({
+        ...e,
+        type: "insertable",
+        data: {
+          pasting,
+          onOpenPicker: pasting ? () => onApplyClipboard({ edge: e }) : () => openPicker((type) => onInsert(e, type)),
+        },
+      })),
       ...phEdges,
     ],
   };
@@ -181,6 +228,13 @@ function CanvasInner({ flow, onChange, stages, automationId }: AutomationCanvasP
   const [realNodes, setRealNodes] = useState<AutomationNode[]>(flow.nodes);
   const [realEdges, setRealEdges] = useState<AutomationFlow["edges"]>(flow.edges);
 
+  // A pending Copy/Move awaiting where to place it -- unlike the old
+  // behavior, populating this never touches the graph by itself; only
+  // clicking a "+" (now repurposed as a paste target while this is set,
+  // see withPlaceholders) actually splices it in. Cleared by applying it,
+  // pressing Escape, or undo/redo (which can invalidate the ids it refers to).
+  const [clipboard, setClipboard] = useState<Clipboard | null>(null);
+
   // Undo/redo: a history of {nodes, edges} snapshots taken before each
   // structural edit (add/insert/duplicate/delete/reconfigure). Node dragging
   // isn't tracked here — positions are ephemeral and recomputed by layout().
@@ -205,6 +259,7 @@ function CanvasInner({ flow, onChange, stages, automationId }: AutomationCanvasP
       setRealNodes(last.nodes);
       setRealEdges(last.edges);
       setSelectedId(null);
+      setClipboard(null);
       return prevPast.slice(0, -1);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -218,6 +273,7 @@ function CanvasInner({ flow, onChange, stages, automationId }: AutomationCanvasP
       setRealNodes(next.nodes);
       setRealEdges(next.edges);
       setSelectedId(null);
+      setClipboard(null);
       return prevFuture.slice(1);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -225,6 +281,10 @@ function CanvasInner({ flow, onChange, stages, automationId }: AutomationCanvasP
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setClipboard(null);
+        return;
+      }
       const isMod = e.metaKey || e.ctrlKey;
       if (!isMod) return;
       if (e.key === "z" && !e.shiftKey) {
@@ -348,6 +408,115 @@ function CanvasInner({ flow, onChange, stages, automationId }: AutomationCanvasP
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [realNodes, realEdges, commit]);
 
+  // Builds a detached chunk from a node (optionally + its downstream chain)
+  // without touching the live graph -- `keepIds` is false for Copy (fresh
+  // ids, since the original stays put right next to the new copy) and true
+  // for Move (same ids, since it's the same node relocating, not a
+  // duplicate). This is the shared basis for both "Copy"/"Copy below" and
+  // "Move"/"Move below": what used to auto-splice immediately after the
+  // source now just gets captured for placement wherever the user clicks a
+  // "+" next (see applyClipboardAt).
+  const buildChunk = useCallback(
+    (nodeId: string, includeSubtree: boolean, keepIds: boolean): Chunk => {
+      const ids = includeSubtree ? collectSubtreeIds(nodeId, realEdges) : [nodeId];
+      const idMap = new Map(ids.map((id) => [id, keepIds ? id : crypto.randomUUID()]));
+      const nodes = ids.map((id) => {
+        const original = realNodes.find((n) => n.id === id)!;
+        return { id: idMap.get(id)!, type: original.type, position: { x: 0, y: 0 }, data: { ...original.data } };
+      });
+      const internalEdges = realEdges
+        .filter((e) => idMap.has(e.source) && idMap.has(e.target))
+        .map((e) => ({
+          id: crypto.randomUUID(),
+          source: idMap.get(e.source)!,
+          target: idMap.get(e.target)!,
+          sourceHandle: e.sourceHandle ?? null,
+        }));
+      const leafIds = ids.filter((id) => !realEdges.some((e) => e.source === id)).map((id) => idMap.get(id)!);
+      return { nodes, internalEdges, rootId: idMap.get(nodeId)!, leafIds };
+    },
+    [realNodes, realEdges],
+  );
+
+  const handleCopyNodeToClipboard = useCallback(
+    (nodeId: string) => setClipboard({ mode: "copy", chunk: buildChunk(nodeId, false, false) }),
+    [buildChunk],
+  );
+  const handleCopySubtreeToClipboard = useCallback(
+    (nodeId: string) => setClipboard({ mode: "copy", chunk: buildChunk(nodeId, true, false) }),
+    [buildChunk],
+  );
+  const handleMoveNodeToClipboard = useCallback(
+    (nodeId: string) => setClipboard({ mode: "move", chunk: buildChunk(nodeId, false, true) }),
+    [buildChunk],
+  );
+  const handleMoveSubtreeToClipboard = useCallback(
+    (nodeId: string) => setClipboard({ mode: "move", chunk: buildChunk(nodeId, true, true) }),
+    [buildChunk],
+  );
+
+  // Splices the pending clipboard chunk in at `destination`. For a Move,
+  // first cuts the chunk's nodes out of their current spot in the *same*
+  // commit -- a single-node move bridges its old incoming/outgoing edges
+  // together (chain keeps running without it, mirroring handleDeleteSingleNode);
+  // a subtree move just drops all edges touching the removed set, leaving a
+  // fresh dead-end there (mirroring handleDeleteSubtree). One commit means
+  // one undo step reverts the whole move, not two.
+  const applyClipboardAt = useCallback(
+    (destination: PasteDestination) => {
+      if (!clipboard) return;
+      const { chunk, mode } = clipboard;
+      const chunkIds = new Set(chunk.nodes.map((n) => n.id));
+
+      const targetTouchesChunk =
+        "edge" in destination
+          ? chunkIds.has(destination.edge.source) || chunkIds.has(destination.edge.target)
+          : chunkIds.has(destination.sourceId);
+      if (targetTouchesChunk) {
+        toast.error("Can't drop an action into the part being moved.");
+        return;
+      }
+
+      let nodes = realNodes;
+      let edges = realEdges;
+
+      if (mode === "move") {
+        if (chunk.nodes.length === 1) {
+          const nodeId = chunk.nodes[0].id;
+          const incoming = edges.filter((e) => e.target === nodeId);
+          const outgoing = edges.filter((e) => e.source === nodeId);
+          const bridgeEdges = incoming.flatMap((inEdge) =>
+            outgoing.map((outEdge) => ({
+              id: crypto.randomUUID(),
+              source: inEdge.source,
+              target: outEdge.target,
+              sourceHandle: inEdge.sourceHandle ?? null,
+            })),
+          );
+          edges = [...edges.filter((e) => e.target !== nodeId && e.source !== nodeId), ...bridgeEdges];
+        } else {
+          edges = edges.filter((e) => !chunkIds.has(e.source) && !chunkIds.has(e.target));
+        }
+        nodes = nodes.filter((n) => !chunkIds.has(n.id));
+      }
+
+      let nextEdges: AutomationFlow["edges"];
+      if ("edge" in destination) {
+        const edge = destination.edge;
+        const rootEdge = { id: crypto.randomUUID(), source: edge.source, target: chunk.rootId, sourceHandle: edge.sourceHandle ?? null };
+        const leafEdges = chunk.leafIds.map((leafId) => ({ id: crypto.randomUUID(), source: leafId, target: edge.target, sourceHandle: null }));
+        nextEdges = [...edges.filter((e) => e.id !== edge.id), rootEdge, ...chunk.internalEdges, ...leafEdges];
+      } else {
+        const rootEdge = { id: crypto.randomUUID(), source: destination.sourceId, target: chunk.rootId, sourceHandle: destination.branch };
+        nextEdges = [...edges, rootEdge, ...chunk.internalEdges];
+      }
+
+      commit(layout([...nodes, ...chunk.nodes], nextEdges), nextEdges);
+      setClipboard(null);
+    },
+    [clipboard, realNodes, realEdges, commit],
+  );
+
   // Removes just one node, reconnecting its incoming edge(s) straight to its
   // outgoing edge's target so the rest of the chain keeps running --
   // deleting a single step should never take its downstream actions with it.
@@ -404,12 +573,14 @@ function CanvasInner({ flow, onChange, stages, automationId }: AutomationCanvasP
 
   const menuActions = useMemo<NodeMenuActions>(
     () => ({
-      onCopyNode: handleDuplicateNode,
-      onCopySubtree: handleCopySubtree,
+      onCopyNode: handleCopyNodeToClipboard,
+      onCopySubtree: handleCopySubtreeToClipboard,
+      onMoveNode: handleMoveNodeToClipboard,
+      onMoveSubtree: handleMoveSubtreeToClipboard,
       onDeleteNode: handleDeleteSingleNode,
       onDeleteSubtree: handleDeleteSubtree,
     }),
-    [handleDuplicateNode, handleCopySubtree, handleDeleteSingleNode, handleDeleteSubtree],
+    [handleCopyNodeToClipboard, handleCopySubtreeToClipboard, handleMoveNodeToClipboard, handleMoveSubtreeToClipboard, handleDeleteSingleNode, handleDeleteSubtree],
   );
 
   useEffect(() => {
@@ -422,11 +593,13 @@ function CanvasInner({ flow, onChange, stages, automationId }: AutomationCanvasP
       counts,
       handleShowContacts,
       menuActions,
+      clipboard,
+      applyClipboardAt,
     );
     setRfNodes(nodes.map((n) => ({ ...n, selected: n.id === selectedId })));
     setRfEdges(edges);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [realNodes, realEdges, handlePick, handleInsertOnEdge, selectedId, counts, handleShowContacts, menuActions]);
+  }, [realNodes, realEdges, handlePick, handleInsertOnEdge, selectedId, counts, handleShowContacts, menuActions, clipboard, applyClipboardAt]);
 
   // Report the real (non-placeholder) structure upward for saving.
   useEffect(() => {
@@ -491,6 +664,22 @@ function CanvasInner({ flow, onChange, stages, automationId }: AutomationCanvasP
           <Redo2 className="size-4" />
         </button>
       </div>
+
+      {clipboard && (
+        <div className="absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-2 rounded-card border border-brand-primary bg-white py-1.5 pl-3 pr-1.5 text-xs font-medium text-text-primary shadow-sm">
+          <ClipboardPaste className="size-3.5 text-brand-primary" />
+          {clipboard.mode === "move" ? "Moving" : "Copying"} {clipboard.chunk.nodes.length}{" "}
+          {clipboard.chunk.nodes.length === 1 ? "action" : "actions"} — click a + where it should go
+          <button
+            type="button"
+            onClick={() => setClipboard(null)}
+            title="Cancel (Esc)"
+            className="text-text-muted hover:bg-surface-secondary hover:text-text-primary rounded p-1"
+          >
+            <X className="size-3.5" />
+          </button>
+        </div>
+      )}
 
       <ReactFlow
         nodes={rfNodes}

@@ -2,19 +2,22 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { Copy, MoreVertical, Trash2 } from "lucide-react";
+import { Copy, MoreVertical, Move, Trash2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { NODE_DEFINITIONS } from "@/lib/automation/nodeRegistry";
 import type { AutomationNodeType } from "@/types";
 
 /**
- * Per-node "..." menu -- offers the GoHighLevel-style copy/delete choices
- * directly on the canvas node, not just inside the side config panel.
- * "Copy action" / "Copy all actions below" are hidden for nodes that can't
- * safely support them (trigger, condition, end_workflow -- see the handlers
- * in AutomationCanvas for why); "Delete action" (single) is hidden for
- * condition nodes specifically, since it can't safely preserve both branches.
+ * Per-node "..." menu -- offers the GoHighLevel-style copy/move/delete
+ * choices directly on the canvas node, not just inside the side config
+ * panel. "Copy"/"Move" just stage the node(s) for placement -- nothing
+ * moves until the user clicks a "+" where it should go (see
+ * AutomationCanvas's clipboard/applyClipboardAt). All four are hidden for
+ * nodes that can't safely support them (trigger, condition, end_workflow --
+ * see the handlers in AutomationCanvas for why); "Delete action"/"Move
+ * action" (single) are hidden for condition nodes specifically, since
+ * detaching just one of a branch's two outgoing edges isn't safe.
  */
 function NodeMenu({
   isBranching,
@@ -22,6 +25,8 @@ function NodeMenu({
   canDelete,
   onCopyNode,
   onCopySubtree,
+  onMoveNode,
+  onMoveSubtree,
   onDeleteNode,
   onDeleteSubtree,
 }: {
@@ -30,6 +35,8 @@ function NodeMenu({
   canDelete: boolean;
   onCopyNode?: () => void;
   onCopySubtree?: () => void;
+  onMoveNode?: () => void;
+  onMoveSubtree?: () => void;
   onDeleteNode?: () => void;
   onDeleteSubtree?: () => void;
 }) {
@@ -51,6 +58,10 @@ function NodeMenu({
   if (canDuplicate) {
     items.push({ label: "Copy action", icon: Copy, onClick: () => onCopyNode?.() });
     items.push({ label: "Copy all actions below", icon: Copy, onClick: () => onCopySubtree?.() });
+    if (!isBranching) {
+      items.push({ label: "Move action", icon: Move, onClick: () => onMoveNode?.() });
+    }
+    items.push({ label: "Move all actions below", icon: Move, onClick: () => onMoveSubtree?.() });
   }
   if (canDelete && !isBranching) {
     items.push({ label: "Delete action", icon: Trash2, danger: true, onClick: () => onDeleteNode?.() });
@@ -108,6 +119,8 @@ export function CanvasNode({ type, data, selected }: NodeProps) {
   const onShowContacts = d.__onShowContacts as (() => void) | undefined;
   const onCopyNode = d.__onCopyNode as (() => void) | undefined;
   const onCopySubtree = d.__onCopySubtree as (() => void) | undefined;
+  const onMoveNode = d.__onMoveNode as (() => void) | undefined;
+  const onMoveSubtree = d.__onMoveSubtree as (() => void) | undefined;
   const onDeleteNode = d.__onDeleteNode as (() => void) | undefined;
   const onDeleteSubtree = d.__onDeleteSubtree as (() => void) | undefined;
 
@@ -137,6 +150,8 @@ export function CanvasNode({ type, data, selected }: NodeProps) {
           canDelete={nodeType !== "trigger"}
           onCopyNode={onCopyNode}
           onCopySubtree={onCopySubtree}
+          onMoveNode={onMoveNode}
+          onMoveSubtree={onMoveSubtree}
           onDeleteNode={onDeleteNode}
           onDeleteSubtree={onDeleteSubtree}
         />

@@ -1,7 +1,7 @@
 "use client";
 
 import { BaseEdge, EdgeLabelRenderer, getSmoothStepPath, type EdgeProps } from "@xyflow/react";
-import { Plus } from "lucide-react";
+import { ClipboardPaste, Plus } from "lucide-react";
 
 export function InsertableEdge({
   id,
@@ -21,7 +21,9 @@ export function InsertableEdge({
     targetY,
     targetPosition,
   });
-  const onOpenPicker = (data as { onOpenPicker?: () => void } | undefined)?.onOpenPicker;
+  const edgeData = data as { onOpenPicker?: () => void; pasting?: boolean } | undefined;
+  const onOpenPicker = edgeData?.onOpenPicker;
+  const pasting = !!edgeData?.pasting;
 
   return (
     <>
@@ -35,9 +37,14 @@ export function InsertableEdge({
             <button
               type="button"
               onClick={onOpenPicker}
-              className="flex size-5 items-center justify-center rounded-full border border-border bg-white text-text-muted shadow-sm transition-colors hover:border-brand-primary hover:text-brand-primary"
+              title={pasting ? "Paste here" : "Add a step"}
+              className={
+                pasting
+                  ? "flex size-5 items-center justify-center rounded-full border border-brand-primary bg-brand-primary/10 text-brand-primary shadow-sm transition-colors hover:bg-brand-primary/20"
+                  : "flex size-5 items-center justify-center rounded-full border border-border bg-white text-text-muted shadow-sm transition-colors hover:border-brand-primary hover:text-brand-primary"
+              }
             >
-              <Plus className="size-3" />
+              {pasting ? <ClipboardPaste className="size-3" /> : <Plus className="size-3" />}
             </button>
           </div>
         </EdgeLabelRenderer>
