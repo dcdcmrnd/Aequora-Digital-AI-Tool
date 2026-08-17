@@ -83,23 +83,27 @@ export function ConversationsView() {
   // via the URL -- it just won't be in this list until a conversation
   // actually starts.
   //
-  // The "recent" query uses `q` (not `label: "INBOX"`) specifically so
-  // outbound-only threads show up too -- a thread only carries the INBOX
-  // label once something has landed there, so a contact we've emailed but
-  // who hasn't replied yet lives entirely under SENT and was invisible here
-  // before. That query is capped at the 30 most-recent threads by *any*
-  // activity though, and this account sends a lot of daily outreach --
-  // enough outbound volume can push an actual unread reply clean off that
-  // list. A dedicated `is:unread` query is fetched alongside it specifically
-  // so an unread contact always shows up here even if it's not otherwise
-  // among the 30 most recent.
+  // The "recent" query is scoped to `in:inbox` -- mail we actually
+  // *received* -- rather than every contact we've ever sent to. This used
+  // to be `in:inbox OR in:sent` specifically so an outbound-only contact
+  // (emailed, no reply yet) wouldn't be invisible here, but that meant a
+  // single day's automated cold-outreach batch (hundreds of brand-new
+  // one-way sends) always outranked every real back-and-forth conversation
+  // by raw recency, permanently burying actual replies under mail nobody
+  // ever answered. A "conversation" should mean the other side has actually
+  // said something back. That query is still capped at the 30 most-recent
+  // threads by *any* inbox activity though, and this account gets a lot of
+  // volume -- enough could still push a specific older reply out of that
+  // window. A dedicated `is:unread` query is fetched alongside it
+  // specifically so an unread contact always shows up here even if it's
+  // not otherwise among the 30 most recent.
   useEffect(() => {
     let cancelled = false;
 
     function loadContacts(showLoading: boolean) {
       if (showLoading) setLoadingContacts(true);
       Promise.all([
-        fetch(`/api/gmail/threads?${new URLSearchParams({ scope: "agency", q: "in:inbox OR in:sent" })}`).then((r) => r.json()),
+        fetch(`/api/gmail/threads?${new URLSearchParams({ scope: "agency", q: "in:inbox" })}`).then((r) => r.json()),
         fetch(`/api/gmail/threads?${new URLSearchParams({ scope: "agency", q: "is:unread" })}`).then((r) => r.json()),
       ])
         .then(([recentData, unreadData]) => {
