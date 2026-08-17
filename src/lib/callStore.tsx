@@ -26,6 +26,7 @@ interface CallContextValue {
   startCall: (target: CallTarget) => void;
   hangUp: () => void;
   toggleMute: () => void;
+  sendDigits: (digits: string) => void;
 }
 
 const CallContext = createContext<CallContextValue | null>(null);
@@ -98,7 +99,14 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  return <CallContext.Provider value={{ call, startCall, hangUp, toggleMute }}>{children}</CallContext.Provider>;
+  /** Sends DTMF tones on the live call (e.g. punching an extension into an IVR menu) -- a no-op if nothing's connected yet. */
+  const sendDigits = useCallback((digits: string) => {
+    connectionRef.current?.sendDigits(digits);
+  }, []);
+
+  return (
+    <CallContext.Provider value={{ call, startCall, hangUp, toggleMute, sendDigits }}>{children}</CallContext.Provider>
+  );
 }
 
 export function useCall() {
