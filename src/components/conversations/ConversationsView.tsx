@@ -22,6 +22,31 @@ import { CALL_STATUS_LABEL, formatCallDuration, isVoicemail } from "@/lib/calls"
 import { cn, formatRelativeTime } from "@/lib/utils";
 import type { Opportunity, OpportunityStatus } from "@/types";
 
+// The underlying /api/gmail/threads route hands back one page (30 threads)
+// at a time, by design -- the Inbox view drives its own "Next" button off
+// that. Conversations wants the opposite: "all of them," since the whole
+// point is managing every contact you've actually talked to, not paging
+// through them like a mailbox. Follows nextPageToken until Gmail runs out
+// or the safety ceiling below is hit, rather than silently stopping at
+// whatever the first page happened to contain.
+const MAX_THREAD_PAGES = 15;
+
+async function fetchAllThreads(params: Record<string, string>): Promise<any[]> {
+  const all: any[] = [];
+  let pageToken: string | undefined;
+  for (let page = 0; page < MAX_THREAD_PAGES; page++) {
+    const search = new URLSearchParams(params);
+    if (pageToken) search.set("pageToken", pageToken);
+    const res = await fetch(`/api/gmail/threads?${search}`);
+    const data = await res.json();
+    if (!Array.isArray(data.threads)) break;
+    all.push(...data.threads);
+    pageToken = data.nextPageToken ?? undefined;
+    if (!pageToken) break;
+  }
+  return all;
+}
+
 interface ThreadContact {
   id: string;
   name: string;
@@ -109,26 +134,20 @@ export function ConversationsView() {
   // one-way sends) always outranked every real back-and-forth conversation
   // by raw recency, permanently burying actual replies under mail nobody
   // ever answered. A "conversation" should mean the other side has actually
-  // said something back. That query is still capped at the 30 most-recent
-  // threads by *any* inbox activity though, and this account gets a lot of
-  // volume -- enough could still push a specific older reply out of that
-  // window. A dedicated `is:unread` query is fetched alongside it
-  // specifically so an unread contact always shows up here even if it's
-  // not otherwise among the 30 most recent.
+  // said something back. fetchAllThreads pages through every matching
+  // thread rather than stopping at the first 30, so every contact who's
+  // actually replied shows up here, not just the most recent handful.
   useEffect(() => {
     let cancelled = false;
 
     function loadContacts(showLoading: boolean) {
       if (showLoading) setLoadingContacts(true);
       Promise.all([
-        fetch(`/api/gmail/threads?${new URLSearchParams({ scope: "agency", q: "in:inbox" })}`).then((r) => r.json()),
-        fetch(`/api/gmail/threads?${new URLSearchParams({ scope: "agency", q: "is:unread" })}`).then((r) => r.json()),
+        fetchAllThreads({ scope: "agency", q: "in:inbox" }),
+        fetchAllThreads({ scope: "agency", q: "is:unread" }),
       ])
-        .then(([recentData, unreadData]) => {
+        .then(([recentThreads, unreadThreads]) => {
           if (cancelled) return;
-          const recentThreads = Array.isArray(recentData.threads) ? recentData.threads : [];
-          const unreadThreads = Array.isArray(unreadData.threads) ? unreadData.threads : [];
-
           const merged = mergeThreadsByContact([recentThreads, unreadThreads]);
           const unread = merged.filter((c) => c.hasUnread);
           const rest = merged.filter((c) => !c.hasUnread);
@@ -173,12 +192,8 @@ export function ConversationsView() {
 
     setSearching(true);
     const handle = setTimeout(() => {
-      fetch(`/api/gmail/threads?${new URLSearchParams({ scope: "agency", q: `${term} (in:inbox OR in:sent)` })}`)
-        .then((res) => res.json())
-        .then((data) => {
-          const threads = Array.isArray(data.threads) ? data.threads : [];
-          setSearchResults(mergeThreadsByContact([threads]));
-        })
+      fetchAllThreads({ scope: "agency", q: `${term} (in:inbox OR in:sent)` })
+        .then((threads) => setSearchResults(mergeThreadsByContact([threads])))
         .catch(() => toast.error("Search failed."))
         .finally(() => setSearching(false));
     }, 400);
