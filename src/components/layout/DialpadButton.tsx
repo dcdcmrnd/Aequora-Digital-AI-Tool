@@ -1,9 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Phone } from "lucide-react";
+import { Delete, Phone } from "lucide-react";
 
 import { useCall } from "@/lib/callStore";
+
+const KEYPAD_KEYS = [
+  ["1", "2", "3"],
+  ["4", "5", "6"],
+  ["7", "8", "9"],
+  ["*", "0", "#"],
+];
 
 /** Header "dial any number" button — for calling numbers that aren't saved as a contact. */
 export function DialpadButton() {
@@ -24,6 +31,16 @@ export function DialpadButton() {
   useEffect(() => {
     if (open) inputRef.current?.focus();
   }, [open]);
+
+  function pressKey(key: string) {
+    inputRef.current?.focus();
+    setNumber((prev) => prev + key);
+  }
+
+  function backspace() {
+    inputRef.current?.focus();
+    setNumber((prev) => prev.slice(0, -1));
+  }
 
   const handleCall = (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,24 +63,50 @@ export function DialpadButton() {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-1 w-72 bg-white border border-border rounded-card shadow-xl z-50 p-4">
+        <div className="absolute right-0 mt-1 w-64 bg-white border border-border rounded-card shadow-xl z-50 p-4">
           <h3 className="text-sm font-semibold text-text-primary mb-2">Call a number</h3>
-          <form onSubmit={handleCall} className="flex items-center gap-2">
-            <input
-              ref={inputRef}
-              type="tel"
-              value={number}
-              onChange={(e) => setNumber(e.target.value)}
-              placeholder="+1 (555) 123-4567"
-              className="flex-1 min-w-0 rounded-btn border border-border px-3 py-1.5 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary/40"
-            />
+          <form onSubmit={handleCall} className="space-y-3">
+            <div className="flex items-center gap-2">
+              <input
+                ref={inputRef}
+                type="tel"
+                value={number}
+                onChange={(e) => setNumber(e.target.value)}
+                placeholder="+1 (555) 123-4567"
+                className="flex-1 min-w-0 rounded-btn border border-border px-3 py-1.5 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary/40"
+              />
+              <button
+                type="button"
+                onClick={backspace}
+                disabled={!number}
+                title="Backspace"
+                aria-label="Backspace"
+                className="flex-shrink-0 flex items-center justify-center size-8 rounded-btn text-text-secondary hover:bg-surface-hover disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                <Delete className="size-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              {KEYPAD_KEYS.flat().map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => pressKey(key)}
+                  className="flex items-center justify-center rounded-btn border border-border py-2 text-sm font-medium text-text-primary hover:bg-surface-hover active:bg-surface-secondary transition-colors"
+                >
+                  {key}
+                </button>
+              ))}
+            </div>
+
             <button
               type="submit"
               disabled={!number.trim()}
-              className="flex-shrink-0 flex items-center justify-center size-8 rounded-btn bg-brand-primary text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-brand-primary/90 transition-colors"
-              aria-label="Call"
+              className="flex w-full items-center justify-center gap-2 rounded-btn bg-brand-primary py-2 text-sm font-medium text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-brand-primary/90 transition-colors"
             >
               <Phone className="size-4" />
+              Call
             </button>
           </form>
           <p className="text-xs text-text-muted mt-2">Not on your contact list? No problem — dial any number.</p>
