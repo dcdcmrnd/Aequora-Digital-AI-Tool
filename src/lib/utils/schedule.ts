@@ -88,3 +88,22 @@ export function formatDailyTime(hour: number, minute: number, timeZone: string):
   const tzLabel = COMMON_TIMEZONES.find((t) => t.value === timeZone)?.label ?? timeZone;
   return `${hh}:${mm} ${ampm} (${tzLabel})`;
 }
+
+/**
+ * Converts a <input type="datetime-local"> value (e.g. "2026-03-05T14:00",
+ * no timezone of its own) into the UTC instant that wall-clock time means in
+ * `timeZone` -- the one-off-timestamp counterpart to getNextTimeOccurrenceUtc
+ * (which finds the next recurring hour:minute rather than converting a
+ * specific date). Used by the "Set Event Date" automation step so the date
+ * a builder picks is interpreted in the timezone they chose, not the
+ * server's (UTC on Vercel) or the configuring browser's.
+ */
+export function zonedDateTimeToUtc(localDateTime: string, timeZone: string): Date {
+  const withSeconds = localDateTime.length === 16 ? `${localDateTime}:00` : localDateTime;
+  return fromZonedTime(withSeconds, timeZone);
+}
+
+export function formatEventDateTime(date: Date, timeZone: string): string {
+  const tzLabel = COMMON_TIMEZONES.find((t) => t.value === timeZone)?.label ?? timeZone;
+  return `${formatInTimeZone(date, timeZone, "MMM d, yyyy h:mm a")} (${tzLabel})`;
+}

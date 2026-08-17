@@ -21,7 +21,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { formatDailyTime, formatWeekdayTime } from "@/lib/utils/schedule";
+import { formatDailyTime, formatEventDateTime, formatWeekdayTime, zonedDateTimeToUtc } from "@/lib/utils/schedule";
 
 import type { AutomationNodeType } from "./types";
 
@@ -289,8 +289,9 @@ export const NODE_DEFINITIONS: Record<AutomationNodeType, NodeDefinition> = {
     summarize: (data) => {
       const value = data.value as string | undefined;
       if (!value) return "Click to configure";
-      const date = new Date(value);
-      return Number.isNaN(date.getTime()) ? "Click to configure" : `Event date: ${date.toLocaleString()}`;
+      const timezone = (data.timezone as string) || "America/New_York";
+      const date = zonedDateTimeToUtc(value, timezone);
+      return Number.isNaN(date.getTime()) ? "Click to configure" : `Event date: ${formatEventDateTime(date, timezone)}`;
     },
     hasTargetHandle: true,
     hasSourceHandle: true,

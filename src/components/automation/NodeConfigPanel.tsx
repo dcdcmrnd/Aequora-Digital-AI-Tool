@@ -179,7 +179,11 @@ export function NodeConfigPanel({ node, stages, automationId, onClose, onSave, o
       });
       const result = await res.json();
       if (!res.ok) throw new Error(result.error ?? "Failed to send test email.");
-      toast.success(`Test email sent to ${testEmail.trim()}`);
+      toast.success(
+        result.usedContact
+          ? `Sent to ${testEmail.trim()} with their real contact info`
+          : `Sent to ${testEmail.trim()} with sample data (no contact found with that email)`,
+      );
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to send test email.");
     } finally {
@@ -373,7 +377,10 @@ export function NodeConfigPanel({ node, stages, automationId, onClose, onSave, o
                   Send Test
                 </Button>
               </div>
-              <p className="text-text-muted mt-1 text-[11px]">Sends with sample contact data so you can check the output.</p>
+              <p className="text-text-muted mt-1 text-[11px]">
+                Uses a real contact&apos;s info if this email matches one on file, otherwise sample data. No [TEST]
+                prefix is added, so this also works as a genuine one-off send.
+              </p>
             </div>
           </>
         )}
@@ -968,16 +975,32 @@ export function NodeConfigPanel({ node, stages, automationId, onClose, onSave, o
 
         {node.type === "set_event_date" && (
           <>
-            <Field label="Event date &amp; time">
-              <Input
-                type="datetime-local"
-                value={(data.value as string) ?? ""}
-                onChange={(e) => set("value", e.target.value)}
-              />
-            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Event date &amp; time">
+                <Input
+                  type="datetime-local"
+                  value={(data.value as string) ?? ""}
+                  onChange={(e) => set("value", e.target.value)}
+                />
+              </Field>
+              <Field label="Timezone">
+                <Select value={(data.timezone as string) || "America/New_York"} onValueChange={(v) => set("timezone", v)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {COMMON_TIMEZONES.map((tz) => (
+                      <SelectItem key={tz.value} value={tz.value}>
+                        {tz.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            </div>
             <p className="text-text-muted text-xs">
-              Stores this date on the contact. A later <strong>Wait</strong> step can then wait for a set amount of
-              time before or after it — e.g. a reminder 4 days before a webinar.
+              Stores this date on the contact, interpreted in the timezone above. A later <strong>Wait</strong> step
+              can then wait for a set amount of time before or after it — e.g. a reminder 4 days before a webinar.
             </p>
           </>
         )}
