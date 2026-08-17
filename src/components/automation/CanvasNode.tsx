@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { Copy, MoreVertical, Move, Trash2 } from "lucide-react";
 
@@ -41,16 +42,36 @@ function NodeMenu({
   onDeleteSubtree?: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  // Fixed-position coords (viewport-relative), recomputed each time the menu
+  // opens -- the dropdown is portaled to document.body instead of rendered
+  // inline, since a React Flow node's transform creates its own stacking
+  // context that traps a plain absolute+z-index child, letting whatever
+  // node comes next in the DOM (drawn after it) paint over the dropdown.
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
     function handler(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (buttonRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+      setOpen(false);
     }
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
+
+  function toggleOpen(e: React.MouseEvent) {
+    e.stopPropagation();
+    setOpen((prev) => {
+      if (!prev && buttonRef.current) {
+        const rect = buttonRef.current.getBoundingClientRect();
+        setMenuPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+      }
+      return !prev;
+    });
+  }
 
   if (!canDelete && !canDuplicate) return null;
 
@@ -71,40 +92,45 @@ function NodeMenu({
   }
 
   return (
-    <div ref={ref} className="relative">
+    <>
       <button
+        ref={buttonRef}
         type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          setOpen((prev) => !prev);
-        }}
+        onClick={toggleOpen}
         className="text-text-muted hover:text-text-primary hover:bg-surface-secondary flex size-6 shrink-0 items-center justify-center rounded"
       >
         <MoreVertical className="size-3.5" />
       </button>
-      {open && (
-        <div className="absolute right-0 top-7 z-20 min-w-[190px] rounded-card border border-border bg-white py-1 shadow-lg">
-          {items.map((item) => (
-            <button
-              key={item.label}
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setOpen(false);
-                item.onClick();
-              }}
-              className={cn(
-                "flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors",
-                item.danger ? "text-danger hover:bg-red-50" : "text-text-primary hover:bg-surface-secondary",
-              )}
-            >
-              <item.icon className="size-3.5" />
-              {item.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+      {open &&
+        menuPos &&
+        createPortal(
+          <div
+            ref={menuRef}
+            style={{ position: "fixed", top: menuPos.top, right: menuPos.right }}
+            className="z-[1000] min-w-[190px] rounded-card border border-border bg-white py-1 shadow-lg"
+          >
+            {items.map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setOpen(false);
+                  item.onClick();
+                }}
+                className={cn(
+                  "flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors",
+                  item.danger ? "text-danger hover:bg-red-50" : "text-text-primary hover:bg-surface-secondary",
+                )}
+              >
+                <item.icon className="size-3.5" />
+                {item.label}
+              </button>
+            ))}
+          </div>,
+          document.body,
+        )}
+    </>
   );
 }
 
