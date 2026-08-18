@@ -5,8 +5,26 @@ import { authOptions } from "@/lib/auth";
 import { pushRunToNextStep, removeRunFromWorkflow } from "@/lib/automation/engine";
 import { checkPermission } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
+import { mapWithConcurrency } from "@/lib/utils/concurrency";
 
+// This is a per-request chunk size, not a hard ceiling on a selection --
+// useBulkRunAction on the client splits a larger "select all" into
+// multiple sequential requests of this size, so every selected contact
+// actually gets processed instead of the request either rejecting outright
+// or (as it used to) silently processing only the first N with no way to
+// reach the rest.
+// Kept in sync with BULK_RUN_CHUNK_SIZE in useAutomations.ts, which chunks
+// a larger selection into requests of this size (can't import a shared
+// constant here -- Next.js route files only allow a fixed set of named
+// exports, route handlers and config options, nothing else).
 const MAX_RUNS_PER_REQUEST = 200;
+const RUN_CONCURRENCY = 5;
+
+// "Push to Next Step" can run a real step (send an email, etc.) per contact --
+// same reasoning as resume-automations' cron: bounded concurrency instead of
+// firing all of them at once, and an explicit budget since a chunk of 200
+// heavier steps could otherwise run past Vercel's default limit.
+export const maxDuration = 60;
 
 /** "Remove from Workflow" / "Push to Next Step" for a batch of contacts' runs — the builder's per-step contact list bulk actions. */
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
@@ -33,8 +51,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     select: { id: true },
   });
 
-  const results = await Promise.all(
-    owned.map((run) => (action === "remove" ? removeRunFromWorkflow(run.id) : pushRunToNextStep(run.id))),
+  const results = await mapWithConcurrency(owned, RUN_CONCURRENCY, (run) =>
+    action === "remove" ? removeRunFromWorkflow(run.id) : pushRunToNextStep(run.id),
   );
 
   return NextResponse.json({ success: true, count: results.filter(Boolean).length });

@@ -111,16 +111,35 @@ export function useNodeContacts(automationId: string | undefined, nodeId: string
   return { ...query, runs: query.data?.runs };
 }
 
-/** "Remove from Workflow" / "Push to Next Step" for a batch of selected contacts' runs. */
+// Matches MAX_RUNS_PER_REQUEST in the bulk route -- a selection larger than
+// this is split into sequential requests below rather than sent in one
+// shot (which the server would reject outright) or silently truncated to
+// the first chunk (which used to leave the rest of a large "select all"
+// unprocessed with no indication anything was left behind).
+const BULK_RUN_CHUNK_SIZE = 200;
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) chunks.push(items.slice(i, i + size));
+  return chunks;
+}
+
+/** "Remove from Workflow" / "Push to Next Step" for a batch of selected contacts' runs -- transparently chunks a selection larger than one request can hold. */
 export function useBulkRunAction(automationId: string | undefined) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ runIds, action }: { runIds: string[]; action: "remove" | "advance" }) =>
-      apiFetch<{ success: true; count: number }>(`/api/automations/${automationId}/runs/bulk`, {
-        method: "PATCH",
-        body: JSON.stringify({ runIds, action }),
-      }),
+    mutationFn: async ({ runIds, action }: { runIds: string[]; action: "remove" | "advance" }) => {
+      let count = 0;
+      for (const batch of chunk(runIds, BULK_RUN_CHUNK_SIZE)) {
+        const result = await apiFetch<{ success: true; count: number }>(`/api/automations/${automationId}/runs/bulk`, {
+          method: "PATCH",
+          body: JSON.stringify({ runIds: batch, action }),
+        });
+        count += result.count;
+      }
+      return { success: true as const, count };
+    },
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["automation-node-counts", automationId] });
       queryClient.invalidateQueries({ queryKey: ["automation-node-contacts", automationId] });

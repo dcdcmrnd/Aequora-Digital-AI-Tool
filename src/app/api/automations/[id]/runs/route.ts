@@ -29,12 +29,17 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       ...(nodeId ? {} : { steps: { orderBy: { createdAt: "asc" } } }),
     },
     orderBy: { createdAt: "desc" },
-    // The full Execution Log (no nodeId) used to cap at 50, silently
-    // truncating any automation with more contacts than that -- the
-    // Execution Log tab now does its own client-side search + pagination
-    // over the whole list, so this only needs to guard against a truly
-    // runaway automation, not the couple hundred contacts a normal one has.
-    take: nodeId ? 200 : 5000,
+    // Both branches used to cap lower (200 for a single node, 50 for the
+    // full log) -- the node-counts badge on the canvas (a true, uncapped
+    // DB count) always showed the real total, but this endpoint silently
+    // truncated the actual list to fewer than that. Selecting "all" in the
+    // contacts-at-this-step panel only ever selected what was loaded, so
+    // bulk Push/Remove processed the first 200 and silently left the rest
+    // still sitting at that step -- the badge count and the panel's own
+    // list now agree, and "select all" actually means all. 5000 is a
+    // shared, generous safety ceiling against a truly runaway automation,
+    // not a normal one.
+    take: 5000,
   });
 
   return NextResponse.json({ runs });
