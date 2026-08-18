@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/Button";
+import { DISPLAY_TIMEZONE } from "@/lib/utils";
 import toast from "react-hot-toast";
 
 interface Document {
@@ -189,7 +190,7 @@ export function DocumentsManager({ initial }: Props) {
                   {formatBytes(doc.fileSize)}
                   {doc.fileSize ? " · " : ""}
                   Uploaded by {doc.uploadedBy.name} ·{" "}
-                  {new Date(doc.createdAt).toLocaleDateString()}
+                  {new Date(doc.createdAt).toLocaleDateString([], { timeZone: DISPLAY_TIMEZONE })}
                 </p>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">

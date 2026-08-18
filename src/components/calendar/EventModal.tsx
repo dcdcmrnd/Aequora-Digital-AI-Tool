@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { cn } from "@/lib/utils";
+import { cn, DISPLAY_TIMEZONE } from "@/lib/utils";
 import type { CalendarEvent, CalendarEventType } from "@/types";
 import { EVENT_TYPE_COLORS } from "@/types";
 import { Avatar } from "@/components/ui/Avatar";
@@ -157,9 +157,9 @@ export function EventModal({ mode, event, defaultDate, teamMembers, currentUserI
   const formatDateRange = (ev: CalendarEvent) => {
     const s = new Date(ev.startDate);
     const e = new Date(ev.endDate);
-    const opts: Intl.DateTimeFormatOptions = { weekday: "short", month: "short", day: "numeric" };
+    const opts: Intl.DateTimeFormatOptions = { weekday: "short", month: "short", day: "numeric", timeZone: DISPLAY_TIMEZONE };
     if (ev.allDay) return `${s.toLocaleDateString([], opts)}${s.toDateString() !== e.toDateString() ? ` – ${e.toLocaleDateString([], opts)}` : ""}`;
-    const timeOpts: Intl.DateTimeFormatOptions = { hour: "numeric", minute: "2-digit" };
+    const timeOpts: Intl.DateTimeFormatOptions = { hour: "numeric", minute: "2-digit", timeZone: DISPLAY_TIMEZONE };
     return `${s.toLocaleDateString([], opts)}, ${s.toLocaleTimeString([], timeOpts)} – ${e.toLocaleTimeString([], timeOpts)}`;
   };
 

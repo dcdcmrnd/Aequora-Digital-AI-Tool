@@ -8,7 +8,7 @@ import { ContactFormModal } from "@/components/contacts/ContactFormModal";
 import { ComposeModal } from "./ComposeModal";
 import { ContactQuickView } from "./ContactQuickView";
 import { SignatureManager } from "./SignatureManager";
-import { cn } from "@/lib/utils";
+import { cn, DISPLAY_TIMEZONE } from "@/lib/utils";
 
 interface ThreadSummary {
   id: string;
@@ -54,10 +54,13 @@ function formatDate(dateStr: string) {
   if (!dateStr) return "";
   const d = new Date(dateStr);
   const now = new Date();
-  const isToday = d.toDateString() === now.toDateString();
+  // Compared as PH calendar days, not the browser's local day -- otherwise
+  // the "is this today" boundary could disagree with the PH-time clock this
+  // renders below it.
+  const isToday = d.toLocaleDateString("en-CA", { timeZone: DISPLAY_TIMEZONE }) === now.toLocaleDateString("en-CA", { timeZone: DISPLAY_TIMEZONE });
   return isToday
-    ? d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-    : d.toLocaleDateString([], { month: "short", day: "numeric" });
+    ? d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", timeZone: DISPLAY_TIMEZONE })
+    : d.toLocaleDateString([], { month: "short", day: "numeric", timeZone: DISPLAY_TIMEZONE });
 }
 
 function getInitials(name: string) {

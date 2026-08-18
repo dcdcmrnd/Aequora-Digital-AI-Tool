@@ -7,6 +7,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { StatusBadge } from "@/components/ui/Badge";
 import { UserPermissionsEditor } from "./UserPermissionsEditor";
 import { ProjectAccessEditor } from "./ProjectAccessEditor";
+import { DISPLAY_TIMEZONE } from "@/lib/utils";
 import type { UserProfile, PermissionType } from "@/types";
 import toast from "react-hot-toast";
 
@@ -136,7 +137,7 @@ export function EditUserModal({ user, open, onClose, onSuccess, currentUserId }:
               {user.activatedAt && (
                 <div>
                   <p className="text-text-muted mb-0.5">Joined</p>
-                  <p className="font-medium">{new Date(user.activatedAt).toLocaleDateString()}</p>
+                  <p className="font-medium">{new Date(user.activatedAt).toLocaleDateString([], { timeZone: DISPLAY_TIMEZONE })}</p>
                 </div>
               )}
             </div>

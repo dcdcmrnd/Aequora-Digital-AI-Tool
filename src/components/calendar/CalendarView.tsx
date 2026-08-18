@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { cn } from "@/lib/utils";
+import { cn, DISPLAY_TIMEZONE } from "@/lib/utils";
 import type { CalendarEvent } from "@/types";
 import { EVENT_TYPE_COLORS } from "@/types";
 import { EventModal } from "./EventModal";
@@ -27,7 +27,7 @@ function isSameDay(a: Date, b: Date) {
 
 function formatTime(iso: string) {
   const d = new Date(iso);
-  return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", timeZone: DISPLAY_TIMEZONE });
 }
 
 export function CalendarView({ initialEvents, teamMembers, currentUserId }: Props) {

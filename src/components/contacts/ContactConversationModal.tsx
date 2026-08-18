@@ -6,7 +6,7 @@ import toast from "react-hot-toast";
 
 import { ComposeModal } from "@/components/inbox/ComposeModal";
 import { Modal } from "@/components/ui/Modal";
-import { cn } from "@/lib/utils";
+import { cn, DISPLAY_TIMEZONE } from "@/lib/utils";
 
 interface ThreadSummary {
   id: string;
@@ -36,7 +36,7 @@ interface ThreadDetail {
 function formatDate(dateStr: string) {
   if (!dateStr) return "";
   const d = new Date(dateStr);
-  return d.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
+  return d.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric", timeZone: DISPLAY_TIMEZONE });
 }
 
 interface ContactConversationModalProps {

@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { checkPermission, getAccessibleProjectIds } from "@/lib/permissions";
-import { getGreeting } from "@/lib/utils";
+import { DISPLAY_TIMEZONE, getGreeting } from "@/lib/utils";
 import { DailyBriefingWidget } from "@/components/dashboard/DailyBriefingWidget";
 import { OpportunityBadge } from "@/components/leads/OpportunityBadge";
 
@@ -78,7 +78,7 @@ export default async function DashboardPage() {
           {greeting}, {session.user.name?.split(" ")[0]} 👋
         </h1>
         <p className="text-text-secondary mt-1 text-sm">
-          {now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+          {now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: DISPLAY_TIMEZONE })}
         </p>
       </div>
 
@@ -183,11 +183,13 @@ export default async function DashboardPage() {
                         {new Date(a.createdAt).toLocaleTimeString("en-US", {
                           hour: "numeric",
                           minute: "2-digit",
+                          timeZone: DISPLAY_TIMEZONE,
                         })}
                         {" · "}
                         {new Date(a.createdAt).toLocaleDateString("en-US", {
                           month: "short",
                           day: "numeric",
+                          timeZone: DISPLAY_TIMEZONE,
                         })}
                       </p>
                     </div>

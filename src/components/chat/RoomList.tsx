@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@/lib/utils";
+import { cn, DISPLAY_TIMEZONE } from "@/lib/utils";
 import { Avatar } from "@/components/ui/Avatar";
 import type { ChatRoom } from "./ChatPageClient";
 
@@ -98,7 +98,7 @@ export function RoomList({ rooms, activeRoomId, currentUserId, onSelect }: Props
 function formatTime(iso: string) {
   const d = new Date(iso);
   const now = new Date();
-  const isToday = d.toDateString() === now.toDateString();
-  if (isToday) return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-  return d.toLocaleDateString([], { month: "short", day: "numeric" });
+  const isToday = d.toLocaleDateString("en-CA", { timeZone: DISPLAY_TIMEZONE }) === now.toLocaleDateString("en-CA", { timeZone: DISPLAY_TIMEZONE });
+  if (isToday) return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", timeZone: DISPLAY_TIMEZONE });
+  return d.toLocaleDateString([], { month: "short", day: "numeric", timeZone: DISPLAY_TIMEZONE });
 }

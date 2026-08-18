@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
+import { DISPLAY_TIMEZONE } from "@/lib/utils";
 import { runAiPrompt } from "@/lib/ai";
 import { verifyAndCacheForContacts } from "@/lib/emailVerification";
 import { sendEmail } from "@/lib/gmail";
@@ -687,7 +688,7 @@ async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string,
               where: { id: run.id },
               data: { status: "waiting", currentNodeId: node.id, waitUntil: target },
             });
-            await logStep(run.id, node.id, node.type, "waiting", `Waiting until ${target.toLocaleString()} (${data.amount ?? 1} ${data.unit ?? "days"} ${direction} event date)`);
+            await logStep(run.id, node.id, node.type, "waiting", `Waiting until ${target.toLocaleString("en-US", { timeZone: DISPLAY_TIMEZONE })} (${data.amount ?? 1} ${data.unit ?? "days"} ${direction} event date)`);
           } catch (err) {
             await logStep(run.id, node.id, node.type, "error", err instanceof Error ? err.message : "Unknown error");
             throw err;

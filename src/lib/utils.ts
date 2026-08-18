@@ -5,10 +5,15 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+// The whole app displays dates/times in Philippine time regardless of the
+// viewer's own device/browser timezone, so everyone sees the same clock
+// rather than whatever timezone happens to be set locally.
+export const DISPLAY_TIMEZONE = "Asia/Manila";
+
 export function formatDate(date: Date | string | null): string {
   if (!date) return "";
   const d = typeof date === "string" ? new Date(date) : date;
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: DISPLAY_TIMEZONE });
 }
 
 export function formatRelativeTime(date: Date | string): string {
@@ -27,7 +32,11 @@ export function formatRelativeTime(date: Date | string): string {
 }
 
 export function getGreeting(): string {
-  const hour = new Date().getHours();
+  // Hour-of-day in DISPLAY_TIMEZONE, not the runtime's own timezone -- this
+  // renders server-side, where the server's local time is UTC (Vercel),
+  // which would otherwise call the middle of the PH afternoon "evening."
+  const hour =
+    Number(new Intl.DateTimeFormat("en-US", { hour: "numeric", hour12: false, timeZone: DISPLAY_TIMEZONE }).format(new Date())) % 24;
   if (hour < 12) return "Good morning";
   if (hour < 17) return "Good afternoon";
   return "Good evening";
