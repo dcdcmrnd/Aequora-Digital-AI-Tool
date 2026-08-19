@@ -1,6 +1,8 @@
 export interface RetryOptions {
   retries?: number;
   backoffMs?: number;
+  /** Only retry errors this returns true for; others rethrow immediately. Defaults to retrying everything. */
+  shouldRetry?: (error: unknown) => boolean;
 }
 
 /**
@@ -9,7 +11,7 @@ export interface RetryOptions {
  */
 export async function withRetry<T>(
   fn: () => Promise<T>,
-  { retries = 2, backoffMs = 300 }: RetryOptions = {},
+  { retries = 2, backoffMs = 300, shouldRetry = () => true }: RetryOptions = {},
 ): Promise<T> {
   let lastError: unknown;
 
@@ -18,8 +20,10 @@ export async function withRetry<T>(
       return await fn();
     } catch (error) {
       lastError = error;
-      if (attempt < retries) {
+      if (attempt < retries && shouldRetry(error)) {
         await new Promise((resolve) => setTimeout(resolve, backoffMs * (attempt + 1)));
+      } else {
+        throw error;
       }
     }
   }

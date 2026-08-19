@@ -1,5 +1,21 @@
 import { google } from "googleapis";
 import { prisma } from "@/lib/prisma";
+import { withRetry } from "@/lib/utils/retry";
+
+/**
+ * Gmail's per-user send quota is tight enough that a handful of automation
+ * steps firing at once (e.g. bulk "Push to Next Step" across several
+ * contacts) routinely trips it — "Too many concurrent requests for user" or
+ * "Quota exceeded ... Units per minute per user". Both are transient: the
+ * quota window clears within seconds, so this is worth a few spaced-out
+ * retries instead of immediately failing the automation run.
+ */
+function isGmailRateLimitError(error: unknown): boolean {
+  const code = (error as { code?: number })?.code;
+  const status = (error as { response?: { status?: number } })?.response?.status;
+  const message = error instanceof Error ? error.message : String(error);
+  return code === 429 || status === 429 || /too many concurrent requests|quota exceeded/i.test(message);
+}
 
 function createOAuthClient() {
   return new google.auth.OAuth2(
@@ -171,10 +187,14 @@ export async function sendEmail(fields: {
     from: `Aequora Digital <${senderEmail}>`,
   });
 
-  const res = await gmail.users.messages.send({
-    userId: "me",
-    requestBody: { raw, threadId: fields.threadId },
-  });
+  const res = await withRetry(
+    () => gmail.users.messages.send({ userId: "me", requestBody: { raw, threadId: fields.threadId } }),
+    {
+      retries: 4,
+      backoffMs: 3_000,
+      shouldRetry: isGmailRateLimitError,
+    },
+  );
 
   return { id: res.data.id, threadId: res.data.threadId };
 }
