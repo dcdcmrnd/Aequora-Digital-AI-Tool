@@ -388,11 +388,17 @@ export async function removeRunFromWorkflow(runId: string): Promise<boolean> {
  * Next Step" action in the builder's per-step contact list. Unlike
  * `resumeRun` (which only resumes a genuine wait), this also works for a run
  * stuck in "error" status, letting someone unblock a contact past a failed
- * step (e.g. a webhook that 500'd) without waiting for a fix.
+ * step (e.g. a webhook that 500'd) without waiting for a fix. Also covers
+ * "running": that status is only ever meant to be held for the duration of
+ * one runLoop call, but if the process handling it dies mid-step (a
+ * serverless timeout, a crash) the DB update to "error"/"completed" never
+ * lands and the run is orphaned there indefinitely — otherwise
+ * unrecoverable, since nothing else ever revisits a "running" row.
  */
 export async function pushRunToNextStep(runId: string): Promise<boolean> {
   const run = await prisma.automationRun.findUnique({ where: { id: runId } });
-  if (!run || !run.currentNodeId || (run.status !== "waiting" && run.status !== "error")) return false;
+  if (!run || !run.currentNodeId) return false;
+  if (!["waiting", "error", "running"].includes(run.status)) return false;
 
   const automation = await prisma.automation.findUnique({ where: { id: run.automationId } });
   if (!automation) return false;
