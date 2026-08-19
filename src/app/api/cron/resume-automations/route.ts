@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { resumeRun } from "@/lib/automation/engine";
+import { findStuckRunIds, pushRunToNextStep, resumeRun } from "@/lib/automation/engine";
 import { prisma } from "@/lib/prisma";
 import { mapWithConcurrency } from "@/lib/utils/concurrency";
 
@@ -38,5 +38,24 @@ export async function GET(req: NextRequest) {
   // throwing) so one bad run can never abort the rest of this batch.
   await mapWithConcurrency(dueRuns, RESUME_CONCURRENCY, (run) => resumeRun(run.id));
 
-  return NextResponse.json({ resumed: dueRuns.length });
+  // Runs left in "running" past STALE_RUNNING_MS mean the process handling
+  // them died mid-step (timeout, crash) before writing back a final status --
+  // nothing else ever revisits that row, so without this sweep a contact
+  // stays silently stuck until someone notices and manually pushes it.
+  const stuckRunIds = await findStuckRunIds();
+  const recovered = await mapWithConcurrency(stuckRunIds, RESUME_CONCURRENCY, async (runId) => {
+    try {
+      return await pushRunToNextStep(runId, "Automatically recovered — run was stuck mid-step");
+    } catch (err) {
+      // Unlike resumeRun, pushRunToNextStep has no built-in catch-all -- a
+      // single DB hiccup here must not throw out of the worker and abort
+      // the rest of this unattended sweep (mapWithConcurrency awaits each
+      // fn() call inline, so an uncaught rejection kills every run still
+      // queued behind it in that worker).
+      console.error(`Failed to recover stuck run ${runId}`, err);
+      return false;
+    }
+  });
+
+  return NextResponse.json({ resumed: dueRuns.length, recovered: recovered.filter(Boolean).length });
 }

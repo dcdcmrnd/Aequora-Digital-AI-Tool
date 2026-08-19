@@ -395,7 +395,7 @@ export async function removeRunFromWorkflow(runId: string): Promise<boolean> {
  * lands and the run is orphaned there indefinitely — otherwise
  * unrecoverable, since nothing else ever revisits a "running" row.
  */
-export async function pushRunToNextStep(runId: string): Promise<boolean> {
+export async function pushRunToNextStep(runId: string, label = "Manually pushed to next step"): Promise<boolean> {
   const run = await prisma.automationRun.findUnique({ where: { id: runId } });
   if (!run || !run.currentNodeId) return false;
   if (!["waiting", "error", "running"].includes(run.status)) return false;
@@ -410,7 +410,7 @@ export async function pushRunToNextStep(runId: string): Promise<boolean> {
     where: { id: run.id },
     data: { status: "running", waitUntil: null, waitToken: null, detail: null },
   });
-  await logStep(run.id, run.currentNodeId, "manual", "success", "Manually pushed to next step");
+  await logStep(run.id, run.currentNodeId, "manual", "success", label);
 
   if (!next) {
     await prisma.automationRun.update({ where: { id: run.id }, data: { status: "completed", currentNodeId: null } });
@@ -419,6 +419,24 @@ export async function pushRunToNextStep(runId: string): Promise<boolean> {
 
   await runLoop(run.id, flow, next);
   return true;
+}
+
+/** A "running" run is only ever meant to hold that status for the duration of one runLoop call — past this, it can only mean the process handling it died mid-step. */
+const STALE_RUNNING_MS = 10 * 60_000;
+
+/**
+ * IDs of runs orphaned in "running" (see `pushRunToNextStep`'s doc comment)
+ * across every automation — the daily cron sweep pushes each of these past
+ * its last known step (bounded concurrency, same as its due-wait handling),
+ * so a process dying mid-step doesn't leave a contact silently stuck until
+ * someone happens to notice and manually push it.
+ */
+export async function findStuckRunIds(): Promise<string[]> {
+  const staleRuns = await prisma.automationRun.findMany({
+    where: { status: "running", currentNodeId: { not: null }, updatedAt: { lte: new Date(Date.now() - STALE_RUNNING_MS) } },
+    select: { id: true },
+  });
+  return staleRuns.map((r) => r.id);
 }
 
 async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string, enrollmentDepth = 0): Promise<void> {
