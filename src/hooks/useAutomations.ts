@@ -116,7 +116,7 @@ export function useNodeContacts(automationId: string | undefined, nodeId: string
 // shot (which the server would reject outright) or silently truncated to
 // the first chunk (which used to leave the rest of a large "select all"
 // unprocessed with no indication anything was left behind).
-const BULK_RUN_CHUNK_SIZE = 200;
+const BULK_RUN_CHUNK_SIZE = 40;
 
 function chunk<T>(items: T[], size: number): T[][] {
   const chunks: T[][] = [];
@@ -130,13 +130,29 @@ export function useBulkRunAction(automationId: string | undefined) {
 
   return useMutation({
     mutationFn: async ({ runIds, action }: { runIds: string[]; action: "remove" | "advance" }) => {
+      const verb = action === "remove" ? "Removing" : "Pushing";
+      const chunks = chunk(runIds, BULK_RUN_CHUNK_SIZE);
+      // "Push to Next Step" over a large selection can take several minutes
+      // (Gmail sends are paced to ~1/second to stay under its quota -- see
+      // throttleGmailSend in lib/gmail.ts) -- a single toast at the very end
+      // otherwise looks indistinguishable from the request having hung.
+      const toastId = chunks.length > 1 ? toast.loading(`${verb} 0 of ${runIds.length}...`) : undefined;
       let count = 0;
-      for (const batch of chunk(runIds, BULK_RUN_CHUNK_SIZE)) {
-        const result = await apiFetch<{ success: true; count: number }>(`/api/automations/${automationId}/runs/bulk`, {
-          method: "PATCH",
-          body: JSON.stringify({ runIds: batch, action }),
-        });
-        count += result.count;
+      try {
+        for (const batch of chunks) {
+          const result = await apiFetch<{ success: true; count: number }>(`/api/automations/${automationId}/runs/bulk`, {
+            method: "PATCH",
+            body: JSON.stringify({ runIds: batch, action }),
+          });
+          count += result.count;
+          if (toastId) toast.loading(`${verb} ${count} of ${runIds.length}...`, { id: toastId });
+          // Refresh progressively rather than only once every chunk is done,
+          // so the builder's node badges reflect contacts as they actually move.
+          queryClient.invalidateQueries({ queryKey: ["automation-node-counts", automationId] });
+          queryClient.invalidateQueries({ queryKey: ["automation-node-contacts", automationId] });
+        }
+      } finally {
+        if (toastId) toast.dismiss(toastId);
       }
       return { success: true as const, count };
     },

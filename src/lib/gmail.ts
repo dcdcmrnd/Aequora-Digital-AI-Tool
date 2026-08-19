@@ -17,6 +17,30 @@ function isGmailRateLimitError(error: unknown): boolean {
   return code === 429 || status === 429 || /too many concurrent requests|quota exceeded/i.test(message);
 }
 
+/**
+ * Serializes actual Gmail send calls with a minimum spacing between them,
+ * shared across every caller in this process — bulk automation pushes,
+ * individual automation sends, and Inbox replies alike. Retrying after a 429
+ * (above) only reacts once the quota's already been tripped; pacing calls
+ * out up front means a burst (e.g. bulk-pushing hundreds of contacts through
+ * a Send Email step) mostly never trips it in the first place.
+ */
+let gmailSendChain: Promise<void> = Promise.resolve();
+let lastGmailSendAt = 0;
+const MIN_GMAIL_SEND_INTERVAL_MS = 1_100;
+
+function throttleGmailSend<T>(fn: () => Promise<T>): Promise<T> {
+  const scheduled = gmailSendChain.then(async () => {
+    const wait = Math.max(0, lastGmailSendAt + MIN_GMAIL_SEND_INTERVAL_MS - Date.now());
+    if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+    lastGmailSendAt = Date.now();
+  });
+  // Keep the chain alive even if this scheduling step's wait somehow rejects --
+  // otherwise every send queued behind it would inherit the rejection too.
+  gmailSendChain = scheduled.catch(() => {});
+  return scheduled.then(fn);
+}
+
 function createOAuthClient() {
   return new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
@@ -187,13 +211,15 @@ export async function sendEmail(fields: {
     from: `Aequora Digital <${senderEmail}>`,
   });
 
-  const res = await withRetry(
-    () => gmail.users.messages.send({ userId: "me", requestBody: { raw, threadId: fields.threadId } }),
-    {
-      retries: 4,
-      backoffMs: 3_000,
-      shouldRetry: isGmailRateLimitError,
-    },
+  const res = await throttleGmailSend(() =>
+    withRetry(
+      () => gmail.users.messages.send({ userId: "me", requestBody: { raw, threadId: fields.threadId } }),
+      {
+        retries: 4,
+        backoffMs: 3_000,
+        shouldRetry: isGmailRateLimitError,
+      },
+    ),
   );
 
   return { id: res.data.id, threadId: res.data.threadId };

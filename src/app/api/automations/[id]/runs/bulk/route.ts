@@ -13,11 +13,18 @@ import { mapWithConcurrency } from "@/lib/utils/concurrency";
 // actually gets processed instead of the request either rejecting outright
 // or (as it used to) silently processing only the first N with no way to
 // reach the rest.
+// Sized for the worst case, not the average: every run in the chunk sitting
+// at a Send Email step. Gmail sends are now globally paced to ~1/second
+// (see throttleGmailSend in lib/gmail.ts) to avoid tripping its per-user
+// quota, so an all-email chunk takes roughly MAX_RUNS_PER_REQUEST seconds --
+// this needs to stay comfortably under maxDuration below, or the request
+// gets killed mid-batch and the un-run remainder looks like a stuck error
+// instead of just "still going."
 // Kept in sync with BULK_RUN_CHUNK_SIZE in useAutomations.ts, which chunks
 // a larger selection into requests of this size (can't import a shared
 // constant here -- Next.js route files only allow a fixed set of named
 // exports, route handlers and config options, nothing else).
-const MAX_RUNS_PER_REQUEST = 200;
+const MAX_RUNS_PER_REQUEST = 40;
 const RUN_CONCURRENCY = 5;
 
 // "Push to Next Step" can run a real step (send an email, etc.) per contact --
