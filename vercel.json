@@ -6,7 +6,7 @@
   "crons": [
     {
       "path": "/api/cron/resume-automations",
-      "schedule": "0 0 * * *"
+      "schedule": "*/5 * * * *"
     },
     {
       "path": "/api/cron/check-new-mail",
