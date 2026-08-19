@@ -439,6 +439,54 @@ export async function findStuckRunIds(): Promise<string[]> {
   return staleRuns.map((r) => r.id);
 }
 
+const OPPORTUNISTIC_SWEEP_MAX_ITEMS = 5;
+const OPPORTUNISTIC_SWEEP_COOLDOWN_MS = 30_000;
+let lastOpportunisticSweepAt = 0;
+
+/**
+ * Piggybacks a small, bounded pass of overdue automation work (due waits,
+ * runs stuck in "running") onto ordinary app traffic — called from the
+ * authenticated layout on every navigation. This project's Vercel plan caps
+ * its cron to once a day, so relying on that alone leaves a due wait or a
+ * stuck run sitting for up to 24 hours; real use of the app is a much
+ * better proxy for "someone cares about this right now" than a fixed daily
+ * tick. Deliberately awaited inline rather than fire-and-forget — a Vercel
+ * serverless function isn't guaranteed to keep running background work once
+ * its response is sent — so this stays capped small enough not to
+ * noticeably slow a page load down. A backlog bigger than the cap just
+ * drains a few more items on the next navigation instead of all at once;
+ * the daily cron still exists as a backstop for when nobody's using the app.
+ */
+export async function maybeRunOpportunisticSweep(): Promise<void> {
+  if (Date.now() - lastOpportunisticSweepAt < OPPORTUNISTIC_SWEEP_COOLDOWN_MS) return;
+  lastOpportunisticSweepAt = Date.now();
+
+  try {
+    const dueWaits = await prisma.automationRun.findMany({
+      where: { status: "waiting", waitUntil: { lte: new Date() } },
+      select: { id: true },
+      take: OPPORTUNISTIC_SWEEP_MAX_ITEMS,
+    });
+    for (const run of dueWaits) await resumeRun(run.id);
+
+    const remaining = OPPORTUNISTIC_SWEEP_MAX_ITEMS - dueWaits.length;
+    if (remaining > 0) {
+      const stuckIds = (await findStuckRunIds()).slice(0, remaining);
+      for (const runId of stuckIds) {
+        try {
+          await pushRunToNextStep(runId, "Automatically recovered — run was stuck mid-step");
+        } catch (err) {
+          console.error(`Opportunistic sweep failed to recover stuck run ${runId}`, err);
+        }
+      }
+    }
+  } catch (err) {
+    // Must never break a page load -- this is a best-effort side effect of
+    // navigating the app, not something any request actually depends on.
+    console.error("Opportunistic automation sweep failed", err);
+  }
+}
+
 async function runLoop(runId: string, flow: AutomationFlow, startNodeId: string, enrollmentDepth = 0): Promise<void> {
   const run = await prisma.automationRun.findUnique({ where: { id: runId } });
   if (!run) return;
