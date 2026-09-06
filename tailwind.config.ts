@@ -41,6 +41,18 @@ const config: Config = {
       width: {
         sidebar: "260px",
       },
+      keyframes: {
+        // Idle "suspended in space" drift for the What We Do floating service cards -- runs on
+        // a layer separate from both the scroll-driven transform and the hover transform, so it
+        // never fights either. Per-card duration/delay (inline style) keeps the three out of sync.
+        "aequora-float": {
+          "0%, 100%": { transform: "translate3d(0, 0, 0) rotate(0deg)" },
+          "50%": { transform: "translate3d(5px, -9px, 0) rotate(1deg)" },
+        },
+      },
+      animation: {
+        "aequora-float": "aequora-float 9s ease-in-out infinite",
+      },
     },
   },
   plugins: [require("tailwindcss-animate")],
